@@ -1,0 +1,16 @@
+Usage: sess_id [options]
+
+General options:
+ -help            Display this summary
+ -context val     Set the session ID context
+
+Input options:
+ -in val          Input file - default stdin
+ -inform PEM|DER  Input format - default PEM (DER or PEM)
+
+Output options:
+ -out outfile     Output file - default stdout
+ -outform format  Output format - default PEM (PEM, DER or NSS)
+ -text            Print ssl session id details
+ -cert            Output certificate 
+ -noout           Don't output the encoded session info

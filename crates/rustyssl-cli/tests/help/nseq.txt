@@ -1,0 +1,17 @@
+Usage: nseq [options]
+
+General options:
+ -help               Display this summary
+
+Input options:
+ -in infile          Input file
+
+Output options:
+ -toseq              Output NS Sequence file
+ -out outfile        Output file
+
+Provider options:
+ -provider-path val  Provider load path (must be before 'provider' argument if required)
+ -provider val       Provider to load (can be specified multiple times)
+ -provparam val      Set a provider key-value parameter
+ -propquery val      Property query used when fetching algorithms

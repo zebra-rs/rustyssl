@@ -22,7 +22,8 @@
 //! With `--ssl`, or the name of one of them, it runs libssl's test programs instead
 //! (`tests/openssl-suite/ssl.txt`; see [`ssl`]), and writes a report of what fails on rustyssl.
 //! With `--all`, it runs the whole upstream test tree, every recipe of `test/recipes/` (see
-//! [`recipes`]), and reports the eligible pass rate (`target/upstream-report.md`).
+//! [`recipes`]), and reports the eligible pass rate (`target/upstream-report.md`); `--all --cli
+//! ours` runs them with our `openssl` tool on rustyssl's libraries.
 
 mod recipes;
 mod ssl;
@@ -312,12 +313,32 @@ fn failure_lines(text: &str) -> String {
 pub fn run(args: &[String]) -> Result {
     let root = workspace_root();
     if args.iter().any(|a| a == "--all") {
-        let rest: Vec<String> = args.iter().filter(|a| *a != "--all").cloned().collect();
+        let mut rest: Vec<String> = args.iter().filter(|a| *a != "--all").cloned().collect();
+        // `--cli ours` (or `--cli upstream`, the default): which openssl tool runs on rustyssl.
+        let mut ours_cli = false;
+        if let Some(i) = rest.iter().position(|a| a == "--cli") {
+            match rest.get(i + 1).map(String::as_str) {
+                Some("ours") => ours_cli = true,
+                Some("upstream") => {}
+                _ => return Err("usage: --cli ours|upstream".into()),
+            }
+            rest.drain(i..i + 2);
+        }
         let (reference, dist) = prepare(&root)?;
         let version = reference::vendored_version(&root)?;
         let ssl_list = ssl::List::load(&root)?;
         let base = [crypto_build(), ssl::build(&ssl_list)];
-        return recipes::run(&root, &version, &reference, &dist.join("lib"), &base, &rest);
+        let cli = dist.join("bin").join(crate::dist::CLI_NAME);
+        let cli = ours_cli.then_some(cli.as_path());
+        return recipes::run(
+            &root,
+            &version,
+            &reference,
+            &dist.join("lib"),
+            cli,
+            &base,
+            &rest,
+        );
     }
     // `--ssl` (or the name of one of its programs or `ssl_test` files) selects libssl's
     // programs, which run apart from the others.

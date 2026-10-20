@@ -1,0 +1,19 @@
+[package]
+name = "rustyssl-cli"
+description = "The openssl command-line tool, on the public C API (ADR 0007)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "openssl"
+path = "src/main.rs"
+
+[dependencies]
+rustyssl-ossl.workspace = true
+
+[lints]
+workspace = true

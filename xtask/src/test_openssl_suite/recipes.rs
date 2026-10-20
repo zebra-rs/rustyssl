@@ -63,6 +63,19 @@ if [ -n \"$RUSTYSSL_LIBDIR\" ]; then\n\
 \tfi\n\
 fi\n";
 
+/// `util/shlib_wrap.sh.in`'s second change: `RUSTYSSL_CLI` runs another `openssl` tool in
+/// place of the tree's `apps/openssl` (`--cli ours`, ADR 0007, section 4). The recipes find the
+/// tool through `bldtop_file("apps", "openssl")`, and every run of it goes through here.
+const CLI_FROM: &str = "cmd=\"$1\"; [ -x \"$cmd\" ] || cmd=\"$cmd${EXE_EXT}\"\n";
+const CLI_TO: &str = r#"# rustyssl: RUSTYSSL_CLI replaces this tree's apps/openssl.
+if [ -n "$RUSTYSSL_CLI" ] && [ "$(basename "$1")" = openssl ] \
+	&& [ "$(cd "$(dirname "$1")" 2>/dev/null && pwd -P)" = "$(cd "${THERE}/apps" 2>/dev/null && pwd -P)" ]; then
+	shift
+	set -- "$RUSTYSSL_CLI" "$@"
+fi
+cmd="$1"; [ -x "$cmd" ] || cmd="$cmd${EXE_EXT}"
+"#;
+
 /// The patches to the reference's source, after the libssl and crypto builds' own.
 fn patches(src: &Path, base: &[Build]) -> Result<Vec<(&'static str, String, String)>> {
     let mut out: Vec<(&'static str, String, String)> = base
@@ -73,6 +86,11 @@ fn patches(src: &Path, base: &[Build]) -> Result<Vec<(&'static str, String, Stri
         "util/shlib_wrap.sh.in",
         WRAP_FROM.to_owned(),
         WRAP_TO.to_owned(),
+    ));
+    out.push((
+        "util/shlib_wrap.sh.in",
+        CLI_FROM.to_owned(),
+        CLI_TO.to_owned(),
     ));
     for (dir, lib) in [
         ("LD_LIBRARY_PATH", "# Linux, ELF HP-UX"),
@@ -367,7 +385,13 @@ fn parse(text: &str, file: &str) -> Run {
 }
 
 /// Runs recipe `name` (`test_x`) on the reference, or with `ours` on rustyssl.
-fn run_recipe(tree: &Path, name: &str, file: &str, ours: Option<&Path>) -> Result<Run> {
+fn run_recipe(
+    tree: &Path,
+    name: &str,
+    file: &str,
+    ours: Option<&Path>,
+    cli: Option<&Path>,
+) -> Result<Run> {
     let side = if ours.is_some() { "ours" } else { "ref" };
     let results = tree.join(format!("test-runs-{side}"));
     fs::create_dir_all(&results)?;
@@ -389,6 +413,9 @@ fn run_recipe(tree: &Path, name: &str, file: &str, ours: Option<&Path>) -> Resul
     if let Some(lib) = ours {
         cmd.env("RUSTYSSL_LIBDIR", lib)
             .env("RUSTYSSL_MODULES", crate::test_c::modules_of(lib));
+        if let Some(cli) = cli {
+            cmd.env("RUSTYSSL_CLI", cli);
+        }
     }
     let mut child = cmd
         .stdin(Stdio::null())
@@ -503,12 +530,14 @@ fn judge(
     recipe
 }
 
-/// Runs the recipes `args` names (all, without any) and writes the report.
+/// Runs the recipes `args` names (all, without any) and writes the report. With `cli`, the
+/// runs on rustyssl use that `openssl` tool in place of the tree's (`--cli ours`).
 pub fn run(
     root: &Path,
     version: &str,
     reference: &Path,
     ours: &Path,
+    cli: Option<&Path>,
     base: &[Build],
     args: &[String],
 ) -> Result {
@@ -533,8 +562,10 @@ pub fn run(
     let (skipped, todo): (Vec<_>, Vec<_>) =
         recipes.iter().partition(|(n, _)| list.skip.contains_key(n));
     println!(
-        "Running {} upstream recipes, each on the reference and then on rustyssl ({} skipped by {LIST}; {} programs need internal functions)...",
+        "Running {} upstream recipes, each on the reference and then on rustyssl{} ({} skipped by {LIST}; {} programs need internal functions)...",
         todo.len(),
+        cli.map(|c| format!(" with {}", c.display()))
+            .unwrap_or_default(),
         skipped.len(),
         internals.len()
     );
@@ -552,8 +583,9 @@ pub fn run(
                     let Some((name, file)) = todo.get(i) else {
                         break;
                     };
-                    let both = run_recipe(&tree, name, file, None)
-                        .and_then(|t| run_recipe(&tree, name, file, Some(ours)).map(|o| (t, o)));
+                    let both = run_recipe(&tree, name, file, None, None).and_then(|t| {
+                        run_recipe(&tree, name, file, Some(ours), cli).map(|o| (t, o))
+                    });
                     match both {
                         Ok((t, o)) => {
                             let r = judge(name, &t, &o, &list, &internals);
@@ -589,7 +621,7 @@ pub fn run(
     }
     let mut done = done.into_inner().map_err(|_| "a runner panicked")?;
     done.sort_by(|a, b| a.name.cmp(&b.name));
-    let report = write_report(root, &done, &skipped, &list, &internals)?;
+    let report = write_report(root, &done, &skipped, &list, &internals, cli)?;
     let count = |v: Verdict| -> usize {
         done.iter()
             .map(|r| r.verdicts.values().filter(|x| x.0 == v).count())
@@ -623,8 +655,17 @@ fn write_report(
     skipped: &[&(String, String)],
     list: &List,
     internals: &BTreeMap<String, Vec<String>>,
+    cli: Option<&Path>,
 ) -> Result<PathBuf> {
     let mut md = String::from("# The upstream test tree on rustyssl\n\n");
+    if let Some(cli) = cli {
+        writeln!(
+            md,
+            "With `--cli ours`: the runs on rustyssl use `{}` in place of the tree's \
+             `apps/openssl`.\n",
+            cli.display()
+        )?;
+    }
     writeln!(
         md,
         "Written by `cargo xtask test-openssl-suite --all`. Each recipe of the reference's \

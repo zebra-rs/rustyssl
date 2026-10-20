@@ -1,0 +1,41 @@
+Usage: pkcs8 [options]
+
+General options:
+ -help               Display this summary
+ -engine val         Use engine, possibly a hardware device
+ -v1 val             Use PKCS#5 v1.5 and cipher
+ -v2 val             Use PKCS#5 v2.0 and cipher
+ -v2prf val          Set the PRF algorithm to use with PKCS#5 v2.0
+
+Input options:
+ -in infile          Input file
+ -inform PEM|DER     Input format (DER or PEM)
+ -passin val         Input file pass phrase source
+ -nocrypt            Use or expect unencrypted private key
+
+Output options:
+ -out outfile        Output file
+ -outform PEM|DER    Output format (DER or PEM)
+ -topk8              Output PKCS8 file
+ -passout val        Output file pass phrase source
+ -traditional        use traditional format private key
+ -iter +int          Specify the iteration count
+ -noiter             Use 1 as iteration count
+ -saltlen +int       Specify the salt length (in bytes)
+                     Default: 8 (For PBE1) or 16 (for PBE2)
+
+Scrypt options:
+ -scrypt             Use scrypt algorithm
+ -scrypt_N val       Set scrypt N parameter
+ -scrypt_r val       Set scrypt r parameter
+ -scrypt_p val       Set scrypt p parameter
+
+Random state options:
+ -rand val           Load the given file(s) into the random number generator
+ -writerand outfile  Write random data to the specified file
+
+Provider options:
+ -provider-path val  Provider load path (must be before 'provider' argument if required)
+ -provider val       Provider to load (can be specified multiple times)
+ -provparam val      Set a provider key-value parameter
+ -propquery val      Property query used when fetching algorithms

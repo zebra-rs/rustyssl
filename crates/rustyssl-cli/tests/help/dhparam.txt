@@ -1,0 +1,35 @@
+Usage: dhparam [options] [numbits]
+
+General options:
+ -help               Display this summary
+ -check              Check the DH parameters
+ -dsaparam           Read or generate DSA parameters, convert to DH
+ -engine val         Use engine e, possibly a hardware device
+
+Input options:
+ -in infile          Input file
+ -inform PEM|DER     Input format, DER or PEM
+
+Output options:
+ -out outfile        Output file
+ -outform PEM|DER    Output format, DER or PEM
+ -text               Print a text form of the DH parameters
+ -noout              Don't output any DH parameters
+ -2                  Generate parameters using 2 as the generator value
+ -3                  Generate parameters using 3 as the generator value
+ -5                  Generate parameters using 5 as the generator value
+ -verbose            Verbose output
+ -quiet              Terse output
+
+Random state options:
+ -rand val           Load the given file(s) into the random number generator
+ -writerand outfile  Write random data to the specified file
+
+Provider options:
+ -provider-path val  Provider load path (must be before 'provider' argument if required)
+ -provider val       Provider to load (can be specified multiple times)
+ -provparam val      Set a provider key-value parameter
+ -propquery val      Property query used when fetching algorithms
+
+Parameters:
+ numbits             Number of bits if generating parameters (optional)

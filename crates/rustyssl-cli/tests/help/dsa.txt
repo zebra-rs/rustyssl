@@ -1,0 +1,30 @@
+Usage: dsa [options]
+
+General options:
+ -help               Display this summary
+ -*                  Any supported cipher
+ -pvk-strong         Enable 'Strong' PVK encoding level (default)
+ -pvk-weak           Enable 'Weak' PVK encoding level
+ -pvk-none           Don't enforce PVK encoding
+ -engine val         Use engine e, possibly a hardware device
+
+Input options:
+ -in val             Input key
+ -inform format      Input format (DER/PEM/PVK); has no effect
+ -pubin              Expect a public key in input file
+ -passin val         Input file pass phrase source
+
+Output options:
+ -out outfile        Output file
+ -outform format     Output format, DER PEM PVK
+ -noout              Don't print key out
+ -text               Print the key in text
+ -modulus            Print the DSA public value
+ -pubout             Output public key, not private
+ -passout val        Output file pass phrase source
+
+Provider options:
+ -provider-path val  Provider load path (must be before 'provider' argument if required)
+ -provider val       Provider to load (can be specified multiple times)
+ -provparam val      Set a provider key-value parameter
+ -propquery val      Property query used when fetching algorithms

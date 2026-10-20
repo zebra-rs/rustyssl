@@ -90,6 +90,8 @@ crates/
   rustyssl-quic/      (later phase) QUIC transport for the SSL QUIC API
   rustyssl-capi/      THE FFI LAYER: every extern "C" export, handle tables, BIO, callbacks,
                       OSSL_PARAM, ex_data, ERR queue, CRYPTO_malloc, the ASN1_ITEM template engine
+  rustyssl-ossl/      the CLI's bindings: safe wrappers over the public C API (generated externs, loaded at run time)
+  rustyssl-cli/       the `openssl` command-line tool (ADR 0007), `#![forbid(unsafe_code)]`
 libs/
   libcrypto/          static archive, linked into libcrypto.so.3 by `cargo xtask dist`; contains the WHOLE implementation
   libssl/             static archive of generated forwarders, linked into libssl.so.3; no implementation of its own
@@ -137,8 +139,9 @@ Key design decisions:
 
 ## Security rules (non-negotiable)
 
-1. **`unsafe` only in `rustyssl-capi`** and the `libs/*` shims. Every other crate has
-   `#![forbid(unsafe_code)]`. Each `unsafe` block needs a `// SAFETY:` comment, enforced
+1. **`unsafe` only in `rustyssl-capi`, the `libs/*` shims, and `rustyssl-ossl`** (the
+   `openssl` CLI's FFI wrappers over the public C API, [ADR 0007](docs/adr/0007-openssl-cli.md)).
+   Every other crate has `#![forbid(unsafe_code)]`. Each `unsafe` block needs a `// SAFETY:` comment, enforced
    by `clippy::undocumented_unsafe_blocks = "deny"`.
 2. **Treat the FFI boundary as hostile input.** Turn raw pointer and length pairs into
    slices exactly once, at the boundary, after checking them. Never truncate with `as`
@@ -191,7 +194,7 @@ generator. Don't paste the number.
 
 Working now: `cargo build`, `test`, `clippy`, `fmt`, `deny`, `vet`, and `fuzz`, and the
 xtask commands `vendor`, `codegen`, `dist`, `ref-openssl`, `abi-check`, `test-c`,
-`test-apps`, `test-interop`, `test-differential`, `test-openssl-suite` (`evp_test`, `bntest`, `ectest`, `rsa_test`; libssl's programs with `--ssl`),
+`test-apps`, `test-interop`, `test-differential`, `test-openssl-suite` (`evp_test`, `bntest`, `ectest`, `rsa_test`; libssl's programs with `--ssl`; the whole tree with `--all`, our CLI with `--cli ours`),
 `test-wycheproof`, `test-bogo`, `test-tlsfuzzer`, `test-timing`, `test-providers`, `test-consumers` (`rust`, `ruby`, `pyca`, `node`, `ngtcp2`, `curl-h3`), `test-quic-interop`, `coverage`, and `usage-scan`.
 The other `cargo xtask` commands arrive later and fail with a message until then. Update this
 section when they change. CI (`.github/workflows/ci.yml`) runs the gates on every push.
@@ -264,6 +267,8 @@ environment variables `RUSTYSSL_OPENSSLDIR`, `RUSTYSSL_ENGINESDIR`, and `RUSTYSS
 | `crates/rustyssl-capi/src/generated/err_strings.rs` | the error-string tables, in OpenSSL's order and load order |
 | `crates/rustyssl-asn1/src/generated/objects.rs` | the NID/name/OID table and the signature-algorithm cross-reference |
 | `crates/rustyssl-crypto/src/generated/curves.rs` | the named curves' parameters, methods, comments, names, and NIST names |
+| `crates/rustyssl-ossl/src/generated/ffi.rs` | every export as the CLI calls it, resolved from its library at run time (ADR 0007) |
+| `crates/rustyssl-cli/src/generated/options.rs` | every command's option table and choice enum, and the command table, from `abi/openssl-<ver>/apps/` |
 
 ```sh
 cargo build --workspace                      # build everything
@@ -273,13 +278,13 @@ cargo fmt --all --check
 cargo deny check && cargo vet                # supply-chain gates
 cargo xtask vendor 3.5.9                     # fetch, verify (PGP + SHA-256), and vendor a release into abi/
 cargo xtask codegen                          # regenerate bindings, export lists, stubs, error and object tables
-cargo xtask dist                             # build lib{crypto,ssl}.so.3 with soname + symbol versions into target/dist/
+cargo xtask dist                             # build lib{crypto,ssl}.so.3 with soname + symbol versions, and bin/openssl-rs, into target/dist/
 cargo xtask ref-openssl [3.5.9]              # build the reference OpenSSL (default: the vendored version) into target/ref/
 cargo xtask abi-check [check...]             # L3: exports+versions, metadata, signatures, layouts, constants, linking, headers, compat35
 cargo xtask coverage [--list PREFIX...]      # implemented exports per library and header -> docs/coverage.md
 cargo xtask usage-scan [--jobs N] [--limit N]  # rank exports by how many distro packages import them -> docs/symbol-usage.md
 cargo xtask test-c                           # tests/c/*.c, each run on the reference and on target/dist; output must match
-cargo xtask test-apps                        # the reference's openssl tool (tests/apps/commands.txt) on both libraries; output must match
+cargo xtask test-apps [--bless] [list...]    # openssl tools: upstream's on both libraries (tests/apps/commands.txt); ours (target/dist/bin/openssl-rs) on both, against upstream's on the reference (tests/apps/<command>.txt); the CLI's live_* helper tests on both
 cargo xtask test-interop [case...]           # the reference's s_server/s_client in four library pairings (tests/interop/cases.txt)
 cargo xtask test-interop --seed S [case...]  # the DTLS +faults cases' drop/duplicate/reorder schedule from seed S (default 1)
 cargo xtask test-interop --peer gnutls [case...]  # s_server/s_client on each library against gnutls-cli/gnutls-serv (tests/interop/gnutls.txt)
@@ -287,6 +292,7 @@ cargo xtask test-differential [--random N] [--seed S]  # probe corpus + N random
 cargo xtask test-differential --only evp --duration 24h  # a campaign: rounds of random EVP sessions on every core
 cargo xtask test-openssl-suite [file|program...]  # upstream evp_test (tests/openssl-suite/evp_test.txt), bntest, ectest, rsa_test, both libraries
 cargo xtask test-openssl-suite --ssl [program...]  # libssl's upstream programs (tests/openssl-suite/ssl.txt), per subtest, both libraries -> target/ssl-suite-report.md
+cargo xtask test-openssl-suite --all [--cli ours] [recipe...]  # upstream's whole test/recipes tree, reference vs rustyssl (with --cli ours: our openssl tool on rustyssl) -> target/upstream-report.md
 cargo xtask test-wycheproof [file...]        # Wycheproof's vectors (tests/wycheproof/files.txt) on both libraries
 cargo xtask test-bogo [pattern...]           # BoringSSL's runner with tests/bogo/shim.c on both libraries -> target/bogo-report.md
 cargo xtask test-tlsfuzzer [--timing] [script...]  # tlsfuzzer (tests/tlsfuzzer/scripts.txt) against s_server, both libraries -> target/tlsfuzzer-report.md

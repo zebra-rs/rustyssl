@@ -1,0 +1,45 @@
+Usage: crl [options]
+
+General options:
+ -help               Display this summary
+ -verify             Verify CRL signature
+
+Input options:
+ -in infile          Input file - default stdin
+ -inform PEM|DER     CRL input format (DER or PEM); has no effect
+ -key infile         CRL signing Private key to use
+ -keyform PEM|DER    Private key file format (DER/PEM/P12); has no effect
+
+Output options:
+ -out outfile        output file - default stdout
+ -outform PEM|DER    Output format - default PEM
+ -dateopt val        Datetime format used for printing. (rfc_822/iso_8601). Default is rfc_822.
+ -text               Print out a text format version
+ -hash               Print hash value
+ -hash_old           Print old-style (MD5) hash value
+ -nameopt val        Certificate subject/issuer name printing options
+ -*                  Any supported digest
+
+CRL options:
+ -issuer             Print issuer DN
+ -lastupdate         Set lastUpdate field
+ -nextupdate         Set nextUpdate field
+ -noout              No CRL output
+ -fingerprint        Print the crl fingerprint
+ -crlnumber          Print CRL number
+ -badsig             Corrupt last byte of loaded CRL signature (for test)
+ -gendelta infile    Other CRL to compare/diff to the Input one
+
+Certificate options:
+ -CApath dir         Verify CRL using certificates in dir
+ -CAfile infile      Verify CRL using certificates in file name
+ -CAstore uri        Verify CRL using certificates in store URI
+ -no-CAfile          Do not load the default certificates file
+ -no-CApath          Do not load certificates from the default certificates directory
+ -no-CAstore         Do not load certificates from the default certificates store
+
+Provider options:
+ -provider-path val  Provider load path (must be before 'provider' argument if required)
+ -provider val       Provider to load (can be specified multiple times)
+ -provparam val      Set a provider key-value parameter
+ -propquery val      Property query used when fetching algorithms

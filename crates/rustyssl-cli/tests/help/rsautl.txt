@@ -1,0 +1,38 @@
+The command rsautl was deprecated in version 3.0. Use 'pkeyutl' instead.
+Usage: rsautl [options]
+
+General options:
+ -help                    Display this summary
+ -sign                    Sign with private key
+ -verify                  Verify with public key
+ -encrypt                 Encrypt with public key
+ -decrypt                 Decrypt with private key
+ -engine val              Use engine, possibly a hardware device
+
+Input options:
+ -in infile               Input file
+ -inkey val               Input key, by default an RSA private key
+ -keyform PEM|DER|ENGINE  Private key format (ENGINE, other values ignored)
+ -pubin                   Input key is an RSA public pkey
+ -certin                  Input is a cert carrying an RSA public key
+ -rev                     Reverse the order of the input buffer
+ -passin val              Input file pass phrase source
+
+Output options:
+ -out outfile             Output file
+ -raw                     Use no padding
+ -pkcs                    Use PKCS#1 v1.5 padding (default)
+ -x931                    Use ANSI X9.31 padding
+ -oaep                    Use PKCS#1 OAEP
+ -asn1parse               Run output through asn1parse; useful with -verify
+ -hexdump                 Hex dump output
+
+Random state options:
+ -rand val                Load the given file(s) into the random number generator
+ -writerand outfile       Write random data to the specified file
+
+Provider options:
+ -provider-path val       Provider load path (must be before 'provider' argument if required)
+ -provider val            Provider to load (can be specified multiple times)
+ -provparam val           Set a provider key-value parameter
+ -propquery val           Property query used when fetching algorithms

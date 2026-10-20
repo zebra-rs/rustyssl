@@ -1,0 +1,15 @@
+Usage: info [options]
+
+General options:
+ -help            Display this summary
+
+Output options:
+ -configdir       Default configuration file directory
+ -enginesdir      Default engine module directory
+ -modulesdir      Default module directory (other than engine modules)
+ -dsoext          Configured extension for modules
+ -dirnamesep      Directory-filename separator
+ -listsep         List separator character
+ -seeds           Seed sources
+ -cpusettings     CPU settings info
+ -windowscontext  Windows install context

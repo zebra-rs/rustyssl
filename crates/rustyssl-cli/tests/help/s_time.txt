@@ -1,0 +1,37 @@
+Usage: s_time [options]
+
+General options:
+ -help               Display this summary
+
+Connection options:
+ -connect val        Where to connect as post:port (default is localhost:4433)
+ -new                Just time new connections
+ -reuse              Just time connection reuse
+ -bugs               Turn on SSL bug compatibility
+ -cipher val         TLSv1.2 and below cipher list to be used
+ -ciphersuites val   Specify TLSv1.3 ciphersuites to be used
+ -tls1               Just use TLSv1.0
+ -tls1_1             Just use TLSv1.1
+ -tls1_2             Just use TLSv1.2
+ -tls1_3             Just use TLSv1.3
+ -verify +int        Turn on peer certificate verification, set depth
+ -time +int          Seconds to collect data, default 30
+ -www val            Fetch specified page from the site
+
+Certificate options:
+ -nameopt val        Certificate subject/issuer name printing options
+ -cert infile        Cert file to use, PEM format assumed
+ -key infile         File with key, PEM; default is -cert file
+ -cafile infile      PEM format file of CA's
+ -CAfile infile      PEM format file of CA's
+ -CApath dir         PEM format directory of CA's
+ -CAstore uri        URI to store of CA's
+ -no-CAfile          Do not load the default certificates file
+ -no-CApath          Do not load certificates from the default certificates directory
+ -no-CAstore         Do not load certificates from the default certificates store URI
+
+Provider options:
+ -provider-path val  Provider load path (must be before 'provider' argument if required)
+ -provider val       Provider to load (can be specified multiple times)
+ -provparam val      Set a provider key-value parameter
+ -propquery val      Property query used when fetching algorithms

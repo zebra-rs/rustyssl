@@ -3,11 +3,13 @@
 
 mod abi;
 mod asn1_items;
+mod cli_options;
 mod curves;
 mod errors;
 pub mod exports;
 pub mod headers;
 mod objects;
+mod ossl;
 pub mod stubs;
 mod verify_strings;
 
@@ -25,7 +27,9 @@ pub fn run(args: &[String]) -> Result {
     let ctx = headers::Context::new(&root, &target_dir(&root).join("xtask/codegen"))?;
     let constants = abi::generate(&ctx)?;
     let exports = exports::generate(&ctx)?;
-    stubs::generate(&ctx, &exports)?;
+    let prototypes = stubs::generate(&ctx, &exports)?;
+    ossl::generate(&ctx, &prototypes)?;
+    cli_options::generate(&ctx)?;
     asn1_items::generate(&ctx)?;
     errors::generate(&ctx, &constants)?;
     verify_strings::generate(&ctx, &constants)?;
@@ -60,6 +64,10 @@ pub fn run(args: &[String]) -> Result {
                     "rustyssl-crypto",
                     "-p",
                     "rustyssl-libssl",
+                    "-p",
+                    "rustyssl-ossl",
+                    "-p",
+                    "rustyssl-cli",
                 ])
                 .args(["--target", target.rust])
                 .current_dir(&ctx.root),

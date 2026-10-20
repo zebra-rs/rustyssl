@@ -1,0 +1,84 @@
+# Dispatch (apps/openssl.c) and every command's -help, as generated from upstream's option
+# tables. Each `<command> -help` line also has a golden copy of upstream's text in
+# crates/rustyssl-cli/tests/help/ (`cargo xtask test-apps --bless help` rewrites them).
+# `ts -help` and `verify -help` print more than their tables (the purposes, ...): they belong
+# to their commands' corpora.
+help
+-help
+--help
+-h
+--h
+-version
+--version
+-v
+--v
+help version
+help x509
+help -help
+help -x
+help a b
+help -command
+help nosuch
+nosuch
+no-x509
+no-nosuch
+no-sha256
+sha256 -help
+md5 -help
+aes-128-cbc -help
+des3 -help
+SHA256 -help
+rsautl -help
+asn1parse -help
+ca -help
+ciphers -help
+cmp -help
+cms -help
+configutl -help
+crl -help
+crl2pkcs7 -help
+dgst -help
+dhparam -help
+dsa -help
+dsaparam -help
+ec -help
+ecparam -help
+enc -help
+engine -help
+errstr -help
+fipsinstall -help
+gendsa -help
+genpkey -help
+genrsa -help
+help -help
+info -help
+kdf -help
+list -help
+mac -help
+nseq -help
+ocsp -help
+passwd -help
+pkcs12 -help
+pkcs7 -help
+pkcs8 -help
+pkey -help
+pkeyparam -help
+pkeyutl -help
+prime -help
+rand -help
+rehash -help
+req -help
+rsa -help
+rsautl -help
+s_client -help
+s_server -help
+s_time -help
+sess_id -help
+skeyutl -help
+smime -help
+speed -help
+spkac -help
+srp -help
+storeutl -help
+version -help
+x509 -help

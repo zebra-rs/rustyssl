@@ -40,7 +40,10 @@ pub(crate) struct Prototype {
     pub(crate) output: Option<String>,
 }
 
-pub fn generate(ctx: &Context, exports: &[Exports]) -> Result {
+/// Each library's exports and their prototypes, which every target agrees on.
+pub type Prototypes = BTreeMap<&'static str, BTreeMap<String, Prototype>>;
+
+pub fn generate(ctx: &Context, exports: &[Exports]) -> Result<Prototypes> {
     // library -> name -> prototype, which must agree across targets.
     let mut agreed: Option<BTreeMap<&str, BTreeMap<String, Prototype>>> = None;
     for target in TARGETS {
@@ -137,7 +140,7 @@ pub fn generate(ctx: &Context, exports: &[Exports]) -> Result {
             functions.len() - stubs
         );
     }
-    Ok(())
+    Ok(libraries)
 }
 
 /// Names of the `extern "C"` functions implemented by hand under `src`.

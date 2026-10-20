@@ -1,0 +1,55 @@
+Usage: des3 [options]
+
+General options:
+ -help               Display this summary
+ -list               List ciphers
+ -ciphers            Alias for -list
+ -e                  Encrypt
+ -d                  Decrypt
+ -p                  Print the iv/key
+ -P                  Print the iv/key and exit
+ -engine val         Use engine, possibly a hardware device
+
+Input options:
+ -in infile          Input file
+ -k val              Passphrase
+ -kfile infile       Read passphrase from file
+
+Output options:
+ -out outfile        Output file
+ -pass val           Passphrase source
+ -v                  Verbose output
+ -a                  Base64 encode/decode, depending on encryption flag
+ -base64             Same as option -a
+ -A                  Used with -[base64|a] to specify base64 buffer as a single line
+
+Encryption options:
+ -nopad              Disable standard block padding
+ -salt               Use salt in the KDF (default)
+ -nosalt             Do not use salt in the KDF
+ -debug              Print debug info
+ -bufsize val        Buffer size
+ -K val              Raw key, in hex
+ -S val              Salt, in hex
+ -iv val             IV in hex
+ -md val             Use specified digest to create a key from the passphrase
+ -iter +int          Specify the iteration count and force the use of PBKDF2
+                     Default: 10000
+ -pbkdf2             Use password-based key derivation function 2 (PBKDF2)
+                     Use -iter to change the iteration count from 10000
+ -none               Don't encrypt
+ -saltlen +int       Specify the PBKDF2 salt length (in bytes)
+                     Default: 16
+ -skeyopt val        Key options as opt:value for opaque symmetric key handling
+ -skeymgmt val       Symmetric key management name for opaque symmetric key handling
+ -*                  Any supported cipher
+
+Random state options:
+ -rand val           Load the given file(s) into the random number generator
+ -writerand outfile  Write random data to the specified file
+
+Provider options:
+ -provider-path val  Provider load path (must be before 'provider' argument if required)
+ -provider val       Provider to load (can be specified multiple times)
+ -provparam val      Set a provider key-value parameter
+ -propquery val      Property query used when fetching algorithms

@@ -1,0 +1,27 @@
+Usage: spkac [options]
+
+General options:
+ -help               Display this summary
+ -spksect val        Specify the name of an SPKAC-dedicated section of configuration
+ -engine val         Use engine, possibly a hardware device
+
+Input options:
+ -in infile          Input file
+ -key infile         Create SPKAC using private key
+ -keyform format     Private key file format (ENGINE, other values ignored)
+ -passin val         Input file pass phrase source
+ -challenge val      Challenge string
+ -spkac val          Alternative SPKAC name
+
+Output options:
+ -digest val         Sign new SPKAC with the specified digest (default: MD5)
+ -out outfile        Output file
+ -noout              Don't print SPKAC
+ -pubkey             Output public key
+ -verify             Verify SPKAC signature
+
+Provider options:
+ -provider-path val  Provider load path (must be before 'provider' argument if required)
+ -provider val       Provider to load (can be specified multiple times)
+ -provparam val      Set a provider key-value parameter
+ -propquery val      Property query used when fetching algorithms

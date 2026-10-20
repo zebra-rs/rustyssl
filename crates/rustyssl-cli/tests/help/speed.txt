@@ -1,0 +1,42 @@
+Usage: speed [options] [algorithm...]
+All +int options consider prefix '0' as base-8 input, prefix '0x'/'0X' as base-16 input.
+
+General options:
+ -help                  Display this summary
+ -mb                    Enable (tls1>=1) multi-block mode on EVP-named cipher
+ -mr                    Produce machine readable output
+ -multi +int            Run benchmarks in parallel
+ -async_jobs +int       Enable async mode and start specified number of jobs
+ -engine val            Use engine, possibly a hardware device
+ -primes +int           Specify number of primes (for RSA only)
+ -mlock                 Lock memory for better result determinism
+ -testmode              Run the speed command in test mode
+ -config infile         Load a configuration file (this may load modules)
+
+Selection options:
+ -evp val               Use EVP-named cipher or digest
+ -hmac val              HMAC using EVP-named digest
+ -cmac val              CMAC using EVP-named cipher
+ -decrypt               Time decryption instead of encryption (only EVP)
+ -aead                  Benchmark EVP-named AEAD cipher in TLS-like sequence
+ -kem-algorithms        Benchmark KEM algorithms
+ -signature-algorithms  Benchmark signature algorithms
+
+Timing options:
+ -elapsed               Use wall-clock time instead of CPU user time as divisor
+ -seconds +int          Run benchmarks for specified amount of seconds
+ -bytes +int            Run [non-PKI] benchmarks on custom-sized buffer
+ -misalign +int         Use specified offset to mis-align buffers
+
+Random state options:
+ -rand val              Load the given file(s) into the random number generator
+ -writerand outfile     Write random data to the specified file
+
+Provider options:
+ -provider-path val     Provider load path (must be before 'provider' argument if required)
+ -provider val          Provider to load (can be specified multiple times)
+ -provparam val         Set a provider key-value parameter
+ -propquery val         Property query used when fetching algorithms
+
+Parameters:
+ algorithm              Algorithm(s) to test (optional; otherwise tests all)

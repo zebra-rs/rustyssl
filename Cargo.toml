@@ -22,6 +22,7 @@ rustyssl-pki = { path = "crates/rustyssl-pki" }
 rustyssl-tls = { path = "crates/rustyssl-tls" }
 rustyssl-quic = { path = "crates/rustyssl-quic" }
 rustyssl-capi = { path = "crates/rustyssl-capi" }
+rustyssl-ossl = { path = "crates/rustyssl-ossl" }
 
 # Third-party crates. Each one is recorded in docs/DEPENDENCIES.md.
 libc = { version = "0.2", default-features = false }
@@ -31,7 +32,7 @@ subtle = { version = "2.6", default-features = false }
 syn = { version = "3", default-features = false, features = ["full", "parsing", "printing"] }
 
 # Baseline for every crate. Crate-level attributes add more: `forbid(unsafe_code)`
-# outside rustyssl-capi and libs/*, and `arithmetic_side_effects` in parser and protocol
+# outside rustyssl-capi, libs/*, and rustyssl-ossl, and `arithmetic_side_effects` in parser and protocol
 # crates. Rule numbers refer to "Security rules" in README.md.
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

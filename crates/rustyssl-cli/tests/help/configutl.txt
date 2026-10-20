@@ -1,0 +1,9 @@
+Usage: configutl [options]
+
+General options:
+ -help         Display this summary
+ -config val   Config file to deal with (the default one if omitted)
+
+Output options:
+ -out outfile  Output to filename rather than stdout
+ -noheader     Don't print the information about original config

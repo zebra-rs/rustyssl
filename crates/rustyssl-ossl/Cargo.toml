@@ -1,0 +1,16 @@
+[package]
+name = "rustyssl-ossl"
+description = "The openssl CLI's bindings: safe wrappers over the public libcrypto and libssl C API, loaded at run time"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+libc.workspace = true
+rustyssl-abi.workspace = true
+
+[lints]
+workspace = true

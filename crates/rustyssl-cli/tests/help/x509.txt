@@ -1,0 +1,98 @@
+Usage: x509 [options]
+
+General options:
+ -help                      Display this summary
+ -in infile                 Certificate input, or CSR input file with -req (default stdin)
+ -passin val                Private key and cert file pass-phrase source
+ -new                       Generate a certificate from scratch
+ -x509toreq                 Output a certification request (rather than a certificate)
+ -req                       Input is a CSR file (rather than a certificate)
+ -copy_extensions val       copy extensions when converting from CSR to x509 or vice versa
+ -inform format             CSR input format to use (PEM or DER; by default try PEM first)
+ -vfyopt val                CSR verification parameter in n:v form
+ -key val                   Key for signing, and to include unless using -force_pubkey
+ -signkey val               Same as -key
+ -keyform PEM|DER|ENGINE    Key input format (ENGINE, other values ignored)
+ -out outfile               Output file - default stdout
+ -outform format            Output format (DER or PEM) - default PEM
+ -nocert                    No cert output (except for requested printing)
+ -noout                     No output (except for requested printing)
+
+Certificate printing options:
+ -text                      Print the certificate in text form
+ -dateopt val               Datetime format used for printing. (rfc_822/iso_8601). Default is rfc_822.
+ -certopt val               Various certificate text printing options
+ -fingerprint               Print the certificate fingerprint
+ -alias                     Print certificate alias
+ -serial                    Print serial number value
+ -startdate                 Print the notBefore field
+ -enddate                   Print the notAfter field
+ -dates                     Print both notBefore and notAfter fields
+ -subject                   Print subject DN
+ -issuer                    Print issuer DN
+ -nameopt val               Certificate subject/issuer name printing options
+ -email                     Print email address(es)
+ -hash                      Synonym for -subject_hash (for backward compat)
+ -subject_hash              Print subject hash value
+ -subject_hash_old          Print old-style (MD5) subject hash value
+ -issuer_hash               Print issuer hash value
+ -issuer_hash_old           Print old-style (MD5) issuer hash value
+ -ext val                   Restrict which X.509 extensions to print and/or copy
+ -ocspid                    Print OCSP hash values for the subject name and public key
+ -ocsp_uri                  Print OCSP Responder URL(s)
+ -purpose                   Print out certificate purposes
+ -pubkey                    Print the public key in PEM format
+ -modulus                   Print the RSA key modulus
+ -multi                     Process multiple certificates
+
+Certificate checking options:
+ -checkend intmax           Check whether cert expires in the next arg seconds
+                            Exit 1 (failure) if so, 0 if not
+ -checkhost val             Check certificate matches host
+ -checkemail val            Check certificate matches email
+ -checkip val               Check certificate matches ipaddr
+
+Certificate output options:
+ -set_serial val            Serial number to use, overrides -CAserial
+ -next_serial               Increment current certificate serial number
+ -not_before val            [CC]YYMMDDHHMMSSZ value for notBefore certificate field
+ -not_after val             [CC]YYMMDDHHMMSSZ value for notAfter certificate field, overrides -days
+ -days int                  Number of days until newly generated certificate expires - default 30
+ -preserve_dates            Preserve existing validity dates
+ -set_issuer val            Set or override certificate issuer
+ -set_subject val           Set or override certificate subject (and issuer)
+ -subj val                  Alias for -set_subject
+ -force_pubkey infile       Key to be placed in new certificate or certificate request
+ -clrext                    Do not take over any extensions from the source certificate or request
+ -extfile infile            Config file with X509V3 extensions to add
+ -extensions val            Section of extfile to use - default: unnamed section
+ -sigopt val                Signature parameter, in n:v form
+ -badsig                    Corrupt last byte of certificate signature (for test)
+ -*                         Any supported digest, used for signing and printing
+
+Micro-CA options:
+ -CA infile                 Use the given CA certificate, conflicts with -key
+ -CAform PEM|DER            CA cert format (PEM/DER/P12); has no effect
+ -CAkey val                 The corresponding CA key; default is -CA arg
+ -CAkeyform PEM|DER|ENGINE  CA key format (ENGINE, other values ignored)
+ -CAserial val              File that keeps track of CA-generated serial number
+ -CAcreateserial            Create CA serial number file if it does not exist
+
+Certificate trust output options:
+ -trustout                  Mark certificate PEM output as trusted
+ -setalias val              Set certificate alias (nickname)
+ -clrtrust                  Clear all trusted purposes
+ -addtrust val              Trust certificate for a given purpose
+ -clrreject                 Clears all the prohibited or rejected uses of the certificate
+ -addreject val             Reject certificate for a given purpose
+
+Random state options:
+ -rand val                  Load the given file(s) into the random number generator
+ -writerand outfile         Write random data to the specified file
+ -engine val                Use engine, possibly a hardware device
+
+Provider options:
+ -provider-path val         Provider load path (must be before 'provider' argument if required)
+ -provider val              Provider to load (can be specified multiple times)
+ -provparam val             Set a provider key-value parameter
+ -propquery val             Property query used when fetching algorithms

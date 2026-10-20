@@ -9,7 +9,12 @@
 //!   lib/libcrypto.a, lib/libssl.a
 //!   lib/pkgconfig/{libcrypto,libssl,openssl}.pc
 //!   lib/ossl-modules/legacy.so              (macOS: legacy.dylib, a bundle) the legacy provider
+//!   bin/openssl-rs                          the `openssl` tool in Rust (crates/rustyssl-cli)
 //! ```
+//!
+//! The Rust `openssl` tool is installed as `openssl-rs` until Phase 11.1 is complete (ADR 0007,
+//! decision 3). It links neither library: it loads them at start-up, from `LD_LIBRARY_PATH`
+//! (`DYLD_LIBRARY_PATH`) when set, else from `../lib` next to itself.
 //!
 //! Cargo builds each library as a static archive, and this links the shared library from it
 //! with the C compiler (`$CC`, default `cc`). rustc gives every cdylib its own anonymous
@@ -112,11 +117,37 @@ pub fn run(args: &[String]) -> Result {
     link_legacy_module(&root, target, &dist, &lib_dir, major, &work)?;
     // What static users of libcrypto must link besides it (pkg-config --static).
     write_pkgconfig(&lib_dir.join("pkgconfig"), version, &native)?;
+    println!("Building the openssl tool...");
+    install_cli(&root, &release, &dist)?;
     println!(
         "Installed OpenSSL {version}-compatible libraries for {host} into {}",
         dist.display()
     );
     Ok(())
+}
+
+/// The name `cargo xtask dist` installs the Rust `openssl` tool under, in `bin/`.
+pub const CLI_NAME: &str = "openssl-rs";
+
+/// Builds `rustyssl-cli` and installs its binary as `bin/openssl-rs`.
+fn install_cli(root: &Path, release: &Path, dist: &Path) -> Result {
+    let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
+    run_output(
+        Command::new(cargo)
+            .args([
+                "build",
+                "--release",
+                "--color",
+                "never",
+                "-p",
+                "rustyssl-cli",
+            ])
+            .current_dir(root),
+    )?;
+    let bin = dist.join("bin");
+    fs::create_dir_all(&bin)?;
+    // fs::copy keeps the executable's permissions.
+    copy_file(&release.join("openssl"), &bin.join(CLI_NAME))
 }
 
 /// Builds `rustyssl-<library>` as a release static archive and returns the system libraries

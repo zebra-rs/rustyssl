@@ -1,0 +1,14 @@
+Usage: skeyutl [options]
+
+General options:
+ -help               Display this summary
+ -skeyopt val        Key options as opt:value for opaque keys handling
+ -skeymgmt val       Symmetric key management name for opaque keys handling
+ -genkey             Generate an opaque symmetric key
+ -cipher val         The cipher to generate key for
+
+Provider options:
+ -provider-path val  Provider load path (must be before 'provider' argument if required)
+ -provider val       Provider to load (can be specified multiple times)
+ -provparam val      Set a provider key-value parameter
+ -propquery val      Property query used when fetching algorithms

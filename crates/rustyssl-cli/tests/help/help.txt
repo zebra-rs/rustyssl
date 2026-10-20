@@ -1,0 +1,7 @@
+Usage: help [options] [command]
+
+General options:
+ -help      Display this summary
+
+Parameters:
+ command    Name of command to display help (optional)

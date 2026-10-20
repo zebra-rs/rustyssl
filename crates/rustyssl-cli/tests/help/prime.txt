@@ -1,0 +1,21 @@
+Usage: prime [options] [number...]
+
+General options:
+ -help               Display this summary
+ -bits +int          Size of number in bits
+ -checks +int        Number of checks
+ -hex                Enables hex format for output from prime generation or input to primality checking
+ -in                 Provide file names containing numbers for primality checking
+
+Output options:
+ -generate           Generate a prime
+ -safe               When used with -generate, generate a safe prime
+
+Provider options:
+ -provider-path val  Provider load path (must be before 'provider' argument if required)
+ -provider val       Provider to load (can be specified multiple times)
+ -provparam val      Set a provider key-value parameter
+ -propquery val      Property query used when fetching algorithms
+
+Parameters:
+ number              Number(s) to check for primality if not generating

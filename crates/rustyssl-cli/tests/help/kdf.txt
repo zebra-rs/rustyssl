@@ -1,0 +1,24 @@
+Usage: kdf [options] kdf_name
+
+General options:
+ -help               Display this summary
+ -kdfopt val         KDF algorithm control parameters in n:v form
+ -cipher val         Cipher
+ -digest val         Digest
+ -mac val            MAC
+                     See 'Supported Controls' in the EVP_KDF_ docs
+
+ -keylen val         The size of the output derived key
+
+Output options:
+ -out outfile        Output to filename rather than stdout
+ -binary             Output in binary format (default is hexadecimal)
+
+Provider options:
+ -provider-path val  Provider load path (must be before 'provider' argument if required)
+ -provider val       Provider to load (can be specified multiple times)
+ -provparam val      Set a provider key-value parameter
+ -propquery val      Property query used when fetching algorithms
+
+Parameters:
+ kdf_name            Name of the KDF algorithm
