@@ -15,10 +15,12 @@ rustyssl-asn1.workspace = true
 rustyssl-conf.workspace = true
 rustyssl-crypto.workspace = true
 rustyssl-pki.workspace = true
+rustyssl-quic.workspace = true
 rustyssl-tls.workspace = true
 subtle.workspace = true
 
 [dev-dependencies]
+rustyssl-quic = { workspace = true, features = ["test-provider"] }
 rustyssl-tls = { workspace = true, features = ["test-provider"] }
 
 [lints]

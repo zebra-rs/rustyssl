@@ -390,6 +390,7 @@ dependencies = [
  "rustyssl-conf",
  "rustyssl-crypto",
  "rustyssl-pki",
+ "rustyssl-quic",
  "rustyssl-tls",
  "subtle",
 ]
@@ -456,6 +457,17 @@ version = "0.1.0"
 dependencies = [
  "rustyssl-asn1",
  "rustyssl-crypto",
+]
+
+[[package]]
+name = "rustyssl-quic"
+version = "0.1.0"
+dependencies = [
+ "rustyssl-abi",
+ "rustyssl-crypto",
+ "rustyssl-tls",
+ "subtle",
+ "zeroize",
 ]
 
 [[package]]
