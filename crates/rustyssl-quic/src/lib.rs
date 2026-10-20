@@ -16,10 +16,10 @@ pub mod cc;
 // pub mod cid;
 pub mod crypto;
 pub mod error;
-// pub mod fc;
+pub mod fc;
 pub mod packet;
 // pub mod port;
-// pub mod stream;
+pub mod stream;
 pub mod time;
 // pub mod tls;
 // pub mod token;
@@ -35,3 +35,6 @@ pub use time::Time;
 #[cfg(any(test, feature = "test-provider"))]
 #[doc(hidden)]
 pub mod testprov;
+
+#[cfg(test)]
+mod testutil;
