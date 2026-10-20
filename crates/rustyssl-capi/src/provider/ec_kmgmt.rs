@@ -1793,11 +1793,11 @@ pub(crate) static SM2_KEYMGMT: Dispatch<23> = Dispatch([
 mod tests {
     use super::*;
 
-    /// docs/DEVIATIONS.md: OpenSSL's `strdup`s a generation parameter's string, reading on
-    /// past its size to a NUL, and crashes on NULL data.
+    /// A generation parameter's string is read to its NUL whatever its size, as OpenSSL's
+    /// `strdup` reads it; NULL data is refused where OpenSSL crashes (docs/DEVIATIONS.md).
     #[test]
-    fn strings_are_read_within_their_size() {
-        let mut name = *b"P-256X";
+    fn strings_are_read_as_c_strings() {
+        let mut name = *b"P-256X\0";
         let mut params = [
             OSSL_PARAM {
                 key: OSSL_PKEY_PARAM_GROUP_NAME.as_ptr(),
@@ -1812,7 +1812,14 @@ mod tests {
         // SAFETY: an array of one parameter.
         let r = unsafe { copy_utf8(params.as_ptr(), OSSL_PKEY_PARAM_GROUP_NAME, &mut got) };
         assert!(r.is_ok());
-        assert_eq!(got.as_deref(), Some(c"P-256"));
+        assert_eq!(got.as_deref(), Some(c"P-256X"));
+        if let Some(p) = params.first_mut() {
+            p.data_size = 0;
+        }
+        // SAFETY: as above.
+        let r = unsafe { copy_utf8(params.as_ptr(), OSSL_PKEY_PARAM_GROUP_NAME, &mut got) };
+        assert!(r.is_ok());
+        assert_eq!(got.as_deref(), Some(c"P-256X"));
         if let Some(p) = params.first_mut() {
             p.data = ptr::null_mut();
         }

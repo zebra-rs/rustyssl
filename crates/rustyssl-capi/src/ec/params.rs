@@ -89,9 +89,10 @@ const FORMATS: [(point_conversion_form_t, &CStr); 3] = [
     ),
 ];
 
-/// A string parameter's text as OpenSSL's EC code reads it: a UTF-8 string's data up to its
-/// NUL (within its size here, where OpenSSL reads on), or what a UTF-8 pointer points to.
-/// `Some(None)` is a pointer parameter holding NULL; `None` is no string at all.
+/// A string parameter's text as OpenSSL's provider code reads it: a UTF-8 string's data as a C
+/// string (up to its NUL, whatever its size says: `OSSL_PARAM_utf8_string(key, s, 0)` names
+/// all of `s`), or what a UTF-8 pointer points to. `Some(None)` is a pointer parameter holding
+/// NULL; `None` is no string at all.
 ///
 /// # Safety
 /// `p` is a live parameter.
@@ -103,10 +104,8 @@ pub(crate) unsafe fn text<'a>(p: *const OSSL_PARAM) -> Option<Option<&'a [u8]>> 
             if prm.data.is_null() {
                 return None;
             }
-            // SAFETY: the parameter's data of its size.
-            let all = unsafe { core::slice::from_raw_parts(prm.data.cast::<u8>(), prm.data_size) };
-            let end = all.iter().position(|&b| b == 0).unwrap_or(all.len());
-            Some(all.get(..end))
+            // SAFETY: a UTF-8 string parameter's data is a NUL-terminated string.
+            Some(Some(unsafe { CStr::from_ptr(prm.data.cast()) }.to_bytes()))
         }
         UTF8_PTR => {
             let mut s: *const c_char = ptr::null();
