@@ -26,6 +26,10 @@
 //! requirements at its CI's versions; its `tests` run by pytest over every core, each test's
 //! `-rA` line its result. Needs Python 3 with `venv` (3.13 or 3.12 preferred, for wheels) and
 //! network access to PyPI for those requirements (skipped without Python).
+//!
+//! **node** (Node.js): built once with `--shared-openssl` against the reference (long; kept under
+//! `target/consumers/build/` until the pin changes), its `test/parallel/test-crypto*` and
+//! `test-tls*` run by `tools/test.py` with TAP output, each `ok`/`not ok` line a result.
 
 use std::fmt::Write as _;
 use std::fs;
@@ -38,7 +42,7 @@ use crate::test_providers::{Pin, Results, Side, fetch, parse_pins, pool, wait};
 use crate::util::{Result, fresh_dir, run_logged, target_dir, workspace_root};
 
 /// The consumers the command knows, as named on its command line.
-const CONSUMERS: &[&str] = &["rust", "ruby", "pyca"];
+const CONSUMERS: &[&str] = &["rust", "ruby", "pyca", "node"];
 
 /// How long one test may run.
 const TEST_TIMEOUT: Duration = Duration::from_secs(300);
@@ -364,6 +368,89 @@ fn run_pyca(ctx: &Ctx<'_>, pins: &[Pin]) -> Result<Vec<Results>> {
     keep(ctx, "pyca", all)
 }
 
+/// Node.js: built once with `--shared-openssl` against the reference (a long build, kept under
+/// `target/consumers/build/`), its `test/parallel/test-crypto*` and `test-tls*` run by
+/// `tools/test.py` with TAP output.
+fn run_node(ctx: &Ctx<'_>, pins: &[Pin]) -> Result<Vec<Results>> {
+    let Some(python) = ["python3.13", "python3.12", "python3"]
+        .into_iter()
+        .find(|p| Command::new(p).arg("--version").output().is_ok())
+    else {
+        println!("node: skipped (no python3 on PATH)");
+        return Ok(Vec::new());
+    };
+    let pin = ctx.pin(pins, "node")?;
+    let tree = fetch(&ctx.dir, pin)?;
+    let node = tree.join("out/Release/node");
+    if !node.exists() {
+        let log = ctx.work.join("node-build.log");
+        println!(
+            "Building Node.js (log: {}; this takes a while)...",
+            log.display()
+        );
+        run_logged(
+            Command::new(python)
+                .arg("configure.py")
+                .arg("--shared-openssl")
+                .arg(format!(
+                    "--shared-openssl-includes={}",
+                    ctx.reference.join("include").display()
+                ))
+                .arg(format!(
+                    "--shared-openssl-libpath={}",
+                    ctx.reference.join("lib").display()
+                ))
+                .current_dir(&tree),
+            &log,
+        )?;
+        run_logged(
+            Command::new("make")
+                .arg(format!("-j{}", ctx.jobs))
+                .current_dir(&tree),
+            &log,
+        )?;
+    }
+    let jobs = ctx.jobs.to_string();
+    let make = move |_: &str| {
+        let mut cmd = Command::new(python);
+        cmd.args([
+            "tools/test.py",
+            "-p",
+            "tap",
+            "-j",
+            &jobs,
+            "--timeout",
+            "240",
+        ])
+        .arg("--shell")
+        .arg(&node)
+        .args(["parallel/test-crypto*", "parallel/test-tls*"])
+        .current_dir(&tree);
+        cmd
+    };
+    let all = run_tests(ctx, &["tests".to_owned()], make, |_, _, out| {
+        tap_results(out)
+    })?;
+    keep(ctx, "node", all)
+}
+
+/// Each test's outcome in TAP: `ok N name` passes (a `# skip` isn't a result), `not ok N
+/// name` fails.
+fn tap_results(out: &str) -> Vec<(String, bool)> {
+    out.lines()
+        .filter_map(|l| {
+            let (passed, rest) = match l.strip_prefix("not ok ") {
+                Some(r) => (false, r),
+                None => (true, l.strip_prefix("ok ")?),
+            };
+            let (_, rest) = rest.split_once(' ')?;
+            let (name, directive) = rest.split_once(" # ").unwrap_or((rest, ""));
+            let skip = directive.to_ascii_lowercase().starts_with("skip");
+            (!skip).then(|| (name.trim().to_owned(), passed))
+        })
+        .collect()
+}
+
 /// Each test's outcome in pytest's `-rA` summary: `PASSED <id>`, `FAILED <id> - ...`,
 /// `ERROR <id> - ...`, `XFAIL`/`XPASS <id>` (skips are listed by place, not by test, and so
 /// aren't results; a test skipped on one side only is missing there).
@@ -544,6 +631,7 @@ pub fn run(args: &[String]) -> Result {
             "rust" => run_rust(&ctx, &pins)?,
             "ruby" => run_ruby(&ctx, &pins)?,
             "pyca" => run_pyca(&ctx, &pins)?,
+            "node" => run_node(&ctx, &pins)?,
             _ => unreachable!(),
         };
         let report = Report {
@@ -576,6 +664,21 @@ pub fn run(args: &[String]) -> Result {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_tap_results() {
+        let out = "TAP version 13\n1..4\nok 1 parallel/test-crypto-a\n  ---\n  duration_ms: 5\n\
+                   not ok 2 parallel/test-tls-b\nok 3 parallel/test-crypto-c # skip no ICU\n\
+                   ok 4 parallel/test-tls-d # TODO later\n";
+        assert_eq!(
+            tap_results(out),
+            [
+                ("parallel/test-crypto-a".to_owned(), true),
+                ("parallel/test-tls-b".to_owned(), false),
+                ("parallel/test-tls-d".to_owned(), true),
+            ]
+        );
+    }
 
     #[test]
     fn reads_pytest_results() {
