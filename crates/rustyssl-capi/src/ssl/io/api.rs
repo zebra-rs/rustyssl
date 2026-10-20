@@ -272,7 +272,10 @@ ffi_export! {
         let mut got = 0usize;
         // SAFETY: the caller's guarantee.
         let r = unsafe { read_internal(s, buf, num, false, &mut got, "SSL_read_ex") };
-        if r > 0 && !readbytes.is_null() {
+        // QUIC reports the count (0) on failure too (`quic_read`, `ossl_quic_write_flags`).
+        // SAFETY: the caller's guarantee.
+        let quic = unsafe { super::super::quic::of(s) }.is_some();
+        if (r > 0 || quic) && !readbytes.is_null() {
             // SAFETY: the caller's slot.
             unsafe { readbytes.write(got) };
         }
@@ -310,7 +313,10 @@ ffi_export! {
         let mut got = 0usize;
         // SAFETY: the caller's guarantee.
         let r = unsafe { read_internal(s, buf, num, true, &mut got, "SSL_peek_ex") };
-        if r > 0 && !readbytes.is_null() {
+        // QUIC reports the count (0) on failure too (`quic_read`, `ossl_quic_write_flags`).
+        // SAFETY: the caller's guarantee.
+        let quic = unsafe { super::super::quic::of(s) }.is_some();
+        if (r > 0 || quic) && !readbytes.is_null() {
             // SAFETY: the caller's slot.
             unsafe { readbytes.write(got) };
         }
@@ -500,7 +506,10 @@ ffi_export! {
         let mut done = 0usize;
         // SAFETY: the caller's guarantee.
         let r = unsafe { write_internal(s, buf, num, &mut done, "SSL_write_ex") };
-        if r > 0 && !written.is_null() {
+        // QUIC reports the count (0) on failure too (`quic_read`, `ossl_quic_write_flags`).
+        // SAFETY: the caller's guarantee.
+        let quic = unsafe { super::super::quic::of(s) }.is_some();
+        if (r > 0 || quic) && !written.is_null() {
             // SAFETY: the caller's slot.
             unsafe { written.write(done) };
         }

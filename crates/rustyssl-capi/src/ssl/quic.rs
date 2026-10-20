@@ -37,6 +37,22 @@ use super::conn::{Ssl, ssl};
 use super::io::Stop;
 use super::tls_provider::EvpProvider;
 use crate::bio::addr;
+use crate::err;
+
+/// Whether the last error on the queue is one the BIO calls transient (`BIO_err_is_non_fatal`).
+fn transient() -> bool {
+    // SAFETY: no preconditions.
+    let e = unsafe { err::ERR_peek_last_error() };
+    // A BIO that failed without saying why is taken as having nothing (ours raise
+    // `BIO_R_NON_FATAL` as OpenSSL's do).
+    if e == 0 {
+        return true;
+    }
+    // SAFETY: no preconditions.
+    (unsafe {
+        crate::bio::dgram::BIO_err_is_non_fatal(core::ffi::c_uint::try_from(e).unwrap_or(0))
+    }) != 0
+}
 
 /// What a QUIC `SSL` handle is (`SSL_TYPE_QUIC_*`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -282,6 +298,12 @@ pub(crate) struct EngineState {
     pub(crate) event_mode: BTreeMap<usize, u64>,
     /// The domain flags of the objects on it (`SSL_get_domain_flags`).
     pub(crate) domain_flags: u64,
+    /// The port failed on a network error (`ossl_quic_port_is_running` is false).
+    pub(crate) net_failed: bool,
+    /// The error the failure left, kept for the calls that report it.
+    err_state: *mut rustyssl_abi::ERR_STATE,
+    /// Datagrams the network BIO couldn't take yet.
+    pub(crate) tx_pending: VecDeque<(PeerAddr, Vec<u8>)>,
     /// Datagrams `SSL_inject_net_dgram` queued, for the next tick.
     pub(crate) injected: VecDeque<(PeerAddr, Vec<u8>)>,
     /// The domain a listener was made from (a reference held), or NULL.
@@ -293,6 +315,8 @@ pub(crate) struct EngineState {
 
 impl Drop for EngineState {
     fn drop(&mut self) {
+        // SAFETY: our state, or NULL.
+        unsafe { err::OSSL_ERR_STATE_free(self.err_state) };
         // SAFETY: our references, each NULL or live.
         unsafe { crate::bio::BIO_free_all(self.net_rbio) };
         // SAFETY: as above.
@@ -357,6 +381,9 @@ impl Engine {
                 domain_flags: unsafe { super::ctx::ctx(ctx) }.map_or(0, |c| c.state().domain_flags),
                 domain: ptr::null_mut(),
                 injected: VecDeque::new(),
+                net_failed: false,
+                err_state: ptr::null_mut(),
+                tx_pending: VecDeque::new(),
             }),
         })
     }
@@ -442,7 +469,8 @@ impl EngineState {
         (self.net_rbio, self.net_wbio)
     }
 
-    /// Reads what the network has into the port.
+    /// Reads what the network has into the port (`demux_recv`): a failure the BIO calls
+    /// transient ends the read; another fails the port.
     fn net_read(&mut self) {
         let Some(p) = self.prov.clone() else { return };
         while let Some((from, d)) = self.injected.pop_front() {
@@ -451,7 +479,7 @@ impl EngineState {
             self.after_datagram();
         }
         let (rbio, _) = self.bios();
-        if rbio.is_null() {
+        if rbio.is_null() || self.net_failed {
             return;
         }
         let mut buf = vec![0u8; 65536];
@@ -481,6 +509,14 @@ impl EngineState {
                     &raw mut n,
                 )
             };
+            if ok == 0 && !transient() {
+                // SAFETY: the mark set above: the BIO's error stays.
+                unsafe { crate::err::ERR_clear_last_mark() };
+                // SAFETY: ours, or NULL.
+                unsafe { addr::BIO_ADDR_free(peer) };
+                self.raise_net_error();
+                return;
+            }
             // SAFETY: the mark set above.
             unsafe { crate::err::ERR_pop_to_mark() };
             let got = ok == 1 && n == 1;
@@ -504,6 +540,43 @@ impl EngineState {
                 self.port.handle_datagram(&*p, now, &from, d);
             }
             self.after_datagram();
+        }
+    }
+
+    /// `ossl_quic_port_raise_net_error`: the port fails, its channels terminate at once, and
+    /// the error (the BIO's, under a cover) is kept for the calls that report it.
+    fn raise_net_error(&mut self) {
+        if self.net_failed {
+            return;
+        }
+        self.net_failed = true;
+        err::raise_with_text(
+            rustyssl_abi::ERR_LIB_SSL,
+            rustyssl_abi::SSL_R_QUIC_NETWORK_ERROR,
+            "ossl_quic_port_raise_net_error",
+            "port failed due to network BIO I/O error",
+        );
+        if self.err_state.is_null() {
+            // SAFETY: no preconditions.
+            self.err_state = unsafe { err::OSSL_ERR_STATE_new() };
+        }
+        // SAFETY: our state (or NULL, which saves nothing).
+        unsafe { err::OSSL_ERR_STATE_save(self.err_state) };
+        let now = self.now();
+        for id in self.port.channel_ids() {
+            if let Some(ch) = self.port.channel(id) {
+                ch.on_net_error(now);
+            }
+        }
+    }
+
+    /// Puts the kept network error back on the queue (`ossl_quic_port_restore_err_state`).
+    pub(crate) fn restore_net_error(&self) {
+        if self.net_failed {
+            // SAFETY: no preconditions.
+            unsafe { err::ERR_clear_error() };
+            // SAFETY: our state, or NULL.
+            unsafe { err::OSSL_ERR_STATE_restore(self.err_state) };
         }
     }
 
@@ -531,17 +604,23 @@ impl EngineState {
         self.fresh.clear();
     }
 
-    /// Sends what the port has.
+    /// Sends what the port has (`ossl_qtx_flush_net`): a datagram the BIO can't take for now
+    /// waits, in order, for the next flush; a failure that isn't transient fails the port.
     pub(crate) fn net_write(&mut self) {
         let Some(p) = self.prov.clone() else { return };
         let (_, wbio) = self.bios();
-        if wbio.is_null() {
+        if wbio.is_null() || self.net_failed {
             return;
         }
         let now = self.now();
         // SAFETY: the owner's live BIO.
         let dst = unsafe { caps(wbio) } & u64::from(BIO_DGRAM_CAP_HANDLES_DST_ADDR) != 0;
-        while let Some((peer, mut data)) = self.port.poll_transmit(&*p, now) {
+        loop {
+            let next = match self.tx_pending.pop_front() {
+                Some(d) => Some(d),
+                None => self.port.poll_transmit(&*p, now),
+            };
+            let Some((peer, mut data)) = next else { break };
             let a = if dst { addr_of(&peer) } else { ptr::null_mut() };
             let mut msg = BIO_MSG {
                 data: data.as_mut_ptr().cast::<c_void>(),
@@ -554,7 +633,7 @@ impl EngineState {
             // SAFETY: no preconditions.
             unsafe { crate::err::ERR_set_mark() };
             // SAFETY: the live BIO; one message over the datagram; a local count.
-            unsafe {
+            let ok = unsafe {
                 crate::bio::BIO_sendmmsg(
                     wbio,
                     &raw mut msg,
@@ -564,10 +643,23 @@ impl EngineState {
                     &raw mut n,
                 )
             };
-            // SAFETY: the mark set above.
-            unsafe { crate::err::ERR_pop_to_mark() };
             // SAFETY: ours, or NULL.
             unsafe { addr::BIO_ADDR_free(a) };
+            if ok == 1 && n == 1 {
+                // SAFETY: the mark set above.
+                unsafe { crate::err::ERR_pop_to_mark() };
+                continue;
+            }
+            if transient() {
+                // SAFETY: as above.
+                unsafe { crate::err::ERR_pop_to_mark() };
+                self.tx_pending.push_front((peer, data));
+                break;
+            }
+            // SAFETY: as above: the BIO's error stays.
+            unsafe { crate::err::ERR_clear_last_mark() };
+            self.raise_net_error();
+            break;
         }
     }
 

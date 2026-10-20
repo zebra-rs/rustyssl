@@ -151,9 +151,12 @@ impl Qctx<'_> {
         0
     }
 
-    /// `QUIC_RAISE_NON_NORMAL_ERROR`: 0.
+    /// `QUIC_RAISE_NON_NORMAL_ERROR`: 0. A shutdown connection's own error comes first.
     fn non_normal(&self, es: &mut EngineState, reason: c_int, function: &str) -> c_int {
         self.set_last_error(es, SSL_ERROR_SSL);
+        if reason == SSL_R_PROTOCOL_IS_SHUTDOWN {
+            es.restore_net_error();
+        }
         err::raise(ERR_LIB_SSL, reason, function);
         0
     }
@@ -568,6 +571,9 @@ pub(crate) unsafe fn get_error(s: *const SSL, ret: c_int) -> Option<c_int> {
     // SAFETY: the caller's guarantee.
     let c = unsafe { expect(s, C | S | NO_ERROR) }?;
     let mut es = c.engine().lock();
+    if es.net_failed {
+        return Some(SSL_ERROR_SYSCALL);
+    }
     let last = if c.is_stream {
         es.stream(c.q.key())
             .map_or(SSL_ERROR_NONE, |r| r.last_error)
@@ -1632,8 +1638,8 @@ pub(crate) fn net_read_desired(q: &Quic) -> c_int {
 
 /// `SSL_net_write_desired`: whether datagrams wait for the network (never: a tick sends all it
 /// can, and a full BIO drops them as a lossy network does).
-pub(crate) fn net_write_desired(_q: &Quic) -> c_int {
-    0
+pub(crate) fn net_write_desired(q: &Quic) -> c_int {
+    c_int::from(!q.engine.lock().tx_pending.is_empty())
 }
 
 /// `SSL_get0_domain`: no QUIC object here belongs to a domain.
@@ -2550,14 +2556,28 @@ unsafe fn pending_int(s: *const SSL, check_channel: bool) -> usize {
         }
     };
     let term = term_any(&mut es, c.conn);
-    let (avail, end) = es
-        .channel_of(c.conn)
-        .map_or((0, false), |ch| ch.streams().readable(id));
-    let avail = usize::try_from(avail).unwrap_or(usize::MAX);
+    // `ossl_quic_stream_recv_pending`, with the end counted when `check_channel`.
+    let pending = es.channel_of(c.conn).map_or(0, |ch| {
+        let Some(p) = ch.streams().get(id).and_then(|st| st.recv.as_ref()) else {
+            return 0;
+        };
+        match p.state {
+            RecvState::Recv | RecvState::SizeKnown | RecvState::DataRecvd => {
+                let avail = usize::try_from(p.buf.available()).unwrap_or(usize::MAX);
+                if avail == 0 && check_channel && p.buf.all_received() {
+                    1
+                } else {
+                    avail
+                }
+            }
+            RecvState::ResetRecvd => usize::from(check_channel),
+            RecvState::DataRead | RecvState::ResetRead => 0,
+        }
+    });
     if check_channel {
-        usize::from(avail > 0 || end || term)
+        usize::from(pending > 0 || term)
     } else {
-        avail
+        pending
     }
 }
 

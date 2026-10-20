@@ -613,6 +613,22 @@ impl Channel {
         );
     }
 
+    /// The network failed (`ossl_quic_channel_raise_net_error`): terminated at once, with
+    /// INTERNAL_ERROR.
+    pub fn on_net_error(&mut self, now: Time) {
+        self.start_terminating(
+            TerminateCause {
+                remote: false,
+                app: false,
+                code: crate::error::code(rustyssl_abi::OSSL_QUIC_ERR_INTERNAL_ERROR),
+                frame_type: 0,
+                reason: b"network BIO I/O error".to_vec(),
+            },
+            true,
+            now,
+        );
+    }
+
     /// Closes with a transport error (`NO_ERROR` when OpenSSL's shutdown flush ends without an
     /// application close set: `ossl_quic_channel_notify_flush_done`).
     pub fn close_transport(&mut self, code: u64, reason: &[u8], now: Time) {
