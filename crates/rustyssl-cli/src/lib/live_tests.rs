@@ -422,7 +422,8 @@ fn live_files_and_config() {
     )
     .unwrap();
     let c = conf.display().to_string();
-    let (cf, e) = io::capture_err(|| apps::app_load_config_modules(Some(&c)));
+    let given = apps::ConfigFile::Given(c.clone());
+    let (cf, e) = io::capture_err(|| apps::app_load_config_modules(Some(&given)));
     let cf = cf.unwrap();
     assert_eq!(
         String::from_utf8(e).unwrap(),

@@ -17,6 +17,8 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicPtr, Ordering};
 
+use crate::abi::OPENSSL_VERSION_MAJOR;
+
 /// The two libraries.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Library {
@@ -25,13 +27,17 @@ pub enum Library {
 }
 
 impl Library {
-    /// The file name the loader knows it by: its soname, or install name on macOS.
-    pub fn file_name(self) -> &'static str {
-        match (self, cfg!(target_os = "macos")) {
-            (Library::Crypto, false) => "libcrypto.so.3",
-            (Library::Ssl, false) => "libssl.so.3",
-            (Library::Crypto, true) => "libcrypto.3.dylib",
-            (Library::Ssl, true) => "libssl.3.dylib",
+    /// The file name the loader knows it by: its soname (`libcrypto.so.3`), or install name
+    /// on macOS (`libcrypto.3.dylib`), with the headers' major version.
+    pub fn file_name(self) -> String {
+        let base = match self {
+            Library::Crypto => "libcrypto",
+            Library::Ssl => "libssl",
+        };
+        if cfg!(target_os = "macos") {
+            format!("{base}.{OPENSSL_VERSION_MAJOR}.dylib")
+        } else {
+            format!("{base}.so.{OPENSSL_VERSION_MAJOR}")
         }
     }
 }
@@ -94,9 +100,9 @@ fn dlerror_text() -> String {
 fn open(library: Library) -> Result<Handle, String> {
     let file = library.file_name();
     let exe = std::env::current_exe().ok();
-    let list = candidates(file, std::env::var_os(LIBRARY_PATH), exe);
+    let list = candidates(&file, std::env::var_os(LIBRARY_PATH), exe);
     for path in &list {
-        let by_name = path.as_os_str() == file;
+        let by_name = path.as_os_str() == file.as_str();
         if !by_name && !path.exists() {
             continue;
         }
@@ -232,6 +238,22 @@ macro_rules! import_variadic {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn library_names() {
+        let (crypto, ssl) = (Library::Crypto.file_name(), Library::Ssl.file_name());
+        if cfg!(target_os = "macos") {
+            assert_eq!(
+                (crypto.as_str(), ssl.as_str()),
+                ("libcrypto.3.dylib", "libssl.3.dylib")
+            );
+        } else {
+            assert_eq!(
+                (crypto.as_str(), ssl.as_str()),
+                ("libcrypto.so.3", "libssl.so.3")
+            );
+        }
+    }
 
     #[test]
     fn search_order_is_runpaths() {

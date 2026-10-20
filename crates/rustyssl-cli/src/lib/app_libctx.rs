@@ -96,8 +96,10 @@ fn provider_param(arg: &str) -> bool {
     let Some((key, value)) = arg.split_once('=') else {
         return malformed();
     };
-    let key = key.trim_end_matches(|c: char| c.is_ascii_whitespace());
-    let value = value.trim_start_matches(|c: char| c.is_ascii_whitespace());
+    // C's isspace: space, \t, \n, \v, \f, \r.
+    let space = [' ', '\t', '\n', '\x0b', '\x0c', '\r'];
+    let key = key.trim_end_matches(space);
+    let value = value.trim_start_matches(space);
     let (name, key) = match key.split_once(':') {
         Some((n, k)) => (if n.is_empty() { None } else { Some(n) }, k),
         None => (None, key),

@@ -2,6 +2,7 @@
 
 use std::cell::RefCell;
 
+use rustyssl_ossl::conf::Conf;
 use rustyssl_ossl::rand;
 
 use super::io;
@@ -23,10 +24,11 @@ const LIST_SEPARATOR: char = ':';
 
 /// `app_RAND_load_conf`: loads the section's `RANDFILE`, which is then also the file written
 /// at exit (unless `-writerand` named one).
-pub fn load_conf(randfile: Option<&str>) {
-    let Some(randfile) = randfile else {
+pub fn load_conf(conf: &Conf, section: Option<&str>) {
+    let Some(randfile) = super::apps::app_conf_try_string(conf, section, "RANDFILE") else {
         return;
     };
+    let randfile = randfile.as_str();
     if rand::load_file(randfile) < 0 {
         eprintf!("Can't load {randfile} into RNG\n");
         io::print_errors();

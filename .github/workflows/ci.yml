@@ -60,7 +60,7 @@ jobs:
         run: cargo xtask test-c
       - name: Differential tests (reference vs rustyssl)
         run: cargo xtask test-differential --random 1000
-      - name: The reference's openssl tool on rustyssl
+      - name: The openssl tools, upstream's and ours, on rustyssl
         run: cargo xtask test-apps
       - name: Upstream OpenSSL's evp_test on rustyssl
         run: cargo xtask test-openssl-suite

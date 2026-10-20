@@ -2,6 +2,7 @@
 
 use core::ffi::{c_char, c_int, c_ulong};
 
+use crate::abi::{ERR_REASON_MASK, ERR_SYSTEM_FLAG, ERR_SYSTEM_MASK};
 use crate::bio::Bio;
 use crate::ffi;
 use crate::util::string_at;
@@ -55,10 +56,20 @@ pub fn peek_last_error() -> c_ulong {
     unsafe { ffi::ERR_peek_last_error() }
 }
 
+/// `ERR_SYSTEM_ERROR(e)`: whether the code is a system error (its reason an `errno`).
+pub fn is_system_error(e: c_ulong) -> bool {
+    e & c_ulong::from(ERR_SYSTEM_FLAG) != 0
+}
+
 /// `ERR_GET_REASON(e)`.
 pub fn reason(e: c_ulong) -> c_int {
-    // ERR_REASON_MASK is 0x7FFFFF and system errors set ERR_SYSTEM_FLAG; the result fits.
-    c_int::try_from(e & 0x7F_FFFF).unwrap_or(0)
+    let mask = if is_system_error(e) {
+        c_ulong::from(ERR_SYSTEM_MASK)
+    } else {
+        c_ulong::try_from(ERR_REASON_MASK).unwrap_or(0)
+    };
+    // Both masks fit an int.
+    c_int::try_from(e & mask).unwrap_or(0)
 }
 
 /// One entry of the queue.

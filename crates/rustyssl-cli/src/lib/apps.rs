@@ -73,8 +73,8 @@ thread_local! {
     /// `app_get_pass`'s `pwdbio`: kept open between the two reads of `app_passwd` when both
     /// passwords come from the same source.
     static PWDBIO: RefCell<Option<Bio>> = const { RefCell::new(None) };
-    /// `nmflag` and whether it was set (`set_nameopt`).
-    static NAMEOPT: RefCell<Option<c_ulong>> = const { RefCell::new(None) };
+    /// `nmflag` and `nmflag_set` (`set_nameopt`).
+    static NAMEOPT: RefCell<(c_ulong, bool)> = const { RefCell::new((0, false)) };
     /// `default_config_file` of `openssl.c`.
     static DEFAULT_CONFIG_FILE: RefCell<Option<String>> = const { RefCell::new(None) };
 }
@@ -87,6 +87,27 @@ pub fn set_default_config_file(file: Option<String>) {
 /// `default_config_file`.
 pub fn default_config_file() -> Option<String> {
     DEFAULT_CONFIG_FILE.with(|d| d.borrow().clone())
+}
+
+/// A command's configuration file: upstream's commands start from the `default_config_file`
+/// pointer and `-config` replaces it, and `app_load_config_modules` tells the two apart by
+/// address, not by name.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ConfigFile {
+    /// `default_config_file`.
+    Default,
+    /// A `-config` value.
+    Given(String),
+}
+
+impl ConfigFile {
+    /// The file name (`None` if there is no default).
+    pub fn name(&self) -> Option<String> {
+        match self {
+            ConfigFile::Default => default_config_file(),
+            ConfigFile::Given(f) => Some(f.clone()),
+        }
+    }
 }
 
 /// `app_get_pass`: one password from `pass:`, `env:`, `file:`, `fd:`, or `stdin`. `keepbio`
@@ -338,12 +359,12 @@ pub fn add_oid_section(conf: &Conf) -> bool {
     true
 }
 
-/// `app_load_config_modules`: loads `configfile` (verbosely) and, unless it is the default
-/// file (already loaded at start-up), its modules.
-pub fn app_load_config_modules(configfile: Option<&str>) -> Option<Conf> {
-    let file = configfile?;
-    let conf = app_load_config_verbose(file, true)?;
-    if Some(file) != default_config_file().as_deref() && !app_load_modules(Some(&conf)) {
+/// `app_load_config_modules`: loads the file (verbosely) and, unless it is the default one
+/// (whose modules start-up loaded), its modules.
+pub fn app_load_config_modules(configfile: Option<&ConfigFile>) -> Option<Conf> {
+    let file = configfile?.name()?;
+    let conf = app_load_config_verbose(&file, true)?;
+    if configfile != Some(&ConfigFile::Default) && !app_load_modules(Some(&conf)) {
         return None;
     }
     Some(conf)
@@ -807,8 +828,8 @@ pub fn load_key_certs_crls(
         if let Some(u) = &uri_shown {
             text.push_str(&format!(" from {u}"));
         }
-        // ERR_SYSTEM_ERROR: the reason is an errno value.
-        if e & (1 << 31) != 0 {
+        // A system error: a more readable reason.
+        if err::is_system_error(e) {
             text.push_str(&format!(": {}", strerror(err::reason(e))));
             err::pop_to_mark();
             err::set_mark();
@@ -1262,31 +1283,33 @@ pub fn set_name_ex(flags: &mut c_ulong, arg: Option<&str>) -> bool {
     true
 }
 
-/// `set_nameopt`.
+/// `set_nameopt`: like upstream, a failed list still changes the flags (`nmflag`), but only
+/// a successful one makes them used.
 pub fn set_nameopt(arg: Option<&str>) -> bool {
-    let mut flags = NAMEOPT.with(|n| n.borrow().unwrap_or(0));
-    let ret = set_name_ex(&mut flags, arg);
-    // upstream updates nmflag even on failure, and marks it set only on success.
     NAMEOPT.with(|n| {
         let mut n = n.borrow_mut();
+        let ret = set_name_ex(&mut n.0, arg);
         if ret {
-            *n = Some(flags);
+            n.1 = true;
         }
-    });
-    ret
+        ret
+    })
 }
 
 /// `get_nameopt`.
 pub fn get_nameopt() -> c_ulong {
     NAMEOPT.with(|n| {
-        n.borrow().unwrap_or(
+        let (flags, set) = *n.borrow();
+        if set {
+            flags
+        } else {
             ul(XN_FLAG_SEP_CPLUS_SPC)
                 | ul(XN_FLAG_FN_SN)
                 | ul(ASN1_STRFLGS_ESC_CTRL)
                 | ul(ASN1_STRFLGS_UTF8_CONVERT)
                 | ul(ASN1_STRFLGS_DUMP_UNKNOWN)
-                | ul(ASN1_STRFLGS_DUMP_DER),
-        )
+                | ul(ASN1_STRFLGS_DUMP_DER)
+        }
     })
 }
 
