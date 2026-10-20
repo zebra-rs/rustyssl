@@ -116,6 +116,27 @@ static void reading(void)
     check(ERR_get_error_line(&file, &line) == (ERR_SYSTEM_FLAG | ENOENT) && ERR_get_error() == 0,
           "ERR_get_error_line: removes the next one");
 
+    /* An error whose code is 0 is still an error: its data and flags are read. */
+    ERR_raise_data(0, 0, "hello %s", "world");
+    data = NULL;
+    flags = 0;
+    check(ERR_peek_error_data(&data, &flags) == 0 && same(data, "hello world")
+          && flags == (ERR_TXT_STRING | ERR_TXT_MALLOCED),
+          "ERR_raise_data(0, 0): ERR_peek_error_data returns 0 with the data");
+    data = NULL;
+    check(ERR_get_error_all(&file, &line, &func, &data, &flags) == 0 && same(data, "hello world")
+          && same(func, "reading") && ERR_peek_last_error_data(&data, &flags) == 0,
+          "ERR_get_error_all: removes it, its details written");
+    data = NULL;
+    flags = -1;
+    check(ERR_peek_error_data(&data, &flags) == 0 && data == NULL && flags == -1,
+          "ERR_peek_error_data: an empty queue leaves the outputs alone");
+    ERR_raise(0, 0);
+    data = NULL;
+    flags = -1;
+    check(ERR_get_error_line_data(&file, &line, &data, &flags) == 0 && flags == 0
+          && same(data, "") && ERR_peek_error() == 0, "ERR_raise(0, 0): an error without data");
+
     ERR_put_error(ERR_LIB_BN, 0, BN_R_DIV_BY_ZERO, "put.c", 7);
     check(ERR_get_error_line_data(&file, &line, &data, &flags)
               == ERR_PACK(ERR_LIB_BN, 0, BN_R_DIV_BY_ZERO)
