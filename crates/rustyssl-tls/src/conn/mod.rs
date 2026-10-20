@@ -241,6 +241,9 @@ pub struct Connection {
     skipped: u64,
     /// Network output not yet taken.
     output: Vec<u8>,
+    /// Offsets in `output` where the state machine flushed (`statem_flush`): what came before
+    /// each went to the network then, not with what followed.
+    flush_marks: Vec<usize>,
     /// Handshake octets read from records and not yet taken as messages
     /// (`s->rlayer.handshake_fragment` and the message buffer).
     pub(crate) hs_in: Vec<u8>,
@@ -405,6 +408,7 @@ impl Connection {
             },
             input: Vec::new(),
             output: Vec::new(),
+            flush_marks: Vec::new(),
             hs_in: Vec::new(),
             cur_msg: None,
             events: VecDeque::new(),
@@ -639,6 +643,25 @@ impl Connection {
         core::mem::take(&mut self.output)
     }
 
+    /// Takes the network output and the offsets in it where the state machine flushed
+    /// (`statem_flush`), in order.
+    pub fn take_output_and_flushes(&mut self) -> (Vec<u8>, Vec<usize>) {
+        (
+            core::mem::take(&mut self.output),
+            core::mem::take(&mut self.flush_marks),
+        )
+    }
+
+    /// Whether the state machine is running, so that OpenSSL writes through its buffering BIO
+    /// (`ssl_init_wbio_buffer` when a handshake or post-handshake exchange starts,
+    /// `ssl_free_wbio_buffer` when it finishes): the network then gets the output at the
+    /// flushes (`statem_flush`, a fatal alert), or when 4096 octets are waiting, rather than a
+    /// record at a time. Not for DTLS, whose datagrams are packed already.
+    #[must_use]
+    pub fn write_buffered(&self) -> bool {
+        !self.cfg.dtls && matches!(self.st.state, MsgFlow::Reading | MsgFlow::Writing)
+    }
+
     /// The ClientHello's legacy_version (`s->client_version`): what a server received, or what a
     /// client sent (TLS 1.2's number for TLS 1.3); 0 before either.
     #[must_use]
@@ -843,6 +866,9 @@ impl Connection {
     pub(crate) fn flushed(&mut self) -> bool {
         if self.cfg.dtls {
             self.dtls_close_datagram();
+        }
+        if self.flush_marks.last() != Some(&self.output.len()) {
+            self.flush_marks.push(self.output.len());
         }
         self.output.is_empty()
     }

@@ -135,6 +135,12 @@ pub(crate) struct Driver {
     pub(crate) out_record_left: usize,
     /// DTLS: the lengths of the datagrams in `out`, in order.
     pub(crate) out_dgrams: std::collections::VecDeque<usize>,
+    /// TLS: the lengths of the writes `out` holds, in order (a record each, or what the
+    /// handshake's buffering BIO wrote at once).
+    pub(crate) out_units: std::collections::VecDeque<usize>,
+    /// TLS: what the handshake's buffering BIO (`ssl_init_wbio_buffer`'s `BIO_f_buffer`) holds
+    /// until a flush or until it fills.
+    pub(crate) bbuf: Vec<u8>,
     /// A write waiting to be retried (`wpend_tot`, `wpend_buf`): what it accepted, and its
     /// buffer's address.
     pub(crate) wpend: Option<(usize, usize)>,
@@ -605,16 +611,101 @@ unsafe fn read_datagram(x: &Ssl) -> Input {
 }
 
 /// Moves the core's output (DTLS: its datagrams) to the driver's buffer.
+///
+/// TLS output goes to the network a record per write, except while the state machine runs:
+/// OpenSSL then writes through a buffering BIO (`ssl_init_wbio_buffer`), which the network sees
+/// at the state machine's flushes (`statem_flush`) and when it fills, and which a fatal alert
+/// flushes. Programs that read the packets (TLSProxy) see the same writes.
 pub(crate) fn push_output(d: &mut Driver, c: &mut Connection) {
     if c.config().dtls {
         for dg in c.take_datagrams() {
             d.out_dgrams.push_back(dg.len());
             d.out.extend_from_slice(&dg);
         }
-    } else {
-        let out = c.take_output();
-        d.out.extend_from_slice(&out);
+        return;
     }
+    let buffered = c.write_buffered();
+    let (out, marks) = c.take_output_and_flushes();
+    let mut at = 0;
+    for mark in marks {
+        let piece = out.get(at..mark.min(out.len())).unwrap_or_default();
+        for record in records(piece) {
+            bbio_write(d, record);
+        }
+        bbio_flush(d);
+        at = at.max(mark);
+    }
+    let rest = out.get(at.min(out.len())..).unwrap_or_default();
+    if buffered {
+        for record in records(rest) {
+            bbio_write(d, record);
+        }
+    } else if !d.bbuf.is_empty() {
+        // The state machine stopped with output still buffered (a fatal alert, which flushes
+        // the buffering BIO): what follows goes out with it.
+        for record in records(rest) {
+            d.bbuf.extend_from_slice(record);
+        }
+        bbio_flush(d);
+    } else {
+        for record in records(rest) {
+            unit(d, record);
+        }
+    }
+}
+
+/// `BIO_f_buffer`'s default size (`DEFAULT_BUFFER_SIZE`).
+const BBIO_SIZE: usize = 4096;
+
+/// The records in `out`, each with its header (what's left, if it doesn't end on a record).
+fn records(mut out: &[u8]) -> impl Iterator<Item = &[u8]> {
+    core::iter::from_fn(move || {
+        if out.is_empty() {
+            return None;
+        }
+        let n = record_len(out).min(out.len());
+        let (head, tail) = out.split_at(n);
+        out = tail;
+        Some(head)
+    })
+}
+
+/// One write to the network.
+fn unit(d: &mut Driver, bytes: &[u8]) {
+    if bytes.is_empty() {
+        return;
+    }
+    d.out_units.push_back(bytes.len());
+    d.out.extend_from_slice(bytes);
+}
+
+/// A record written into the buffering BIO (`buffer_write`): kept while it fits; otherwise the
+/// buffer is filled, written out, and what remains is written straight through when it's a
+/// buffer's worth or more, or kept.
+fn bbio_write(d: &mut Driver, mut data: &[u8]) {
+    loop {
+        let space = BBIO_SIZE.saturating_sub(d.bbuf.len());
+        if space >= data.len() {
+            d.bbuf.extend_from_slice(data);
+            return;
+        }
+        if !d.bbuf.is_empty() {
+            let (fill, rest) = data.split_at(space);
+            d.bbuf.extend_from_slice(fill);
+            data = rest;
+            bbio_flush(d);
+        }
+        if data.len() >= BBIO_SIZE {
+            unit(d, data);
+            return;
+        }
+    }
+}
+
+/// The buffering BIO flushed: what it holds is one write.
+fn bbio_flush(d: &mut Driver) {
+    let held = core::mem::take(&mut d.bbuf);
+    unit(d, &held);
 }
 
 /// [`push_output`] for the connection's core, if it's in place.
@@ -705,6 +796,7 @@ pub(crate) unsafe fn flush(x: &Ssl) -> Flush {
             let mut st = x.state();
             if st.drv.out.is_empty() {
                 st.drv.out_record_left = 0;
+                st.drv.out_units.clear();
                 return Flush::Done;
             }
             if st.drv.out_record_left == 0 {
@@ -712,7 +804,8 @@ pub(crate) unsafe fn flush(x: &Ssl) -> Flush {
                     // One datagram per write.
                     st.drv.out_dgrams.pop_front().unwrap_or(st.drv.out.len())
                 } else {
-                    record_len(&st.drv.out)
+                    // A record, or what the buffering BIO wrote at once.
+                    st.drv.out_units.pop_front().unwrap_or(st.drv.out.len())
                 };
             }
             let n = st.drv.out_record_left.min(st.drv.out.len());
