@@ -5879,6 +5879,12 @@ with disjoint files: A (the seam and 10.3), B (the transport), then C (10.2's AP
 HTTP/3 works over the OpenSSL QUIC backend. upstream `quicapitest` and
 `quic_multistream_test` pass.
 
+The exit's harnesses are built (2026-10-20, fork D): `cargo xtask test-quic-interop` (the
+runner's core cases, locally, against quiche, ngtcp2, and quic-go; TEST_PLAN L7) and
+`cargo xtask test-consumers curl-h3` (curl 8.18.0 with `--with-openssl-quic`, the last curl
+with that backend). On the reference every supported run passes in both roles; rustyssl's
+runs wait for 10.2.
+
 ## Phase 11: The `openssl` command-line tool
 
 Until this phase, the upstream `apps/` sources compiled against our libraries serve as the

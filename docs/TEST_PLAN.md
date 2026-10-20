@@ -313,6 +313,29 @@ rustyssl itself**. You can only regenerate golden files with
     seeds 1 to 6, and the 17 GnuTLS cases on both libraries.
 - **QUIC:** quic-interop-runner cases (handshake, transfer, retry, resumption, zerortt,
   chacha20, keyupdate, multiplexing), plus curl and nghttp3 over HTTP/3.
+  - Built: `cargo xtask test-quic-interop [--peer quiche|ngtcp2|quic-go] [--reference-only]
+    [case...]` (the user's decision, 2026-10-20: a local driver first, the Docker runner a
+    follow-up). The cases follow the runner's `testcases_quic.py` (pinned commit): each case's
+    files, and the test name each role is given. They run on loopback between OpenSSL's own
+    interop endpoint (`test/quic-openssl-docker/`'s `quic-hq-interop` client and server for
+    HTTP/0.9; curl 8.18.0 with `--with-openssl-quic` and `ossl-nghttp3-demo-server` for http3),
+    compiled from the reference's source and run on each library, and three peers built from
+    pinned sources (`tests/quic-interop/pins.txt`): quiche 0.30.0's apps (BoringSSL), ngtcp2
+    v1.25.0's `ossl` examples (on the reference; HTTP/0.9 variants added to its cmake build),
+    and quic-go v0.64.1's interop programs (Go's crypto/tls). Each endpoint supports what its
+    own `run_endpoint.sh` supports; the rest is "unsupported", as the runner's exit 127.
+  - A run passes when the client exits 0 and every file arrived intact. The runner's
+    packet-trace checks (one handshake, a Retry sent, no certificate on resumption, the key
+    phase changing, the stream limit) need a capture and its keys, and aren't made locally.
+    A failing run is tried up to three times (OpenSSL's nghttp3 demo server asserts on some
+    orders of parallel requests, on any library); runs that needed a retry are listed.
+  - Status (2026-10-20, reference only): every supported run passes, both ways, against all
+    three peers: handshake, transfer, retry, resumption, multiplexing, and http3 everywhere;
+    chacha20 with ngtcp2 and quic-go, and as a client with quiche (quiche's client can't pick
+    ciphers); keyupdate as a server with ngtcp2's and quic-go's clients (OpenSSL's client
+    doesn't run it, nor does quiche's). zerortt is unsupported
+    by OpenSSL's endpoint in both roles. rustyssl's runs wait for 10.2 (its QUIC API is still
+    stubs).
 - **PKI:** the full x509-limbo suite. Results equal the reference's or are stricter only
   where `DEVIATIONS.md` documents it. A dedicated hostname-verification corpus covers
   wildcards, IDNA, IP SANs, and the CN-fallback flags.
@@ -340,6 +363,7 @@ reference run.** Any difference is the signal to investigate.
 | OpenVPN, stunnel, socat, wget, git, Tor, BIND 9, Unbound, OpenLDAP, Postfix | mixed | their own suites, or smoke tests | M6 |
 | pkcs11-provider, oqs-provider, tpm2-openssl | the provider ABI | their own suites (`cargo xtask test-providers`) | Phase 9 |
 | ngtcp2 (ossl backend) | third-party QUIC API | its examples' pytest suite (`cargo xtask test-consumers ngtcp2`) | Phase 10 |
+| curl 8.18.0 (`--with-openssl-quic`, nghttp3) | OpenSSL's QUIC client API over HTTP/3 | downloads from quiche's, ngtcp2's, and quic-go's h3 servers (`cargo xtask test-consumers curl-h3`) | Phase 10 |
 
 The providers run under `cargo xtask test-providers [oqs|pkcs11|tpm2]`, pinned to commits
 with their tarballs' SHA-256 in `tests/providers/pins.txt` and built against the reference;

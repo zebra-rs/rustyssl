@@ -24,3 +24,6 @@ pin ngtcp2 ngtcp2/ngtcp2 f9e9ff01ad2c8116bc09de4f644b0028a61486a6 5011b0e5b53faa
 pin ngtcp2-urlparse ngtcp2/urlparse c8168839c89fc5c5917c375e1bd6ffeddf3f7f88 8b638ee2fd2bd4d1633a8ed10bc090101ccb8050a9ff22444b7404fe21d8e8f1
 pin nghttp3 ngtcp2/nghttp3 dbfc24286138cb0b6490160e7ca87fe1ce6722a0 987c1f908cee3a708109a41c264a53728aebf91b32d1110182277df1181d21b5
 pin nghttp3-sfparse ngtcp2/sfparse 4b313cfd2e1b389ae632b36dcd50402307289af2 cc8256a65a03577654941839e100b3d61fe7f7d69f2a08f9b2f17a123b580b4c
+
+# curl-h3: curl and the HTTP/3 servers it downloads from are pinned in
+# tests/quic-interop/pins.txt (test-quic-interop builds them).
