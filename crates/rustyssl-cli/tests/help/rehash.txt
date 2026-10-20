@@ -1,0 +1,20 @@
+Usage: rehash [options] [directory...]
+
+General options:
+ -help               Display this summary
+ -h                  Display this summary
+ -compat             Create both new- and old-style hash links
+ -old                Use old-style hash to generate links
+ -n                  Do not remove existing links
+
+Output options:
+ -v                  Verbose output
+
+Provider options:
+ -provider-path val  Provider load path (must be before 'provider' argument if required)
+ -provider val       Provider to load (can be specified multiple times)
+ -provparam val      Set a provider key-value parameter
+ -propquery val      Property query used when fetching algorithms
+
+Parameters:
+ directory           One or more directories to process (optional)

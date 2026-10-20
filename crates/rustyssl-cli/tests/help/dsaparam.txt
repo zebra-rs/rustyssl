@@ -1,0 +1,32 @@
+Usage: dsaparam [options] [numbits] [numqbits]
+
+General options:
+ -help               Display this summary
+ -engine val         Use engine e, possibly a hardware device
+
+Input options:
+ -in infile          Input file
+ -inform PEM|DER     Input format - DER or PEM
+
+Output options:
+ -out outfile        Output file
+ -outform PEM|DER    Output format - DER or PEM
+ -text               Print as text
+ -noout              No output
+ -verbose            Verbose output
+ -quiet              Terse output
+ -genkey             Generate a DSA key
+
+Random state options:
+ -rand val           Load the given file(s) into the random number generator
+ -writerand outfile  Write random data to the specified file
+
+Provider options:
+ -provider-path val  Provider load path (must be before 'provider' argument if required)
+ -provider val       Provider to load (can be specified multiple times)
+ -provparam val      Set a provider key-value parameter
+ -propquery val      Property query used when fetching algorithms
+
+Parameters:
+ numbits             Number of bits if generating parameters or key (optional)
+ numqbits            Number of bits in the subprime parameter q if generating parameters or key (optional)

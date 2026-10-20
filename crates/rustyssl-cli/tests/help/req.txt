@@ -1,0 +1,71 @@
+Usage: req [options]
+
+General options:
+ -help                 Display this summary
+ -cipher val           Specify the cipher for private key encryption
+ -engine val           Use engine, possibly a hardware device
+ -keygen_engine val    Specify engine to be used for key generation operations
+ -in infile            X.509 request input file (default stdin)
+ -inform PEM|DER       CSR input format to use (PEM or DER; by default try PEM first)
+ -verify               Verify self-signature on the request
+
+Certificate options:
+ -new                  New request
+ -config infile        Request template file
+ -section val          Config section to use (default "req")
+ -utf8                 Input characters are UTF8 (default ASCII)
+ -nameopt val          Certificate subject/issuer name printing options
+ -reqopt val           Various request text options
+ -text                 Text form of request
+ -x509                 Output an X.509 certificate structure instead of a cert request
+ -x509v1               Request cert generation with X.509 version 1
+ -CA infile            Issuer cert to use for signing a cert, implies -x509
+ -CAkey val            Issuer private key to use with -CA; default is -CA arg
+                       (Required by some CA's)
+ -subj val             Set or modify subject of request or cert
+ -subject              Print the subject of the output request or cert
+ -multivalue-rdn       Deprecated; multi-valued RDNs support is always on.
+ -not_before val       [CC]YYMMDDHHMMSSZ value for notBefore certificate field
+ -not_after val        [CC]YYMMDDHHMMSSZ value for notAfter certificate field, overrides -days
+ -days +int            Number of days certificate is valid for
+ -set_serial val       Serial number to use
+ -copy_extensions val  copy extensions from request when using -x509
+ -extensions val       Cert or request extension section (override value in config file)
+ -reqexts val          An alias for -extensions
+ -addext val           Additional cert extension key=value pair (may be given more than once)
+ -precert              Add a poison extension to generated cert (implies -new)
+
+Keys and Signing options:
+ -key val              Key for signing, and to include unless -in given
+ -keyform format       Key file format (ENGINE, other values ignored)
+ -pubkey               Output public key
+ -keyout outfile       File to write private key to
+ -passin val           Private key and certificate password source
+ -passout val          Output file pass phrase source
+ -newkey val           Generate new key with [<alg>:]<nbits> or <alg>[:<file>] or param:<file>
+ -pkeyopt val          Public key options as opt:value
+ -sigopt val           Signature parameter in n:v form
+ -vfyopt val           Verification parameter in n:v form
+ -*                    Any supported digest
+
+Output options:
+ -out outfile          Output file
+ -outform PEM|DER      Output format - DER or PEM
+ -batch                Do not ask anything during request generation
+ -verbose              Verbose output
+ -quiet                Terse output
+ -noenc                Don't encrypt private keys
+ -nodes                Don't encrypt private keys; deprecated
+ -noout                Do not output REQ
+ -newhdr               Output "NEW" in the header lines
+ -modulus              RSA modulus
+
+Random state options:
+ -rand val             Load the given file(s) into the random number generator
+ -writerand outfile    Write random data to the specified file
+
+Provider options:
+ -provider-path val    Provider load path (must be before 'provider' argument if required)
+ -provider val         Provider to load (can be specified multiple times)
+ -provparam val        Set a provider key-value parameter
+ -propquery val        Property query used when fetching algorithms

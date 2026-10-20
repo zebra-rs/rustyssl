@@ -1,0 +1,20 @@
+Usage: crl2pkcs7 [options]
+
+General options:
+ -help               Display this summary
+
+Input options:
+ -in infile          Input file
+ -inform PEM|DER     Input format - DER or PEM
+ -nocrl              No crl to load, just certs from '-certfile'
+ -certfile infile    File of chain of certs to a trusted CA; can be repeated
+
+Output options:
+ -out outfile        Output file
+ -outform PEM|DER    Output format - DER or PEM
+
+Provider options:
+ -provider-path val  Provider load path (must be before 'provider' argument if required)
+ -provider val       Provider to load (can be specified multiple times)
+ -provparam val      Set a provider key-value parameter
+ -propquery val      Property query used when fetching algorithms

@@ -318,6 +318,46 @@ mod tests {
         assert!(find_function("zlib").is_none());
     }
 
+    /// Golden tests: each command's `-help`, from the generated table, is upstream's text
+    /// byte for byte (`tests/help/<command>.txt`, written by `cargo xtask test-apps --bless
+    /// help` from the reference build).
+    #[test]
+    fn help_is_upstreams() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/help");
+        let mut checked = 0;
+        for entry in std::fs::read_dir(&dir).unwrap() {
+            let path = entry.unwrap().path();
+            let command = path.file_stem().unwrap().to_str().unwrap().to_owned();
+            let golden = std::fs::read(&path).unwrap();
+            let argv = [command.clone(), "-help".to_owned()];
+            let ((), text) = io::capture_err(|| {
+                if command == "help" {
+                    assert_eq!(help_main(&argv), 0);
+                } else {
+                    let f = find_function(&command).unwrap();
+                    if f.deprecated_alternative.is_some() {
+                        warn_deprecated(f);
+                    }
+                    let module = match f.kind {
+                        FuncType::Md => "dgst",
+                        FuncType::Cipher => "enc",
+                        _ => f.options.unwrap(),
+                    };
+                    assert_eq!(generated::options::help_only(module, &argv), Some(true));
+                }
+            });
+            assert!(
+                text == golden,
+                "{command}: the -help text differs from {}",
+                path.display()
+            );
+            checked += 1;
+        }
+        // Every command but `ts` and `verify`, which print more than their tables, and some
+        // digest and cipher commands.
+        assert!(checked >= 53);
+    }
+
     #[test]
     fn every_table_has_help() {
         for f in FUNCTIONS.iter().filter(|f| f.kind == FuncType::General) {

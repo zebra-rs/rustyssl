@@ -1,0 +1,26 @@
+# `openssl version` (cargo xtask test-apps runs each line with upstream's tool on the reference,
+# then with ours on rustyssl and on the reference). Lines starting with `~` print what the
+# library was built with (date, compiler flags, CPU), which differ by design: they must only
+# succeed.
+version
+version -v
+version -o -p -r -v
+version -d -e -m
+version -m -v -d -o
+version -p -p
+~version -a
+~version -b
+~version -f
+~version -c
+~version -a -v -b
+version -help
+version -h
+version --help
+version -help -x
+version -x
+version -a=1
+version extra
+version -v -- extra
+version -v -- -a
+version ---S
+version -

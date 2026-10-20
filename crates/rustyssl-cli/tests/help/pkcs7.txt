@@ -1,0 +1,24 @@
+Usage: pkcs7 [options]
+
+General options:
+ -help               Display this summary
+ -engine val         Use engine, possibly a hardware device
+
+Input options:
+ -in infile          Input file
+ -inform PEM|DER     Input format - DER or PEM
+
+Output options:
+ -outform PEM|DER    Output format - DER or PEM
+ -out outfile        Output file
+ -noout              Don't output encoded data
+ -text               Print full details of certificates
+ -print              Print out all fields of the PKCS7 structure
+ -print_certs        Print_certs  print any certs or crl in the input
+ -quiet              When used with -print_certs, it produces a cleaner output
+
+Provider options:
+ -provider-path val  Provider load path (must be before 'provider' argument if required)
+ -provider val       Provider to load (can be specified multiple times)
+ -provparam val      Set a provider key-value parameter
+ -propquery val      Property query used when fetching algorithms

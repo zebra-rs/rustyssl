@@ -1,0 +1,68 @@
+Usage: pkcs12 [options]
+
+General options:
+ -help                  Display this summary
+ -in infile             Input file
+ -out outfile           Output file
+ -passin val            Input file pass phrase source
+ -passout val           Output file pass phrase source
+ -password val          Set PKCS#12 import/export password source
+ -twopass               Separate MAC, encryption passwords
+ -nokeys                Don't output private keys
+ -nocerts               Don't output certificates
+ -noout                 Don't output anything, just verify PKCS#12 input
+ -legacy                Use legacy encryption: 3DES_CBC for keys, RC2_CBC for certs
+ -engine val            Use engine, possibly a hardware device
+
+Provider options:
+ -provider-path val     Provider load path (must be before 'provider' argument if required)
+ -provider val          Provider to load (can be specified multiple times)
+ -provparam val         Set a provider key-value parameter
+ -propquery val         Property query used when fetching algorithms
+
+Random state options:
+ -rand val              Load the given file(s) into the random number generator
+ -writerand outfile     Write random data to the specified file
+
+PKCS#12 import (parsing PKCS#12) options:
+ -info                  Print info about PKCS#12 structure
+ -nomacver              Don't verify integrity MAC
+ -clcerts               Only output client certificates
+ -cacerts               Only output CA certificates
+ -*                     Any supported cipher for output encryption
+ -noenc                 Don't encrypt private keys
+ -nodes                 Don't encrypt private keys; deprecated
+
+PKCS#12 output (export) options:
+ -export                Create PKCS12 file
+ -inkey val             Private key, else read from -in input file
+ -certfile infile       Extra certificates for PKCS12 output
+ -passcerts val         Certificate file pass phrase source
+ -chain                 Build and add certificate chain for EE cert,
+                        which is the 1st cert from -in matching the private key (if given)
+ -untrusted infile      Untrusted certificates for chain building
+ -CAfile infile         PEM-format file of CA's
+ -CApath dir            PEM-format directory of CA's
+ -CAstore uri           URI to store of CA's
+ -no-CAfile             Do not load the default certificates file
+ -no-CApath             Do not load certificates from the default certificates directory
+ -no-CAstore            Do not load certificates from the default certificates store
+ -name val              Use name as friendly name
+ -caname val            Use name as CA friendly name (can be repeated)
+ -CSP val               Microsoft CSP name
+ -LMK                   Add local machine keyset attribute to private key
+ -keyex                 Set key type to MS key exchange
+ -keysig                Set key type to MS key signature
+ -keypbe val            Private key PBE algorithm (default AES-256 CBC)
+ -certpbe val           Certificate PBE algorithm (default PBES2 with PBKDF2 and AES-256 CBC)
+ -descert               Encrypt output with 3DES (default PBES2 with PBKDF2 and AES-256 CBC)
+ -macalg val            Digest algorithm to use in MAC (default SHA256)
+ -pbmac1_pbkdf2         Use PBMAC1 with PBKDF2 instead of MAC
+ -pbmac1_pbkdf2_md val  Digest to use for PBMAC1 KDF (default SHA256)
+ -iter +int             Specify the iteration count for encryption and MAC
+ -noiter                Don't use encryption iteration
+ -nomaciter             Don't use MAC iteration)
+ -maciter               Unused, kept for backwards compatibility
+ -macsaltlen +int       Specify the salt len for MAC
+ -nomac                 Don't generate MAC
+ -jdktrust val          Mark certificate in PKCS#12 store as trusted for JDK compatibility

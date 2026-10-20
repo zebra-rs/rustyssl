@@ -1,0 +1,54 @@
+Usage: fipsinstall [options]
+
+General options:
+ -help                         Display this summary
+ -pedantic                     Set options for strict FIPS compliance
+ -verify                       Verify a config file instead of generating one
+ -module infile                File name of the provider module
+ -provider_name val            FIPS provider name
+ -section_name val             FIPS Provider config section name (optional)
+ -no_conditional_errors        Disable the ability of the fips module to enter an error state if any conditional self tests fail
+ -no_security_checks           Disable the run-time FIPS security checks in the module
+ -self_test_onload             Forces self tests to always run on module load
+ -self_test_oninstall          Forces self tests to run once on module installation
+ -ems_check                    Enable the run-time FIPS check for EMS during TLS1_PRF
+ -no_short_mac                 Disallow short MAC output
+ -no_drbg_truncated_digests    Disallow truncated digests with Hash and HMAC DRBGs
+ -signature_digest_check       Enable checking for approved digests for signatures
+ -hmac_key_check               Enable key check for HMAC
+ -kmac_key_check               Enable key check for KMAC
+ -hkdf_digest_check            Enable digest check for HKDF
+ -tls13_kdf_digest_check       Enable digest check for TLS13-KDF
+ -tls1_prf_digest_check        Enable digest check for TLS1-PRF
+ -sshkdf_digest_check          Enable digest check for SSHKDF
+ -sskdf_digest_check           Enable digest check for SSKDF
+ -x963kdf_digest_check         Enable digest check for X963KDF
+ -dsa_sign_disabled            Disallow DSA signing
+ -tdes_encrypt_disabled        Disallow Triple-DES encryption
+ -rsa_pkcs15_padding_disabled  Disallow PKCS#1 version 1.5 padding for RSA encryption
+ -rsa_pss_saltlen_check        Enable salt length check for RSA-PSS signature operations
+ -rsa_sign_x931_disabled       Disallow X931 Padding for RSA signing
+ -hkdf_key_check               Enable key check for HKDF
+ -kbkdf_key_check              Enable key check for KBKDF
+ -tls13_kdf_key_check          Enable key check for TLS13-KDF
+ -tls1_prf_key_check           Enable key check for TLS1-PRF
+ -sshkdf_key_check             Enable key check for SSHKDF
+ -sskdf_key_check              Enable key check for SSKDF
+ -x963kdf_key_check            Enable key check for X963KDF
+ -x942kdf_key_check            Enable key check for X942KDF
+ -no_pbkdf2_lower_bound_check  Disable lower bound check for PBKDF2
+ -ecdh_cofactor_check          Enable Cofactor check for ECDH
+
+Input options:
+ -in infile                    Input config file, used when verifying
+
+Output options:
+ -out outfile                  Output config file, used when generating
+ -mac_name val                 MAC name
+ -macopt val                   MAC algorithm parameters in n:v form.
+                               See 'PARAMETER NAMES' in the EVP_MAC_ docs
+ -noout                        Disable logging of self test events
+ -corrupt_desc val             Corrupt a self test by description
+ -corrupt_type val             Corrupt a self test by type
+ -config infile                The parent config to verify
+ -quiet                        No messages, just exit status

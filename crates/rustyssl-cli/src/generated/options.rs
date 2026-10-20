@@ -12670,11 +12670,25 @@ pub mod s_client {
             help: Some("Proxy authentication password source"),
         },
         OptDef {
+            name: "unix",
+            marker: None,
+            ret: Some(Opt::UNIX),
+            valtype: b's',
+            help: Some("Connect over the specified Unix-domain socket"),
+        },
+        OptDef {
             name: "4",
             marker: None,
             ret: Some(Opt::_4),
             valtype: b'-',
             help: Some("Use IPv4 only"),
+        },
+        OptDef {
+            name: "6",
+            marker: None,
+            ret: Some(Opt::_6),
+            valtype: b'-',
+            help: Some("Use IPv6 only"),
         },
         OptDef {
             name: "maxfraglen",
@@ -14228,6 +14242,20 @@ pub mod s_server {
             help: Some(
                 "TCP/IP optional host and port to listen on for connections (default is *:4433)",
             ),
+        },
+        OptDef {
+            name: "unix",
+            marker: None,
+            ret: Some(Opt::UNIX),
+            valtype: b's',
+            help: Some("Unix domain socket to accept on"),
+        },
+        OptDef {
+            name: "unlink",
+            marker: None,
+            ret: Some(Opt::UNLINK),
+            valtype: b'-',
+            help: Some("For -unix, unlink existing socket first"),
         },
         OptDef {
             name: "4",

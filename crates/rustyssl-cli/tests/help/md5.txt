@@ -1,0 +1,44 @@
+Usage: md5 [options] [file...]
+
+General options:
+ -help               Display this summary
+ -list               List digests
+ -engine val         Use engine e, possibly a hardware device
+ -engine_impl        Also use engine given by -engine for digest operations
+ -passin val         Input file pass phrase source
+
+Output options:
+ -c                  Print the digest with separating colons
+ -r                  Print the digest in coreutils format
+ -out outfile        Output to filename rather than stdout
+ -keyform format     Key file format (ENGINE, other values ignored)
+ -hex                Print as hex dump
+ -binary             Print in binary form
+ -xoflen +int        Output length for XOF algorithms. To obtain the maximum security strength set this to 32 (or greater) for SHAKE128, and 64 (or greater) for SHAKE256
+ -d                  Print debug info
+ -debug              Print debug info
+
+Signing options:
+ -sign val           Sign digest using private key
+ -verify val         Verify a signature using public key
+ -prverify val       Verify a signature using private key
+ -sigopt val         Signature parameter in n:v form
+ -signature infile   File with signature to verify
+ -hmac val           Create hashed MAC with key
+ -mac val            Create MAC (not necessarily HMAC)
+ -macopt val         MAC algorithm parameters in n:v form or key
+ -*                  Any supported digest
+ -fips-fingerprint   Compute HMAC with the key used in OpenSSL-FIPS fingerprint
+
+Random state options:
+ -rand val           Load the given file(s) into the random number generator
+ -writerand outfile  Write random data to the specified file
+
+Provider options:
+ -provider-path val  Provider load path (must be before 'provider' argument if required)
+ -provider val       Provider to load (can be specified multiple times)
+ -provparam val      Set a provider key-value parameter
+ -propquery val      Property query used when fetching algorithms
+
+Parameters:
+ file                Files to digest (optional; default is stdin)

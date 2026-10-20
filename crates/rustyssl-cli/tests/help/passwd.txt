@@ -1,0 +1,35 @@
+Usage: passwd [options] [password]
+
+General options:
+ -help               Display this summary
+
+Input options:
+ -in infile          Read passwords from file
+ -noverify           Never verify when reading password from terminal
+ -stdin              Read passwords from stdin
+
+Output options:
+ -quiet              No warnings
+ -table              Format output as table
+ -reverse            Switch table columns
+
+Cryptographic options:
+ -salt val           Use provided salt
+ -6                  SHA512-based password algorithm
+ -5                  SHA256-based password algorithm
+ -apr1               MD5-based password algorithm, Apache variant
+ -1                  MD5-based password algorithm
+ -aixmd5             AIX MD5-based password algorithm
+
+Random state options:
+ -rand val           Load the given file(s) into the random number generator
+ -writerand outfile  Write random data to the specified file
+
+Provider options:
+ -provider-path val  Provider load path (must be before 'provider' argument if required)
+ -provider val       Provider to load (can be specified multiple times)
+ -provparam val      Set a provider key-value parameter
+ -propquery val      Property query used when fetching algorithms
+
+Parameters:
+ password            Password text to digest (optional)

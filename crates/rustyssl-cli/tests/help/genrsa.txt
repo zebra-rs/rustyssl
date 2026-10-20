@@ -1,0 +1,32 @@
+Usage: genrsa [options] numbits
+
+General options:
+ -help               Display this summary
+ -engine val         Use engine, possibly a hardware device
+
+Input options:
+ -3                  (deprecated) Use 3 for the E value
+ -F4                 Use the Fermat number F4 (0x10001) for the E value
+ -f4                 Use the Fermat number F4 (0x10001) for the E value
+
+Output options:
+ -out outfile        Output the key to specified file
+ -passout val        Output file pass phrase source
+ -primes +int        Specify number of primes
+ -verbose            Verbose output
+ -quiet              Terse output
+ -traditional        Use traditional format for private keys
+ -*                  Encrypt the output with any supported cipher
+
+Random state options:
+ -rand val           Load the given file(s) into the random number generator
+ -writerand outfile  Write random data to the specified file
+
+Provider options:
+ -provider-path val  Provider load path (must be before 'provider' argument if required)
+ -provider val       Provider to load (can be specified multiple times)
+ -provparam val      Set a provider key-value parameter
+ -propquery val      Property query used when fetching algorithms
+
+Parameters:
+ numbits             Size of key in bits

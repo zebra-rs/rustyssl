@@ -1,0 +1,7 @@
+Usage: errstr [options] errnum...
+
+General options:
+ -help     Display this summary
+
+Parameters:
+ errnum    Error number(s) to decode

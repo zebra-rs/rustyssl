@@ -1,0 +1,47 @@
+Usage: list [options]
+
+General options:
+ -help                      Display this summary
+
+Output options:
+ -1                         List in one column
+ -verbose                   Verbose listing
+ -select val                Select a single algorithm
+ -commands                  List of standard commands
+ -standard-commands         List of standard commands
+ -all-algorithms            List of all algorithms
+ -digest-commands           List of message digest commands (deprecated)
+ -digest-algorithms         List of message digest algorithms
+ -kdf-algorithms            List of key derivation and pseudo random function algorithms
+ -random-instances          List the primary, public and private random number generator details
+ -random-generators         List of random number generators
+ -mac-algorithms            List of message authentication code algorithms
+ -cipher-commands           List of cipher commands (deprecated)
+ -cipher-algorithms         List of symmetric cipher algorithms
+ -encoders                  List of encoding methods
+ -decoders                  List of decoding methods
+ -key-managers              List of key managers
+ -skey-managers             List of symmetric key managers
+ -key-exchange-algorithms   List of key exchange algorithms
+ -kem-algorithms            List of key encapsulation mechanism algorithms
+ -signature-algorithms      List of signature algorithms
+ -tls-signature-algorithms  List of TLS signature algorithms
+ -asymcipher-algorithms     List of asymmetric cipher algorithms
+ -public-key-algorithms     List of public key algorithms
+ -public-key-methods        List of public key methods
+ -store-loaders             List of store loaders
+ -tls-groups                List implemented TLS key exchange 'groups'
+ -all-tls-groups            List implemented TLS key exchange 'groups' and all aliases
+ -tls1_2                    When listing 'groups', list those compatible with TLS1.2
+ -tls1_3                    When listing 'groups', list those compatible with TLS1.3
+ -providers                 List of provider information
+ -engines                   List of loaded engines
+ -disabled                  List of disabled features
+ -options val               List options for specified command
+ -objects                   List built in objects (OID<->name mappings)
+
+Provider options:
+ -provider-path val         Provider load path (must be before 'provider' argument if required)
+ -provider val              Provider to load (can be specified multiple times)
+ -provparam val             Set a provider key-value parameter
+ -propquery val             Property query used when fetching algorithms

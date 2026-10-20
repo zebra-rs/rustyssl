@@ -39,6 +39,11 @@ const GROUPS: &[(&str, &str, &str)] = &[
     ("OPT_PROV_ENUM", "OPT_PROV_", "Prov"),
 ];
 
+/// The system headers' macros the tables test (`#ifdef AF_UNIX`), whose headers are filtered
+/// out with the other includes: the socket families every target's `<sys/socket.h>` defines
+/// (Linux and macOS both have Unix-domain sockets and IPv6). Only their presence matters.
+const SYSTEM_MACROS: &str = "#define AF_UNIX 1\n#define AF_INET6 1\n";
+
 /// The marker names of `opt.c` (`OPT_HELP_STR` and so on), which C compares by address.
 const MARKERS: &[(&str, &str, &str)] = &[
     ("OPT_HELP_STR", "-H", "Help"),
@@ -166,7 +171,7 @@ fn preprocess(ctx: &Context, target: &Target, source: &str, label: &str) -> Resu
     fs::write(
         &wrapper,
         format!(
-            "#include \"opt.h\"\n#include \"function.h\"\n{headers}{}",
+            "#include \"opt.h\"\n#include \"function.h\"\n{SYSTEM_MACROS}{headers}{}",
             filter(source)
         ),
     )?;
