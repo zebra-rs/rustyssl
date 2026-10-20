@@ -1192,7 +1192,19 @@ unsafe fn activate_fallbacks(libctx: *mut OSSL_LIB_CTX) -> bool {
         if !fallback {
             continue;
         }
-        let handle = provider_new(libctx, name, init, Vec::new());
+        // The parameters of the first information under the name (the configuration's, for a
+        // provider it names without activating).
+        // SAFETY: the caller's guarantee.
+        let params = with_store(unsafe { context(libctx) }, |s| {
+            s.lock()
+                .infos
+                .iter()
+                .find(|i| i.name.as_c_str() == name)
+                .and_then(|i| i.parameters.clone())
+        })
+        .flatten()
+        .unwrap_or_default();
+        let handle = provider_new(libctx, name, init, params);
         // SAFETY: just made.
         if !unsafe { activate(handle) } {
             // SAFETY: as above, freed.
