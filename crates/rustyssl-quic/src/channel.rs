@@ -34,6 +34,11 @@ pub const MAX_NAT_INTERVAL: Duration = Duration::from_millis(25_000);
 pub const PATH_RESPONSE_QLEN: usize = 32;
 /// The length of a client's random initial DCID (OpenSSL's `INIT_DCID_LEN`).
 pub const INIT_DCID_LEN: usize = 8;
+/// A TLS alert (`SSL_AD_*`) the transport raises itself, as CRYPTO_ERROR 0x100 plus it.
+fn alert(a: core::ffi::c_int) -> u8 {
+    u8::try_from(a).unwrap_or(u8::MAX)
+}
+
 /// The ack-eliciting probes a PTO sends.
 const PROBES_PER_PTO: u8 = 2;
 /// The smallest room worth starting another coalesced packet in.
@@ -332,6 +337,18 @@ impl Channel {
             keys,
         );
         ch.token = cfg.token.clone();
+        if !ch.hs.alpn_configured() {
+            // quic_tls.c refuses to start a client without ALPN.
+            ch.hs_failed = true;
+            ch.raise(
+                Error::crypto(
+                    alert(rustyssl_abi::SSL_AD_NO_APPLICATION_PROTOCOL),
+                    "ALPN must be configured when using QUIC",
+                ),
+                now,
+            );
+            return Ok(ch);
+        }
         let tp = ch.local_tp.encode()?;
         ch.hs.set_transport_params(tp);
         ch.hs.start();
@@ -371,6 +388,15 @@ impl Channel {
         ch.address_validated = init.validated;
         ch.new_token = init.new_token;
         ch.reset_idle(now);
+        if !ch.hs.alpn_configured() {
+            // A server without an ALPN selection callback: internal error (quic_tls.c).
+            ch.hs_failed = true;
+            ch.raise(
+                Error::crypto(alert(rustyssl_abi::SSL_AD_INTERNAL_ERROR), "internal error"),
+                now,
+            );
+            return Ok(ch);
+        }
         ch.hs.start();
         Ok(ch)
     }
@@ -606,7 +632,7 @@ impl Channel {
                 }
             }
         }
-        for (level, data) in self.hs.take_output() {
+        for (level, data) in self.hs.take_quic_crypto() {
             if let Some(s) = level.space()
                 && let Some(cs) = self.crypto.get_mut(space_index(s))
             {
@@ -620,8 +646,12 @@ impl Channel {
             HsEvent::Secret(s) => {
                 // OpenSSL's QUIC supports only the GCM suites and ChaCha20-Poly1305; any other
                 // fails at the first secret with internal_error (quic_tls.c).
-                let suite = Suite::from_cipher(s.cipher)
-                    .map_err(|_| Error::crypto(80, "unknown cipher type"))?;
+                let suite = Suite::from_cipher(s.cipher).map_err(|_| {
+                    Error::crypto(
+                        alert(rustyssl_abi::SSL_AD_INTERNAL_ERROR),
+                        "unknown cipher type",
+                    )
+                })?;
                 let keys = Keys::new(p, suite, s.secret.bytes())?;
                 match (s.level, s.direction) {
                     (Level::Handshake, Direction::Read) => self.hs_rx = Some(keys),
@@ -647,6 +677,20 @@ impl Channel {
             HsEvent::Request(r) => self.events.push_back(ChannelEvent::TlsRequest(r)),
             HsEvent::Info(e) => self.events.push_back(ChannelEvent::TlsInfo(e)),
             HsEvent::Complete => {
+                // What OpenSSL's QUIC layer, not libssl, requires of the handshake: the peer's
+                // transport parameters (t1_lib.c) and a negotiated protocol (quic_tls.c).
+                if self.peer_tp.is_none() {
+                    return Err(Error::crypto(
+                        alert(rustyssl_abi::SSL_AD_MISSING_EXTENSION),
+                        "missing transport parameters",
+                    ));
+                }
+                if self.hs.alpn_selected().is_none_or(|a| a.is_empty()) {
+                    return Err(Error::crypto(
+                        alert(rustyssl_abi::SSL_AD_NO_APPLICATION_PROTOCOL),
+                        "no application protocol negotiated",
+                    ));
+                }
                 self.handshake_complete = true;
                 self.events.push_back(ChannelEvent::HandshakeComplete);
                 if self.is_server {
@@ -1219,7 +1263,7 @@ impl Channel {
                 cs.on_frame(offset, data)?;
                 let readable = cs.take_readable(now);
                 if !readable.is_empty() && !self.hs_failed {
-                    if let Err(e) = self.hs.feed(Level::of_space(space), &readable) {
+                    if let Err(e) = self.hs.feed_quic_crypto(Level::of_space(space), &readable) {
                         self.hs_failed = true;
                         return Err(e);
                     }

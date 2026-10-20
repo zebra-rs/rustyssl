@@ -86,14 +86,22 @@ pub trait Handshake: Send {
     /// Starts it (a client writes its ClientHello).
     fn start(&mut self);
 
-    /// Handshake bytes received at `level`.
+    /// Handshake bytes received at `level` (`Connection::feed_quic_crypto`).
     ///
     /// # Errors
     /// The level isn't the current read level, or the bytes are refused (a CRYPTO_ERROR).
-    fn feed(&mut self, level: Level, data: &[u8]) -> Result<()>;
+    fn feed_quic_crypto(&mut self, level: Level, data: &[u8]) -> Result<()>;
 
-    /// Handshake bytes to send, each tagged with its level.
-    fn take_output(&mut self) -> Vec<(Level, Vec<u8>)>;
+    /// Handshake bytes to send, each tagged with its level (`Connection::take_quic_crypto`;
+    /// the tags make the order relative to secrets immaterial here).
+    fn take_quic_crypto(&mut self) -> Vec<(Level, Vec<u8>)>;
+
+    /// Whether ALPN is configured: a client must offer protocols, a server must have a
+    /// selection callback (checked before starting, as `ossl_quic_tls_tick`).
+    fn alpn_configured(&self) -> bool;
+
+    /// The protocol ALPN selected, once known.
+    fn alpn_selected(&self) -> Option<Vec<u8>>;
 
     /// Runs until it has something to report (`Some`) or must wait for input or an answer
     /// (`None`).
@@ -162,6 +170,8 @@ pub struct TestHandshake {
     events: std::collections::VecDeque<HsEvent>,
     /// Fail with this alert when the peer's parameters arrive (to test CRYPTO_ERROR).
     pub fail_alert: Option<u8>,
+    /// The protocol ALPN configures and selects (`None`: not configured).
+    pub alpn: Option<Vec<u8>>,
     error: Option<u8>,
 }
 
@@ -180,6 +190,7 @@ impl TestHandshake {
             output: Vec::new(),
             events: std::collections::VecDeque::new(),
             fail_alert: None,
+            alpn: Some(b"test".to_vec()),
             error: None,
         }
     }
@@ -266,7 +277,7 @@ impl Handshake for TestHandshake {
         self.state = TestState::WaitHello;
     }
 
-    fn feed(&mut self, level: Level, data: &[u8]) -> Result<()> {
+    fn feed_quic_crypto(&mut self, level: Level, data: &[u8]) -> Result<()> {
         if level != self.read_level {
             return Err(self.fail(UNEXPECTED_MESSAGE, "handshake data at the wrong level"));
         }
@@ -274,8 +285,20 @@ impl Handshake for TestHandshake {
         Ok(())
     }
 
-    fn take_output(&mut self) -> Vec<(Level, Vec<u8>)> {
+    fn take_quic_crypto(&mut self) -> Vec<(Level, Vec<u8>)> {
         core::mem::take(&mut self.output)
+    }
+
+    fn alpn_configured(&self) -> bool {
+        self.alpn.is_some()
+    }
+
+    fn alpn_selected(&self) -> Option<Vec<u8>> {
+        if self.state == TestState::Done {
+            self.alpn.clone()
+        } else {
+            None
+        }
     }
 
     fn step(&mut self, _p: &dyn Provider) -> Result<Option<HsEvent>> {

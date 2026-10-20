@@ -464,3 +464,20 @@ fn version_negotiation_and_garbage() {
     assert!(server.poll_transmit(&p, Time(0)).is_none());
     assert_eq!(server.accept_queue_len(), 0);
 }
+
+#[test]
+fn alpn_is_required_as_openssl() {
+    let p = TestProvider::new(b"alpn");
+    let suite = TestHandshake::suite(AeadAlg::Aes128Gcm).unwrap();
+    // A client without ALPN fails before sending anything.
+    let mut hs = TestHandshake::new(false, suite);
+    hs.alpn = None;
+    let mut client = Port::new(PortConfig::default());
+    let id = client
+        .connect(&p, Box::new(hs), PeerAddr(SERVER.to_vec()), Time(0))
+        .unwrap();
+    let ch = client.channel(id).unwrap();
+    assert_eq!(ch.state(), crate::channel::State::Terminated);
+    assert_eq!(ch.terminate_cause().unwrap().code, 0x100 + 120);
+    assert!(client.poll_transmit(&p, Time(0)).is_none());
+}
