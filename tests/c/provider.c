@@ -18,9 +18,12 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <openssl/bio.h>
+#include <openssl/conf.h>
 #include <openssl/core_names.h>
 #include <openssl/crypto.h>
 #include <openssl/err.h>
+#include <openssl/evp.h>
 #include <openssl/params.h>
 #include <openssl/provider.h>
 
@@ -306,6 +309,41 @@ static void conf(void)
     OSSL_LIB_CTX_free(ctx);
 }
 
+static int show_each(OSSL_PROVIDER *prov, void *arg)
+{
+    (void)arg;
+    printf("# %s:\n", OSSL_PROVIDER_get0_name(prov));
+    show_conf(prov, "plain");
+    show_conf(prov, "nested.inner");
+    return 1;
+}
+
+/* A provider the configuration names without activating it: the fallback takes its parameters. */
+static void conf_fallback(void)
+{
+    static const char text[] = "openssl_conf = init\n"
+                               "[init]\nproviders = provs\n"
+                               "[provs]\ndefault = default_sect\n"
+                               "[default_sect]\nplain = 1\nnested = nested_sect\n"
+                               "[nested_sect]\ninner = no\n";
+    OSSL_LIB_CTX *ctx = OSSL_LIB_CTX_new();
+    CONF *cnf = NCONF_new_ex(ctx, NULL);
+    BIO *b = BIO_new_mem_buf(text, -1);
+    EVP_MD *md;
+
+    check(NCONF_load_bio(cnf, b, NULL) == 1 && CONF_modules_load(cnf, NULL, 0) == 1,
+          "a configuration naming default without activating it");
+    check(OSSL_PROVIDER_available(ctx, "default") == 1, "default is still available");
+    md = EVP_MD_fetch(ctx, "SHA256", NULL);
+    check(md != NULL, "a fetch activates the fallback");
+    OSSL_PROVIDER_do_all(ctx, show_each, NULL);
+    errors();
+    EVP_MD_free(md);
+    NCONF_free(cnf);
+    BIO_free(b);
+    OSSL_LIB_CTX_free(ctx);
+}
+
 int main(void)
 {
     library_base = ERR_get_next_error_library();
@@ -315,6 +353,7 @@ int main(void)
     callbacks();
     modules();
     conf();
+    conf_fallback();
     printf("1..%d\n", number);
     return failures == 0 ? 0 : 1;
 }

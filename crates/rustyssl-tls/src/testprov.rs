@@ -349,6 +349,8 @@ fn block_of(alg: CipherAlg, key: &[u8]) -> Result<Option<Box<dyn sym::BlockCiphe
             ))));
         }
         CipherAlg::Sm4Cbc => B::Sm4,
+        // The test provider has no IDEA (the legacy provider's, which the capi layer fetches).
+        CipherAlg::IdeaCbc => return Err(fail()),
     };
     if key.len() != alg.key_len() {
         return Err(fail());

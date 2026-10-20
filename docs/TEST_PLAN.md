@@ -190,6 +190,25 @@ rustyssl itself**. You can only regenerate golden files with
   Each test, and each iteration of an iterated one, runs in its own process with a timeout, on
   the reference and then on rustyssl, so a stub's abort or a crash costs one subtest; the
   failures are classified and ranked by root cause in `target/ssl-suite-report.md`.
+- **The whole tree** (`--all [recipe...]`, milestone M6): every recipe in `test/recipes/`,
+  run by upstream's own `test/run_tests.pl` in the reference's source tree, built whole and
+  configured as the reference is, with the programs upstream links statically relinked with
+  the shared libraries. Each recipe runs twice in the same tree, the second time with the
+  dynamic loader and `OPENSSL_MODULES` pointed at rustyssl's build (`util/shlib_wrap.sh` takes
+  `RUSTYSSL_LIBDIR` and `RUSTYSSL_MODULES`). A recipe's results are its top-level TAP subtests,
+  reported per recipe in `target/upstream-report.md`.
+  - **Eligible:** a subtest that passes on the reference and isn't excluded. Excluded, and
+    reported apart: recipes `tests/openssl-suite/recipes.txt` skips, each with its reason
+    (FIPS, there being no FIPS provider; QUIC, Phase 10; features the default build leaves
+    out); subtests running a program that imports libcrypto's or libssl's internal functions
+    (found from the programs' own imports, so they can't load on another library by
+    construction); subtests `recipes.txt` lists as reading the libraries' private structures
+    (`internal` lines, with reasons); subtests skipped on both; and subtests failing on the
+    reference itself.
+  - **Measured (2026-10-19, OpenSSL 3.6.5, macOS arm64):** all 4333 eligible subtests pass on
+    rustyssl (100.00%; M6 asks for 98%). 103 are excluded as internal, 83 skipped on both, none
+    fails on the reference. x86_64 Linux isn't measured yet: the whole tree's build and
+    rustyssl's need more than the Docker VM's free space here.
 - Classify every test, and keep the list in `tests/openssl-suite/classification.toml`:
   - **(a) Public API** → must pass.
   - **(b) Needs internal symbols or headers** → excluded, with the reason.

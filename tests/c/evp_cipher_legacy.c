@@ -204,6 +204,144 @@ static void test_wrapped(void)
     EVP_CIPHER_meth_free(c);
 }
 
+/*
+ * A cipher over EVP_aes_128_gcm()'s own functions and state size, as the ossltest engine makes
+ * its AES-128-GCM: the context's state is the static cipher's.
+ */
+static int gcm_init(EVP_CIPHER_CTX *ctx, const unsigned char *k, const unsigned char *v, int enc)
+{
+    return EVP_CIPHER_meth_get_init(EVP_aes_128_gcm())(ctx, k, v, enc);
+}
+
+static int gcm_do(EVP_CIPHER_CTX *ctx, unsigned char *out, const unsigned char *in, size_t inl)
+{
+    return EVP_CIPHER_meth_get_do_cipher(EVP_aes_128_gcm())(ctx, out, in, inl);
+}
+
+static int gcm_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *ptr)
+{
+    return EVP_CIPHER_meth_get_ctrl(EVP_aes_128_gcm())(ctx, type, arg, ptr);
+}
+
+static int gcm_cleanup(EVP_CIPHER_CTX *ctx)
+{
+    return EVP_CIPHER_meth_get_cleanup(EVP_aes_128_gcm())(ctx);
+}
+
+/* Encrypts `plain` with AAD under `c`; the ciphertext's length, the tag in `tag`. */
+static int gcm_seal(const EVP_CIPHER *c, unsigned char *out, unsigned char tag[16])
+{
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    static const unsigned char aad[] = "header";
+    int l = 0, n = 0, ok;
+
+    ok = EVP_EncryptInit_ex(ctx, c, NULL, NULL, NULL)
+         && EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_SET_IVLEN, 12, NULL) > 0
+         && EVP_EncryptInit_ex(ctx, NULL, NULL, key, iv)
+         && EVP_EncryptUpdate(ctx, NULL, &l, aad, (int)sizeof(aad) - 1)
+         && EVP_EncryptUpdate(ctx, out, &l, (const unsigned char *)plain, (int)sizeof(plain) - 1)
+         && EVP_EncryptFinal_ex(ctx, out + l, &n)
+         && EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_GET_TAG, 16, tag) > 0;
+    EVP_CIPHER_CTX_free(ctx);
+    return ok ? l + n : -1;
+}
+
+/* Decrypts `in` with `tag`: whether the tag held, and the plaintext in `out`. */
+static int gcm_open(const EVP_CIPHER *c, const unsigned char *in, int inl, unsigned char tag[16],
+                    unsigned char *out)
+{
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    static const unsigned char aad[] = "header";
+    int l = 0, n = 0, ok;
+
+    ok = EVP_DecryptInit_ex(ctx, c, NULL, NULL, NULL)
+         && EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_SET_IVLEN, 12, NULL) > 0
+         && EVP_DecryptInit_ex(ctx, NULL, NULL, key, iv)
+         && EVP_DecryptUpdate(ctx, NULL, &l, aad, (int)sizeof(aad) - 1)
+         && EVP_DecryptUpdate(ctx, out, &l, in, inl)
+         && EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_SET_TAG, 16, tag) > 0
+         && EVP_DecryptFinal_ex(ctx, out + l, &n) > 0;
+    EVP_CIPHER_CTX_free(ctx);
+    return ok;
+}
+
+/* A TLS 1.2 record (explicit IV, payload, tag) sealed and opened in place. */
+static void gcm_tls_record(const EVP_CIPHER *c)
+{
+    EVP_CIPHER_CTX *e = EVP_CIPHER_CTX_new(), *d = EVP_CIPHER_CTX_new();
+    unsigned char hdr[13] = { 0, 0, 0, 0, 0, 0, 0, 1, 23, 3, 3, 0, 0 };
+    unsigned char rec[8 + 32 + 16];
+    int pad, n, m;
+
+    memcpy(rec + 8, plain, 32);
+    hdr[11] = (unsigned char)((8 + 32 + 16) >> 8);
+    hdr[12] = (unsigned char)((8 + 32 + 16) & 0xff);
+    check(EVP_CipherInit_ex(e, c, NULL, key, NULL, 1)
+              && EVP_CIPHER_CTX_ctrl(e, EVP_CTRL_GCM_SET_IV_FIXED, 4, (void *)iv) > 0,
+          "TLS: a sealing context with a fixed IV field");
+    /* The header gives the record's length with the explicit IV and the tag; seal wants the
+       payload's, which the ctrl corrects and returns the tag length for. */
+    hdr[11] = 0;
+    hdr[12] = 8 + 32;
+    pad = EVP_CIPHER_CTX_ctrl(e, EVP_CTRL_AEAD_TLS1_AAD, 13, hdr);
+    printf("# TLS AAD returns %d\n", pad);
+    n = EVP_Cipher(e, rec, rec, (unsigned int)sizeof(rec));
+    printf("# sealed %d\n", n);
+    check(EVP_CipherInit_ex(d, c, NULL, key, NULL, 0)
+              && EVP_CIPHER_CTX_ctrl(d, EVP_CTRL_GCM_SET_IV_FIXED, 4, (void *)iv) > 0,
+          "TLS: an opening context with the same fixed field");
+    hdr[11] = 0;
+    hdr[12] = 8 + 32 + 16;
+    pad = EVP_CIPHER_CTX_ctrl(d, EVP_CTRL_AEAD_TLS1_AAD, 13, hdr);
+    m = EVP_Cipher(d, rec, rec, (unsigned int)sizeof(rec));
+    printf("# opened %d (pad %d)\n", m, pad);
+    check(m == 32 && memcmp(rec + 8, plain, 32) == 0, "TLS: the record opens to its payload");
+    rec[20] ^= 1;
+    hdr[11] = 0;
+    hdr[12] = 8 + 32 + 16;
+    EVP_CIPHER_CTX_ctrl(d, EVP_CTRL_AEAD_TLS1_AAD, 13, hdr);
+    check(EVP_Cipher(d, rec, rec, (unsigned int)sizeof(rec)) == -1,
+          "TLS: a changed record doesn't open");
+    EVP_CIPHER_CTX_free(e);
+    EVP_CIPHER_CTX_free(d);
+}
+
+static void test_wrapped_gcm(void)
+{
+    EVP_CIPHER *c = EVP_CIPHER_meth_new(NID_aes_128_gcm, 1, 16);
+    unsigned char ref[128], out[128], back[128], tag[16], reftag[16];
+    int lr, l;
+
+    printf("# AES-128-GCM over EVP_aes_128_gcm()'s functions, state size %d\n",
+           EVP_CIPHER_impl_ctx_size(EVP_aes_128_gcm()) > 0);
+    check(c != NULL && EVP_CIPHER_meth_set_iv_length(c, 12)
+              && EVP_CIPHER_meth_set_flags(c, EVP_CIPH_GCM_MODE | EVP_CIPH_CUSTOM_IV
+                                                  | EVP_CIPH_FLAG_CUSTOM_CIPHER
+                                                  | EVP_CIPH_ALWAYS_CALL_INIT | EVP_CIPH_CTRL_INIT
+                                                  | EVP_CIPH_FLAG_AEAD_CIPHER
+                                                  | EVP_CIPH_CUSTOM_IV_LENGTH)
+              && EVP_CIPHER_meth_set_init(c, gcm_init)
+              && EVP_CIPHER_meth_set_do_cipher(c, gcm_do)
+              && EVP_CIPHER_meth_set_ctrl(c, gcm_ctrl)
+              && EVP_CIPHER_meth_set_cleanup(c, gcm_cleanup)
+              && EVP_CIPHER_meth_set_impl_ctx_size(c, EVP_CIPHER_impl_ctx_size(EVP_aes_128_gcm())),
+          "a cipher over EVP_aes_128_gcm()'s functions");
+    lr = gcm_seal(EVP_aes_128_gcm(), ref, reftag);
+    l = gcm_seal(c, out, tag);
+    hex("gcm", out, l > 0 ? l : 0);
+    hex("tag", tag, 16);
+    check(l == lr && memcmp(out, ref, (size_t)l) == 0 && memcmp(tag, reftag, 16) == 0,
+          "the same ciphertext and tag as AES-128-GCM's");
+    check(gcm_open(c, out, l, tag, back) && memcmp(back, plain, sizeof(plain) - 1) == 0,
+          "it opens with the tag");
+    tag[0] ^= 1;
+    check(!gcm_open(c, out, l, tag, back), "and not with another");
+    ERR_clear_error();
+    gcm_tls_record(c);
+    ERR_clear_error();
+    EVP_CIPHER_meth_free(c);
+}
+
 int main(void)
 {
     static const char *const names[] = {
@@ -224,6 +362,7 @@ int main(void)
     printf("# the NULL cipher: init %d, do %d\n", EVP_CIPHER_meth_get_init(EVP_enc_null()) != NULL,
            EVP_CIPHER_meth_get_do_cipher(EVP_enc_null()) != NULL);
     test_wrapped();
+    test_wrapped_gcm();
     printf("1..%d\n", number);
     return failures != 0;
 }

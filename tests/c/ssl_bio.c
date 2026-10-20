@@ -588,9 +588,155 @@ static void test_closed_before_tickets(void)
     SSL_CTX_free(sctx);
 }
 
+/*
+ * A write the peer hasn't made room for waits for SSL_write's retry: meanwhile SSL_read reads
+ * (WANT_READ), it doesn't try that write again (WANT_WRITE), so two ends that each read before
+ * writing more don't wait for each other (ssl_old_test's BIO pairs).
+ */
+static void test_read_with_write_pending(void)
+{
+    SSL_CTX *sctx = server_ctx(), *cctx = client_ctx();
+    SSL *c = SSL_new(cctx), *s = SSL_new(sctx);
+    BIO *a = NULL, *b = NULL;
+    static char data[4000], buf[8192];
+    int r, total = 0, rounds;
+
+    printf("# a read while a write waits\n");
+    BIO_new_bio_pair(&a, 1024, &b, 1024);
+    SSL_set_bio(c, a, a);
+    SSL_set_bio(s, b, b);
+    SSL_set_connect_state(c);
+    SSL_set_accept_state(s);
+    check(run(c, s, 0) == 0, "the handshake");
+    r = SSL_read(c, buf, sizeof(buf));
+    printf("  the client reads the tickets: %d -> %d\n", r, SSL_get_error(c, r));
+    memset(data, 'x', sizeof(data));
+    r = SSL_write(c, data, sizeof(data));
+    printf("  the client writes more than fits: %d -> %d\n", r, SSL_get_error(c, r));
+    r = SSL_read(c, buf, sizeof(buf));
+    printf("  then reads: %d -> %d\n", r, SSL_get_error(c, r));
+    check(SSL_get_error(c, r) == SSL_ERROR_WANT_READ, "the read waits for input, not for the write");
+    for (rounds = 0; rounds < 32 && total < (int)sizeof(data); rounds++) {
+        r = SSL_read(s, buf, sizeof(buf));
+        if (r > 0)
+            total += r;
+        r = SSL_write(c, data, sizeof(data));
+        if (r > 0)
+            printf("  the retried write: %d\n", r);
+    }
+    check(total == (int)sizeof(data), "the server read it all");
+    errors();
+    SSL_free(c);
+    SSL_free(s);
+    SSL_CTX_free(cctx);
+    SSL_CTX_free(sctx);
+}
+
+/* The client's side of the BIO-pair loop below: a write and a read through an SSL filter BIO. */
+static void step_through(BIO *f, long *w, long *r)
+{
+    static char buf[8192];
+    int n;
+
+    if (*w > 0 && (n = BIO_write(f, buf, (int)*w)) > 0)
+        *w -= n;
+    if (*r > 0 && (n = BIO_read(f, buf, sizeof(buf))) > 0)
+        *r -= n;
+}
+
+/*
+ * ssl_old_test's doit_biopair with a client certificate: SSL filter BIOs over 256-octet BIO
+ * pairs, client-to-server octets relayed only as far as the server asks to read. The server's
+ * NewSessionTickets (large, as they hold the client's certificate) arrive while the client's
+ * own data waits to be written: reading them doesn't retry that write, or both ends would wait
+ * to write.
+ */
+static void test_biopair_with_client_cert(void)
+{
+    SSL_CTX *sctx = server_ctx(), *cctx = client_ctx();
+    SSL *c, *s;
+    BIO *server, *server_io, *client, *client_io, *sb, *cb;
+    long cw = 256, cr = 256, sw = 256, sr = 256;
+    int round, prev = 1, stuck = 0;
+    X509 *x = cert(CLIENT_PEM);
+    EVP_PKEY *k = key(CLIENT_KEY_PEM);
+
+    printf("# BIO pairs, a client certificate, and tickets during a pending write\n");
+    trust_root(sctx);
+    SSL_CTX_set_verify(sctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, NULL);
+    SSL_CTX_use_certificate(cctx, x);
+    SSL_CTX_use_PrivateKey(cctx, k);
+    s = SSL_new(sctx);
+    c = SSL_new(cctx);
+    BIO_new_bio_pair(&server, 256, &server_io, 256);
+    BIO_new_bio_pair(&client, 256, &client_io, 256);
+    sb = BIO_new(BIO_f_ssl());
+    cb = BIO_new(BIO_f_ssl());
+    SSL_set_connect_state(c);
+    SSL_set_bio(c, client, client);
+    BIO_set_ssl(cb, c, BIO_NOCLOSE);
+    SSL_set_accept_state(s);
+    SSL_set_bio(s, server, server);
+    BIO_set_ssl(sb, s, BIO_NOCLOSE);
+    for (round = 0; round < 1000 && (cw > 0 || cr > 0 || sw > 0 || sr > 0); round++) {
+        int progress = 0;
+        size_t r1, r2, num;
+        char *p;
+
+        step_through(cb, &cw, &cr);
+        step_through(sb, &sw, &sr);
+        do {
+            r1 = BIO_ctrl_pending(server_io);
+            r2 = BIO_ctrl_get_write_guarantee(client_io);
+            num = r1 < r2 ? r1 : r2;
+            if (num > 0) {
+                int got = BIO_nread(server_io, &p, (int)num);
+
+                BIO_write(client_io, p, got);
+                progress = 1;
+            }
+        } while (r1 > 0 && r2 > 0);
+        r1 = BIO_ctrl_pending(client_io);
+        r2 = BIO_ctrl_get_read_request(server_io);
+        num = r1 < r2 ? r1 : r2;
+        if (num > 0) {
+            int room;
+
+            if (num > 1)
+                num--;
+            room = BIO_nwrite0(server_io, &p);
+            if (room < (int)num)
+                num = (size_t)room;
+            BIO_read(client_io, p, (int)num);
+            BIO_nwrite(server_io, &p, (int)num);
+            progress = 1;
+        }
+        if (!progress && !prev) {
+            stuck = 1;
+            break;
+        }
+        prev = progress;
+    }
+    check(!stuck, "neither end waits for the other");
+    check(cw == 0 && cr == 0 && sw == 0 && sr == 0, "256 octets each way");
+    errors();
+    BIO_free(sb);
+    BIO_free(cb);
+    BIO_free(server_io);
+    BIO_free(client_io);
+    SSL_free(c);
+    SSL_free(s);
+    X509_free(x);
+    EVP_PKEY_free(k);
+    SSL_CTX_free(cctx);
+    SSL_CTX_free(sctx);
+}
+
 int main(void)
 {
     test_buffered_wbio();
+    test_read_with_write_pending();
+    test_biopair_with_client_cert();
     test_closed_before_tickets();
     test_pair();
     test_set_ssl();

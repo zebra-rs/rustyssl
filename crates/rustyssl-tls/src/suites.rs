@@ -236,6 +236,7 @@ impl Cipher {
             SSL_CAMELLIA128 => CipherAlg::Camellia128Cbc,
             SSL_CAMELLIA256 => CipherAlg::Camellia256Cbc,
             SSL_SEED => CipherAlg::SeedCbc,
+            SSL_IDEA => CipherAlg::IdeaCbc,
             SSL_3DES => CipherAlg::DesEde3Cbc,
             _ => return Protection::Unsupported,
         };

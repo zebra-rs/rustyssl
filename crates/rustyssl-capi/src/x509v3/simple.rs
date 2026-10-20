@@ -212,9 +212,11 @@ static NS_CERT_TYPE: BitNames<9> = BitNames([
     BIT_END,
 ]);
 
-static KEY_USAGE: BitNames<10> = BitNames([
+static KEY_USAGE: BitNames<11> = BitNames([
     bit(0, c"Digital Signature", c"digitalSignature"),
     bit(1, c"Non Repudiation", c"nonRepudiation"),
+    // 3.6: X.509's current name for bit 1, accepted as an alias (printed as the first).
+    bit(1, c"Content Commitment", c"contentCommitment"),
     bit(2, c"Key Encipherment", c"keyEncipherment"),
     bit(3, c"Data Encipherment", c"dataEncipherment"),
     bit(4, c"Key Agreement", c"keyAgreement"),
@@ -258,8 +260,14 @@ ffi_export! {
     where failure = ptr::null_mut(), library = ERR_LIB_X509V3
     {
         let mut ret = extlist;
+        // A row with the previous row's bit is an alias, which 3.6 doesn't print.
+        let mut last = None;
         // SAFETY: the caller's guarantee.
         for b in unsafe { bit_names(method) } {
+            if last == Some(b.bitnum) {
+                continue;
+            }
+            last = Some(b.bitnum);
             // SAFETY: the caller's BIT STRING.
             if unsafe { ASN1_BIT_STRING_get_bit(bits, b.bitnum) } != 0 {
                 // SAFETY: a static name; the list.

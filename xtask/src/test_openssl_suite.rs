@@ -21,7 +21,10 @@
 //!
 //! With `--ssl`, or the name of one of them, it runs libssl's test programs instead
 //! (`tests/openssl-suite/ssl.txt`; see [`ssl`]), and writes a report of what fails on rustyssl.
+//! With `--all`, it runs the whole upstream test tree, every recipe of `test/recipes/` (see
+//! [`recipes`]), and reports the eligible pass rate (`target/upstream-report.md`).
 
+mod recipes;
 mod ssl;
 
 use std::fs;
@@ -308,6 +311,14 @@ fn failure_lines(text: &str) -> String {
 
 pub fn run(args: &[String]) -> Result {
     let root = workspace_root();
+    if args.iter().any(|a| a == "--all") {
+        let rest: Vec<String> = args.iter().filter(|a| *a != "--all").cloned().collect();
+        let (reference, dist) = prepare(&root)?;
+        let version = reference::vendored_version(&root)?;
+        let ssl_list = ssl::List::load(&root)?;
+        let base = [crypto_build(), ssl::build(&ssl_list)];
+        return recipes::run(&root, &version, &reference, &dist.join("lib"), &base, &rest);
+    }
     // `--ssl` (or the name of one of its programs or `ssl_test` files) selects libssl's
     // programs, which run apart from the others.
     let ssl_all = args.iter().any(|a| a == "--ssl");

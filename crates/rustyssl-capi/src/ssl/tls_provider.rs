@@ -45,6 +45,10 @@ use rustyssl_tls::error::{Error, Result};
 
 use crate::bn::BN_free;
 use crate::bn::conv::BN_bin2bn;
+use crate::engine::ENGINE_finish;
+use crate::engine::table::{
+    ENGINE_get_cipher, ENGINE_get_cipher_engine, ENGINE_get_digest, ENGINE_get_digest_engine,
+};
 use crate::err::{ERR_pop_to_mark, ERR_set_mark};
 use crate::evp::asymcipher::{
     EVP_PKEY_decrypt, EVP_PKEY_decrypt_init, EVP_PKEY_encrypt, EVP_PKEY_encrypt_init,
@@ -642,8 +646,12 @@ impl EvpProvider {
             .ok_or_else(fail)
     }
 
-    /// A message digest by name, fetched.
+    /// A message digest by name: an engine's when one is registered for it (libssl's
+    /// `ssl_evp_md_fetch`, `tls_get_digest_from_engine`), else fetched.
     fn fetch_md(&self, name: &CStr) -> Result<Md> {
+        if let Some(md) = engine_digest(name) {
+            return Ok(Md(md.cast_mut()));
+        }
         // SAFETY: the library context; a NUL-terminated name; the property query.
         let md = unsafe { EVP_MD_fetch(self.libctx(), name.as_ptr(), self.propq()) };
         if md.is_null() {
@@ -1280,6 +1288,7 @@ fn cipher_name(alg: CipherAlg) -> Option<&'static CStr> {
         CipherAlg::Aria256Cbc => c"ARIA-256-CBC",
         CipherAlg::DesEde3Cbc => c"DES-EDE3-CBC",
         CipherAlg::SeedCbc => c"SEED-CBC",
+        CipherAlg::IdeaCbc => c"IDEA-CBC",
         CipherAlg::Sm4Cbc => c"SM4-CBC",
         CipherAlg::Null => return None,
     })
@@ -1729,6 +1738,157 @@ fn encoded_public(k: &Pkey) -> Result<Vec<u8>> {
     Ok(v)
 }
 
+/// The digest an engine registered for `name`'s NID (`tls_get_digest_from_engine`): libssl
+/// prefers it to a fetched one, so an engine set as the default (`-engine ossltest`) runs the
+/// handshake's hashes. It's the engine's own object: freeing it does nothing.
+fn engine_digest(name: &CStr) -> Option<*const EVP_MD> {
+    // SAFETY: a NUL-terminated name.
+    let nid = unsafe { OBJ_sn2nid(name.as_ptr()) };
+    if nid == rustyssl_abi::NID_undef {
+        return None;
+    }
+    // SAFETY: no preconditions; a functional reference, or NULL.
+    let e = unsafe { ENGINE_get_digest_engine(nid) };
+    if e.is_null() {
+        return None;
+    }
+    // SAFETY: the engine just taken; the NID.
+    let md = unsafe { ENGINE_get_digest(e, nid) };
+    // SAFETY: releases the functional reference taken above.
+    unsafe { ENGINE_finish(e) };
+    (!md.is_null()).then_some(md)
+}
+
+/// The cipher an engine registered for `name`'s NID (`tls_get_cipher_from_engine`), as
+/// [`engine_digest`] for digests.
+/// An engine's stitched CBC-and-HMAC cipher, keyed for one direction (`tls1_enc`'s
+/// `EVP_CIPH_FLAG_AEAD_CIPHER` path): the record's header goes in through
+/// `EVP_CTRL_AEAD_TLS1_AAD`, then `EVP_Cipher` processes the whole record body.
+struct EvpStitched {
+    ctx: CipherCtx,
+}
+
+impl EvpStitched {
+    /// `EVP_CTRL_AEAD_TLS1_AAD` with a copy of `header` (the cipher may rewrite its length):
+    /// its answer, the octets to add when sealing or the MAC's length when opening.
+    fn aad(&mut self, header: &[u8; 13]) -> Result<usize> {
+        let mut aad = *header;
+        let len = c_int::try_from(aad.len()).map_err(|_| fail())?;
+        // SAFETY: the keyed context; the header's 13 octets, which the cipher may rewrite.
+        let r = unsafe {
+            EVP_CIPHER_CTX_ctrl(
+                self.ctx.0,
+                rustyssl_abi::EVP_CTRL_AEAD_TLS1_AAD,
+                len,
+                aad.as_mut_ptr().cast(),
+            )
+        };
+        usize::try_from(r).ok().filter(|&n| n > 0).ok_or_else(fail)
+    }
+
+    /// `EVP_Cipher` over `body` in place.
+    fn run(&mut self, body: &mut [u8]) -> Result<()> {
+        let n = core::ffi::c_uint::try_from(body.len()).map_err(|_| fail())?;
+        let p = body.as_mut_ptr();
+        // SAFETY: the keyed context; the body's octets, read and written in place.
+        let r = unsafe { crate::evp::cipher_ctx::EVP_Cipher(self.ctx.0, p, p, n) };
+        if r <= 0 {
+            return Err(fail());
+        }
+        Ok(())
+    }
+}
+
+impl rustyssl_tls::crypto::Stitched for EvpStitched {
+    fn seal(&mut self, header: &[u8; 13], body: &mut Vec<u8>) -> Result<()> {
+        let pad = self.aad(header)?;
+        body.resize(body.len().checked_add(pad).ok_or_else(fail)?, 0);
+        self.run(body)
+    }
+
+    fn open(&mut self, header: &[u8; 13], body: &mut [u8]) -> Result<usize> {
+        let mac_len = self.aad(header)?;
+        self.run(body)?;
+        Ok(mac_len)
+    }
+}
+
+/// The engine's stitched cipher for `nid`, if an engine registered one, keyed as
+/// `tls1_set_crypto_state` keys it (the key and IV, then `EVP_CTRL_AEAD_SET_MAC_KEY`).
+fn engine_stitched(
+    nid: c_int,
+    key: &[u8],
+    mac_key: &[u8],
+    iv: &[u8],
+    encrypt: bool,
+) -> Option<EvpStitched> {
+    // SAFETY: no preconditions; a functional reference, or NULL.
+    let e = unsafe { ENGINE_get_cipher_engine(nid) };
+    if e.is_null() {
+        return None;
+    }
+    // SAFETY: the engine just taken; the NID.
+    let c = unsafe { ENGINE_get_cipher(e, nid) };
+    // SAFETY: releases the functional reference taken above.
+    unsafe { ENGINE_finish(e) };
+    if c.is_null() {
+        return None;
+    }
+    // Only a stitched cipher takes this path (`EVP_CIPH_FLAG_AEAD_CIPHER`).
+    // SAFETY: the engine's cipher.
+    let flags = unsafe { crate::evp::cipher::EVP_CIPHER_get_flags(c) };
+    if flags & c_ulong::try_from(rustyssl_abi::EVP_CIPH_FLAG_AEAD_CIPHER).unwrap_or(0) == 0 {
+        return None;
+    }
+    // SAFETY: no preconditions.
+    let ctx = CipherCtx(unsafe { EVP_CIPHER_CTX_new() });
+    if ctx.0.is_null() {
+        return None;
+    }
+    let mac_len = c_int::try_from(mac_key.len()).ok()?;
+    // SAFETY: the context; the engine's cipher; the key and IV (the cipher's lengths, which the
+    // suite's key block gave).
+    let ok = unsafe {
+        EVP_CipherInit_ex(
+            ctx.0,
+            c,
+            ptr::null_mut(),
+            key.as_ptr(),
+            iv.as_ptr(),
+            c_int::from(encrypt),
+        )
+    } != 0
+        && (mac_key.is_empty()
+            // SAFETY: the keyed context; the MAC key's octets, which the cipher copies.
+            || unsafe {
+                EVP_CIPHER_CTX_ctrl(
+                    ctx.0,
+                    rustyssl_abi::EVP_CTRL_AEAD_SET_MAC_KEY,
+                    mac_len,
+                    mac_key.as_ptr().cast_mut().cast(),
+                )
+            } > 0);
+    ok.then_some(EvpStitched { ctx })
+}
+
+fn engine_cipher(name: &CStr) -> Option<*const EVP_CIPHER> {
+    // SAFETY: a NUL-terminated name.
+    let nid = unsafe { OBJ_sn2nid(name.as_ptr()) };
+    if nid == rustyssl_abi::NID_undef {
+        return None;
+    }
+    // SAFETY: no preconditions; a functional reference, or NULL.
+    let e = unsafe { ENGINE_get_cipher_engine(nid) };
+    if e.is_null() {
+        return None;
+    }
+    // SAFETY: the engine just taken; the NID.
+    let c = unsafe { ENGINE_get_cipher(e, nid) };
+    // SAFETY: releases the functional reference taken above.
+    unsafe { ENGINE_finish(e) };
+    (!c.is_null()).then_some(c)
+}
+
 impl Provider for EvpProvider {
     fn hash(&self, alg: HashAlg) -> Result<Box<dyn Hash>> {
         let md = self.fetch_md(hash_name(alg))?;
@@ -1758,8 +1918,13 @@ impl Provider for EvpProvider {
         if key.len() != alg.key_len() {
             return Err(fail());
         }
-        // SAFETY: the library context; a NUL-terminated name; the property query.
-        let c = unsafe { EVP_CIPHER_fetch(self.libctx(), aead_name(alg).as_ptr(), self.propq()) };
+        let c = match engine_cipher(aead_name(alg)) {
+            Some(c) => c.cast_mut(),
+            // SAFETY: the library context; a NUL-terminated name; the property query.
+            None => unsafe {
+                EVP_CIPHER_fetch(self.libctx(), aead_name(alg).as_ptr(), self.propq())
+            },
+        };
         if c.is_null() {
             return Err(fail());
         }
@@ -1782,8 +1947,11 @@ impl Provider for EvpProvider {
         if key.len() != alg.key_len() {
             return Err(fail());
         }
-        // SAFETY: the library context; a NUL-terminated name; the property query.
-        let c = CipherPtr(unsafe { EVP_CIPHER_fetch(self.libctx(), name.as_ptr(), self.propq()) });
+        let c = CipherPtr(match engine_cipher(name) {
+            Some(c) => c.cast_mut(),
+            // SAFETY: the library context; a NUL-terminated name; the property query.
+            None => unsafe { EVP_CIPHER_fetch(self.libctx(), name.as_ptr(), self.propq()) },
+        });
         if c.0.is_null() {
             return Err(fail());
         }
@@ -1805,6 +1973,35 @@ impl Provider for EvpProvider {
             key: Secret::new(key.to_vec()),
             chain: None,
         }))
+    }
+
+    fn stitched(
+        &self,
+        alg: CipherAlg,
+        mac: HashAlg,
+        key: &[u8],
+        mac_key: &[u8],
+        iv: &[u8],
+        encrypt: bool,
+    ) -> Option<Box<dyn rustyssl_tls::crypto::Stitched>> {
+        use rustyssl_abi::{
+            NID_aes_128_cbc_hmac_sha1, NID_aes_128_cbc_hmac_sha256, NID_aes_256_cbc_hmac_sha1,
+            NID_aes_256_cbc_hmac_sha256,
+        };
+        // `ssl_cipher_get_evp`'s stitched NIDs. Only an engine's take the stitched path here:
+        // a provider's stitched cipher writes the records the separate cipher and MAC write.
+        let nid = match (alg, mac) {
+            (CipherAlg::Aes128Cbc, HashAlg::Sha1) => NID_aes_128_cbc_hmac_sha1,
+            (CipherAlg::Aes256Cbc, HashAlg::Sha1) => NID_aes_256_cbc_hmac_sha1,
+            (CipherAlg::Aes128Cbc, HashAlg::Sha256) => NID_aes_128_cbc_hmac_sha256,
+            (CipherAlg::Aes256Cbc, HashAlg::Sha256) => NID_aes_256_cbc_hmac_sha256,
+            _ => return None,
+        };
+        if key.len() != alg.key_len() || iv.len() != alg.block_len() {
+            return None;
+        }
+        engine_stitched(nid, key, mac_key, iv, encrypt)
+            .map(|s| Box::new(s) as Box<dyn rustyssl_tls::crypto::Stitched>)
     }
 
     fn tls_cbc_mac(

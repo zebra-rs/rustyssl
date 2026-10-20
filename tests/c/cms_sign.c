@@ -967,6 +967,53 @@ int main(void)
         BIO_free(in);
     }
 
+    /*
+     * A receipt in a library context, while nothing can be fetched in the default one (as the
+     * openssl tool's OPENSSL_TEST_LIBCTX mode has it): the msgSigDigest's digest comes from the
+     * signer's context.
+     */
+    {
+        OSSL_LIB_CTX *lc = OSSL_LIB_CTX_new();
+        BIO *b = mem(RSA_KEY_PEM);
+        EVP_PKEY *k = PEM_read_bio_PrivateKey_ex(b, NULL, NULL, NULL, lc, NULL);
+        BIO *b2 = mem(EC_KEY_PEM);
+        EVP_PKEY *k2 = PEM_read_bio_PrivateKey_ex(b2, NULL, NULL, NULL, lc, NULL);
+        CMS_ContentInfo *rcms;
+        CMS_SignerInfo *si;
+        CMS_ReceiptRequest *rr;
+        STACK_OF(GENERAL_NAMES) *to = sk_GENERAL_NAMES_new_null();
+        GENERAL_NAMES *gns = GENERAL_NAMES_new();
+        GENERAL_NAME *gn = GENERAL_NAME_new();
+
+        gn->type = GEN_EMAIL;
+        gn->d.rfc822Name = ASN1_IA5STRING_new();
+        ASN1_STRING_set(gn->d.rfc822Name, "a@example.com", -1);
+        sk_GENERAL_NAME_push(gns, gn);
+        sk_GENERAL_NAMES_push(to, gns);
+        BIO_free(b);
+        BIO_free(b2);
+        in = mem(msg);
+        check(EVP_set_default_properties(NULL, "provider=none-at-all") == 1, "no fetches in the default context");
+        cms = CMS_sign_ex(NULL, NULL, NULL, NULL, CMS_PARTIAL, lc, NULL);
+        si = CMS_add1_signer(cms, rsa, k, NULL, 0);
+        rr = CMS_ReceiptRequest_create0_ex(NULL, -1, 1, NULL, to, lc);
+        printf("# receipt request in a context: add1 %d, final %d\n", CMS_add1_ReceiptRequest(si, rr), CMS_final(cms, in, NULL, 0));
+        CMS_ReceiptRequest_free(rr);
+        errors();
+        rcms = si == NULL ? NULL : CMS_sign_receipt(si, ec, k2, NULL, 0);
+        printf("# sign_receipt in a context: %s\n", rcms == NULL ? "NULL" : "made");
+        errors();
+        EVP_set_default_properties(NULL, "");
+        check(rcms != NULL && CMS_verify_receipt(rcms, cms, NULL, st, 0) == 1, "a receipt signed in a library context");
+        errors();
+        CMS_ContentInfo_free(rcms);
+        CMS_ContentInfo_free(cms);
+        BIO_free(in);
+        EVP_PKEY_free(k);
+        EVP_PKEY_free(k2);
+        OSSL_LIB_CTX_free(lc);
+    }
+
     /* S/MIME, capabilities, and the SignedData functions */
     {
         BIO *out = BIO_new(BIO_s_mem()), *bcont = NULL;

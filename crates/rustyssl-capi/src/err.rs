@@ -531,13 +531,15 @@ struct Details {
     func: *const c_char,
     data: *const c_char,
     flags: c_int,
+    /// Whether there was an error: one whose code is 0 (`ERR_raise(0, 0)`) is still an error.
+    found: bool,
 }
 
 /// Reads the oldest or the newest error, removing the oldest for [`Get::Pop`] (OpenSSL's
 /// `get_error_values`). Errors flagged `ERR_FLAG_CLEAR` are dropped first. A popped error keeps
 /// its data, file, and function until its slot is reused, so the pointers stay valid that long.
 /// `keep_data` says the caller wants the data: missing data then reads as `""` with flags 0;
-/// without it, a popped error's data is dropped at once. Returns 0 for an empty queue.
+/// without it, a popped error's data is dropped at once. Returns 0, not found, for an empty queue.
 fn get(action: Get, keep_data: bool) -> (c_ulong, Details) {
     let none = Details {
         file: c"".as_ptr(),
@@ -545,6 +547,7 @@ fn get(action: Get, keep_data: bool) -> (c_ulong, Details) {
         func: c"".as_ptr(),
         data: c"".as_ptr(),
         flags: 0,
+        found: false,
     };
     let Some(state) = state() else {
         return (0, none);
@@ -604,6 +607,7 @@ fn get(action: Get, keep_data: bool) -> (c_ulong, Details) {
         func: or_empty(entry.func),
         data: entry.data,
         flags: entry.data_flags,
+        found: true,
     };
     if !keep_data {
         if action == Get::Pop {
@@ -642,7 +646,8 @@ unsafe fn get_into(
     flags: *mut c_int,
 ) -> c_ulong {
     let (code, details) = get(action, !data.is_null());
-    if code == 0 {
+    // An error whose code is 0 still has its details written, as OpenSSL does.
+    if !details.found {
         return 0;
     }
     // SAFETY: the caller's guarantee, for each output.
