@@ -380,7 +380,10 @@ pub(crate) unsafe fn write_internal(
         // SAFETY: as above.
         return match unsafe { drive(s, x, false, function) } {
             Stop::Idle | Stop::Done | Stop::AppData => {
-                x.state().drv.wpend = None;
+                let mut st = x.state();
+                st.drv.wpend = None;
+                st.drv.out_after_wpend = false;
+                drop(st);
                 *written = tot;
                 1
             }
@@ -432,7 +435,9 @@ pub(crate) unsafe fn write_internal(
             1
         }
         Stop::Retry => {
-            x.state().drv.wpend = Some((chunk, buf.addr()));
+            let mut st = x.state();
+            st.drv.wpend = Some((chunk, buf.addr()));
+            st.drv.out_after_wpend = false;
             -1
         }
         _ => -1,

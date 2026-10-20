@@ -147,6 +147,9 @@ pub(crate) struct Driver {
     /// A write waiting to be retried (`wpend_tot`, `wpend_buf`): what it accepted, and its
     /// buffer's address.
     pub(crate) wpend: Option<(usize, usize)>,
+    /// Output the core produced after a write was left pending: a read flushes it (the pending
+    /// write before it), as the state machine's writes do.
+    pub(crate) out_after_wpend: bool,
     /// Whether a call is driving the core (a callback re-entering is refused).
     pub(crate) driving: bool,
     /// The peer's certificates as objects.
@@ -632,6 +635,9 @@ pub(crate) fn push_output(d: &mut Driver, c: &mut Connection) {
     }
     let buffered = c.write_buffered();
     let (out, marks) = c.take_output_and_flushes();
+    if d.wpend.is_some() && (!out.is_empty() || !marks.is_empty()) {
+        d.out_after_wpend = true;
+    }
     let mut at = 0;
     for mark in marks {
         let piece = out.get(at..mark.min(out.len())).unwrap_or_default();
@@ -869,16 +875,18 @@ pub(crate) unsafe fn flush(x: &Ssl) -> Flush {
     }
 }
 
-/// [`flush`], except in a read (`reading`) outside a handshake while an application write
-/// waits to be retried: `ssl3_read_bytes` leaves that write (`wpend`) to `SSL_write`'s retry and
-/// reads, so a peer that won't read until it has been answered isn't waited for.
+/// [`flush`], except in a read (`reading`) while an application write waits to be retried and
+/// nothing has been written since: `ssl3_read_bytes` leaves that write (`wpend`) to
+/// `SSL_write`'s retry and reads, so a peer that won't read until it has been answered isn't
+/// waited for. That holds while a post-handshake message (a NewSessionTicket) is read too; the
+/// state machine's own writes (a KeyUpdate's answer) go out, the pending write first.
 ///
 /// # Safety
 /// As for [`flush`].
 unsafe fn flush_for(x: &Ssl, reading: bool) -> Flush {
     if reading {
         let st = x.state();
-        if st.drv.wpend.is_some() && !st.in_init {
+        if st.drv.wpend.is_some() && !st.drv.out_after_wpend {
             return Flush::Done;
         }
     }
