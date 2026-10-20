@@ -168,8 +168,10 @@ fn poll_events(c: &Qctx<'_>, es: &mut EngineState, events: u64) -> u64 {
 /// # Safety
 /// `items` holds `i + 1` items `stride` octets apart.
 unsafe fn item<'a>(items: *mut SSL_POLL_ITEM, stride: usize, i: usize) -> &'a mut SSL_POLL_ITEM {
-    // SAFETY: the caller's guarantee.
-    unsafe { &mut *items.cast::<u8>().add(i * stride).cast::<SSL_POLL_ITEM>() }
+    // SAFETY: the caller's guarantee: the item is within the array.
+    let p = unsafe { items.cast::<u8>().add(i.saturating_mul(stride)) };
+    // SAFETY: as above: an item.
+    unsafe { &mut *p.cast::<SSL_POLL_ITEM>() }
 }
 
 /// What a readout found.

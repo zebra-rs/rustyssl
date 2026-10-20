@@ -899,7 +899,7 @@ unsafe fn run(cc: &ConfCtx, t: Target, cmd: Cmd, value: &CStr) -> c_int {
                 let mut st = x.state();
                 let st = &mut *st;
                 set(
-                    st.method.version,
+                    if st.method.quic { 0 } else { st.method.version },
                     &mut st.min_proto_version,
                     &mut st.max_proto_version,
                 )
@@ -911,7 +911,7 @@ unsafe fn run(cc: &ConfCtx, t: Target, cmd: Cmd, value: &CStr) -> c_int {
                 let mut st = x.state();
                 let st = &mut *st;
                 set(
-                    st.method.version,
+                    if st.method.quic { 0 } else { st.method.version },
                     &mut st.min_proto_version,
                     &mut st.max_proto_version,
                 )

@@ -272,7 +272,7 @@ pub(crate) unsafe fn new_listener(ctx: *mut SSL_CTX, flags: u64) -> *mut SSL {
     };
     // SAFETY: the new object.
     unsafe { crate::ssl::conn::rustyssl_private_SSL_set_accept_state(s) };
-    let validate = flags & u64::from(SSL_LISTENER_FLAG_NO_VALIDATE) == 0;
+    let validate = flags & SSL_LISTENER_FLAG_NO_VALIDATE == 0;
     let engine = Engine::new(ctx, true, validate);
     {
         let mut es = engine.lock();
@@ -546,10 +546,9 @@ pub(crate) unsafe fn event_timeout(
     };
     if !tv.is_null() {
         // SAFETY: the caller's guarantee.
-        unsafe {
-            (*tv).tv_sec = sec.try_into().unwrap_or(1_000_000);
-            (*tv).tv_usec = usec.try_into().unwrap_or(0);
-        }
+        let tv = unsafe { &mut *tv };
+        tv.tv_sec = sec.try_into().unwrap_or(1_000_000);
+        tv.tv_usec = usec.try_into().unwrap_or(0);
     }
     if !is_infinite.is_null() {
         // SAFETY: as above.
@@ -1016,10 +1015,10 @@ pub(crate) unsafe fn write(
         return c.non_normal(&mut es, SSL_R_NO_STREAM, F);
     };
     let conclude = flags & u64::from(SSL_WRITE_FLAG_CONCLUDE) != 0;
-    if let Err(r) = validate_for_write(&mut es, c.conn, id) {
-        if len > 0 {
-            return c.non_normal(&mut es, r, F);
-        }
+    if len > 0
+        && let Err(r) = validate_for_write(&mut es, c.conn, id)
+    {
+        return c.non_normal(&mut es, r, F);
     }
     if len == 0 {
         if conclude && let Some(ch) = es.channel_of(c.conn) {
@@ -1342,7 +1341,7 @@ pub(crate) unsafe fn accept_connection(s: *mut SSL, flags: u64) -> *mut SSL {
     let Some(c) = (unsafe { expect(s, L) }) else {
         return ptr::null_mut();
     };
-    let no_block = flags & u64::from(SSL_ACCEPT_CONNECTION_NO_BLOCK) != 0;
+    let no_block = flags & SSL_ACCEPT_CONNECTION_NO_BLOCK != 0;
     let engine = Arc::clone(c.engine());
     listen(s);
     let empty = engine.lock().accept_queue.is_empty();
@@ -1423,8 +1422,8 @@ pub(crate) unsafe fn set_initial_peer(s: *mut SSL, peer: *const BIO_ADDR) -> c_i
 /// Whether the network BIOs can block (they have poll descriptors).
 fn can_block(es: &EngineState) -> bool {
     let (r, w) = es.bios();
-    let pollable = |b| {
-        if b == ptr::null_mut() {
+    let pollable = |b: *mut BIO| {
+        if b.is_null() {
             return false;
         }
         let mut d: rustyssl_abi::BIO_POLL_DESCRIPTOR =
@@ -1908,13 +1907,12 @@ pub(crate) unsafe fn conn_close_info(
         flags |= SSL_CONN_CLOSE_FLAG_TRANSPORT;
     }
     // SAFETY: the caller's guarantee.
-    unsafe {
-        (*info).error_code = tc.code;
-        (*info).frame_type = tc.frame_type;
-        (*info).reason = reason;
-        (*info).reason_len = tc.reason.len();
-        (*info).flags = flags;
-    }
+    let info = unsafe { &mut *info };
+    info.error_code = tc.code;
+    info.frame_type = tc.frame_type;
+    info.reason = reason;
+    info.reason_len = tc.reason.len();
+    info.flags = flags;
     1
 }
 
@@ -2679,13 +2677,12 @@ pub(crate) unsafe fn poll_descriptor(
             "ossl_quic_get_rpoll_descriptor",
         );
     }
-    // SAFETY: the port's live BIO; the caller's descriptor.
-    unsafe {
-        if write {
-            crate::bio::BIO_get_wpoll_descriptor(b, desc)
-        } else {
-            crate::bio::BIO_get_rpoll_descriptor(b, desc)
-        }
+    if write {
+        // SAFETY: the port's live BIO; the caller's descriptor.
+        unsafe { crate::bio::BIO_get_wpoll_descriptor(b, desc) }
+    } else {
+        // SAFETY: as above.
+        unsafe { crate::bio::BIO_get_rpoll_descriptor(b, desc) }
     }
 }
 

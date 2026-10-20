@@ -885,7 +885,8 @@ ffi_export! {
             }
             SSL_CTRL_SET_MIN_PROTO_VERSION | SSL_CTRL_SET_MAX_PROTO_VERSION => {
                 let Ok(v) = c_int::try_from(larg) else { return 0 };
-                let method_version = st.method.version;
+                // QUIC's methods take no bounds (`OSSL_QUIC_ANY_VERSION`: a version-inflexible one).
+                let method_version = if st.method.quic { 0 } else { st.method.version };
                 if cmd == SSL_CTRL_SET_MIN_PROTO_VERSION {
                     c_long::from(check_allowed_versions(v, st.max_proto_version) != 0 && set_version_bound(method_version, v, &mut st.min_proto_version) != 0)
                 } else {
@@ -1560,10 +1561,8 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
-        if unsafe { super::quic::api::is_quic_ctx(c) } {
-            if app_block_size > 1 || hs_block_size > 1 {
-                return 0;
-            }
+        if unsafe { super::quic::api::is_quic_ctx(c) } && (app_block_size > 1 || hs_block_size > 1) {
+            return 0;
         }
         let (Some(a), Some(h)) = (padding(app_block_size), padding(hs_block_size)) else { return 0 };
         // SAFETY: the caller's guarantee.

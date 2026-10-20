@@ -832,7 +832,9 @@ pub(crate) unsafe fn caps(b: *mut BIO) -> u64 {
 pub(crate) fn attach_tls(x: &Ssl, sh: &Arc<Shared>) {
     // The handshake layer's BIOs are null ones: its octets go through the transport.
     // SAFETY: no preconditions.
-    let nb = unsafe { crate::bio::BIO_new(crate::bio::null::BIO_s_null()) };
+    let m = unsafe { crate::bio::null::BIO_s_null() };
+    // SAFETY: the built-in method.
+    let nb = unsafe { crate::bio::BIO_new(m) };
     if !nb.is_null() {
         // One reference for each side.
         // SAFETY: the new BIO.

@@ -406,7 +406,7 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         if unsafe { super::quic::of(s) }.is_some() {
-            return ();
+            return;
         }
         // SAFETY: the caller's guarantee.
         if let Some(x) = unsafe { ssl(s) } {

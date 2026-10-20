@@ -380,7 +380,7 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         if unsafe { super::quic::of(s) }.is_some() {
-            return ();
+            return;
         }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { conn::ssl(s) }) else { return };
@@ -418,7 +418,7 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         if unsafe { super::quic::of(s) }.is_some() {
-            return ();
+            return;
         }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { conn::ssl(s) }) else { return };
@@ -968,7 +968,7 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         if unsafe { super::quic::of(s) }.is_some() {
-            return ();
+            return;
         }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { conn::ssl(s) }) else { return };
@@ -1100,7 +1100,7 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         if unsafe { super::quic::of(s) }.is_some() {
-            return ();
+            return;
         }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { conn::ssl(s) }) else { return };
@@ -1420,7 +1420,7 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         if unsafe { super::quic::of(s) }.is_some() {
-            return ();
+            return;
         }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { conn::ssl(s) }) else { return };
