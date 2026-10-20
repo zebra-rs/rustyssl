@@ -452,8 +452,8 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BIO_connect` | libcrypto | `openssl/bio.h` | `bio_sock` |
 | `BIO_copy_next_retry` | libcrypto | `openssl/bio.h` | `bio_mem` |
 | `BIO_ctrl` | libcrypto | `openssl/bio.h` | `asn1_bit_string`, `asn1_generate`, `asn1_hex`, `asn1_integer`, `asn1_item_io`, `asn1_parse`, `asn1_print`, `asn1_text`, `asn1_time`, `bio_base64`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_dump`, `bio_evp`, `bio_file`, `bio_filter`, `bio_log`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `bn`, `cmp`, `cms_data`, `cms_env`, `cms_kemri`, `cms_sign`, `conf`, `ct`, `custom_methods`, `d2i_pkey`, `dh_asn1`, `dsa_asn1`, `ec_key`, `ec_params`, `encoder`, `err_bio`, `evp_dsa_kmgmt`, `evp_ecx448_legacy`, `evp_ecx_legacy`, `evp_pkey_ec`, `evp_pkey_print`, `evp_rsa_legacy`, `http`, `ietf_attr_syntax`, `key2text`, `lhash`, `modules/test_prov`, `objects`, `ocsp`, `pem`, `pem_crypt`, `pem_pkey`, `pem_write_pkey`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `pvkfmt`, `rand`, `rsa_asn1`, `rsa_print`, `ssl_bio`, `ssl_errors`, `ssl_ktls`, `ssl_libctx`, `ssl_sess_fatal`, `ssl_session`, `ssl_shutdown`, `ssl_strings`, `ssl_trace`, `store`, `trace`, `txt_db`, `x509_cert`, `x509_ext`, `x509_info`, `x509_name`, `x509_policy`, `x509_print`, `x509_pubkey`, `x509_req`, `x509_spki`, `x509v3_acext`, `x509v3_admission`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_misc`, `x509v3_policy`, `x509v3_rfc3779`, `x509v3_san` |
-| `BIO_ctrl_get_read_request` | libcrypto | `openssl/bio.h` | `bio_pair` |
-| `BIO_ctrl_get_write_guarantee` | libcrypto | `openssl/bio.h` | `bio_dgram_pair`, `bio_pair` |
+| `BIO_ctrl_get_read_request` | libcrypto | `openssl/bio.h` | `bio_pair`, `ssl_bio` |
+| `BIO_ctrl_get_write_guarantee` | libcrypto | `openssl/bio.h` | `bio_dgram_pair`, `bio_pair`, `ssl_bio` |
 | `BIO_ctrl_pending` | libcrypto | `openssl/bio.h` | `bio_log`, `bio_mem`, `rand`, `ssl_bio`, `ssl_dtls`, `ssl_requests`, `ssl_trace` |
 | `BIO_ctrl_reset_read_request` | libcrypto | `openssl/bio.h` | `bio_pair` |
 | `BIO_ctrl_wpending` | libcrypto | `openssl/bio.h` | `bio_mem`, `ssl_bio` |
@@ -557,12 +557,12 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BIO_new_mem_buf` | libcrypto | `openssl/bio.h` | `asn1_generate`, `asn1_hex`, `asn1_item_io`, `asn1_item_sign`, `bio_base64`, `bio_evp`, `bio_filter`, `bio_mem`, `cmp`, `cms_data`, `cms_env`, `cms_kemri`, `cms_sign`, `conf`, `conf_modules`, `crmf`, `ct`, `custom_methods`, `d2i_pkey`, `decoder`, `encoder`, `evp_pkey_print`, `evp_seal`, `http`, `ocsp`, `pem`, `pem_pkey`, `pkcs12`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `pkcs8_crypt`, `provider`, `pvkfmt`, `ssl_apis`, `ssl_bio`, `ssl_check_chain`, `ssl_client_cert_engine`, `ssl_ct`, `ssl_ctrl_more`, `ssl_ctx`, `ssl_custom`, `ssl_dane`, `ssl_eap`, `ssl_early`, `ssl_errors`, `ssl_flights`, `ssl_handshake`, `ssl_handshake_reads`, `ssl_io`, `ssl_ktls`, `ssl_libctx`, `ssl_lists`, `ssl_misc`, `ssl_padding`, `ssl_requests`, `ssl_rpk`, `ssl_sess_cache`, `ssl_shutdown`, `ssl_stateless`, `ssl_stitched`, `ssl_strings`, `ssl_ticket_key`, `ssl_tickets`, `ssl_trace`, `store`, `ts`, `txt_db`, `ui`, `x509_acert`, `x509_cert`, `x509_check`, `x509_crl`, `x509_crlcheck`, `x509_ctx`, `x509_info`, `x509_policy`, `x509_print`, `x509_purpose`, `x509_req`, `x509_rfc3779`, `x509_spki`, `x509_store`, `x509_trust`, `x509_verify`, `x509v3_acext`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_policy`, `x509v3_san` |
 | `BIO_new_socket` | libcrypto | `openssl/bio.h` | `bio_sock`, `ssl_ktls` |
 | `BIO_next` | libcrypto | `openssl/bio.h` | `bio_evp`, `bio_mem`, `bio_sock`, `evp_pkey_print`, `ssl_bio` |
-| `BIO_nread` | libcrypto | `openssl/bio.h` | `bio_pair` |
+| `BIO_nread` | libcrypto | `openssl/bio.h` | `bio_pair`, `ssl_bio` |
 | `BIO_nread0` | libcrypto | `openssl/bio.h` | `bio_pair` |
 | `BIO_number_read` | libcrypto | `openssl/bio.h` | `bio_mem`, `bio_pair` |
 | `BIO_number_written` | libcrypto | `openssl/bio.h` | `bio_mem`, `bio_pair` |
-| `BIO_nwrite` | libcrypto | `openssl/bio.h` | `bio_pair` |
-| `BIO_nwrite0` | libcrypto | `openssl/bio.h` | `bio_pair` |
+| `BIO_nwrite` | libcrypto | `openssl/bio.h` | `bio_pair`, `ssl_bio` |
+| `BIO_nwrite0` | libcrypto | `openssl/bio.h` | `bio_pair`, `ssl_bio` |
 | `BIO_parse_hostserv` | libcrypto | `openssl/bio.h` | `bio_addr` |
 | `BIO_pop` | libcrypto | `openssl/bio.h` | `bio_connect`, `bio_evp`, `bio_mem`, `bio_sock`, `cms_data`, `pkcs7_stream`, `ssl_bio` |
 | `BIO_printf` | libcrypto | `openssl/bio.h` | `asn1_print`, `bio_filter`, `bio_log`, `bio_print`, `evp_pkey_print`, `modules/test_prov` |
