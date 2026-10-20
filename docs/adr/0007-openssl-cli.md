@@ -1,6 +1,6 @@
 # ADR 0007: The `openssl` command-line tool in Rust (Phase 11)
 
-Status: proposed (2026-10-20). The decisions marked **[user]** in section 7 are open.
+Status: accepted (2026-10-20). The user decided section 7's four questions; see there.
 
 ## Context
 
@@ -38,7 +38,10 @@ Rule 1 says `unsafe` belongs only in `rustyssl-capi` and the `libs/*` shims, so 
 ## 2. Packaging
 
 - **Crates:** `crates/rustyssl-cli` builds the binary `openssl`; `crates/rustyssl-ossl` is its bindings. Both are workspace members.
-- **dist:** `cargo xtask dist` also builds the binary and installs it as `target/dist/bin/openssl`. On Linux it links `libssl.so.3` and `libcrypto.so.3` dynamically, by soname with versioned symbols, as upstream's binary does; on macOS it links by install name (`@rpath` plus the dist `lib/`). The installed libraries are what it runs on, and `RUSTYSSL_LIBDIR`/`DYLD_LIBRARY_PATH` can swap them, exactly as for upstream's binary.
+- **dist:** `cargo xtask dist` also builds the binary and installs it (as `target/dist/bin/openssl-rs` until 11.1 is complete, decision 3; then as `openssl`).
+- **Linking (decided while building F0):** `rustyssl-ossl` loads `libcrypto` and `libssl` when the binary starts, by soname (`libcrypto.so.3`, `libssl.so.3`) or install name (`libcrypto.3.dylib`, ...), and resolves each export it calls once, rather than linking them when it is built. A build-time link would make `cargo build` and `cargo test --workspace` need `target/dist` (or the reference) first, which the gates and a fresh checkout don't have.
+  - **Search order, as a linked binary's `RUNPATH` would give:** the platform's library path variable when it is set (`LD_LIBRARY_PATH`, `DYLD_LIBRARY_PATH`), so the same binary runs on our libraries or the reference's exactly as upstream's binary does; otherwise `../lib` next to the binary (the dist layout); otherwise the system's default search.
+  - **Fail closed:** a library that can't be loaded, or an export missing from it, stops the command with a message and exit code 1. Nothing falls back to another implementation.
 - **`openssl version`:** upstream's logic. It prints `OPENSSL_VERSION_TEXT` from the headers it was built with (3.6.5's), and adds `(Library: …)` when `OpenSSL_version(OPENSSL_VERSION)` differs. On rustyssl it differs (`+rustyssl…`), so it shows both, as upstream's binary on our libraries does today.
 
 ## 3. Options, help, and errors
@@ -101,9 +104,16 @@ Everything else depends on it.
 
 **11.2 last:** `--cli ours` across the whole tree once every command is ported.
 
-## 7. Decisions for the user
+## 7. Decisions (the user's, 2026-10-20)
 
-1. **[user]** Approve the approach, (a): the CLI on the public C API. It needs rule 1 amended so that a new bindings crate, `rustyssl-ossl`, may hold the FFI `unsafe`. The alternative is to keep rule 1 unchanged by placing that crate under `libs/` as a shim.
-2. **[user]** Vendor `apps/` (as a specification only) and `doc/man1/` into `abi/` and generate the option tables from them.
-3. **[user]** When our binary becomes `target/dist/bin/openssl`, and so what `test-apps` and the recipes use by default: per command as each is ported, or only when 11.1 is complete. Until then, upstream's relinked binary stays the one users and the recipes get.
-4. **[user]** The byte-exactness exclusions in section 4: timings, interactive sessions, TTY prompts.
+1. **(a), the CLI on the public C API.** The FFI lives in `crates/rustyssl-ossl`, the only
+   crate outside `rustyssl-capi` and `libs/*` allowed `unsafe`; AGENTS.md rule 1 names it.
+   `crates/rustyssl-cli` is `#![forbid(unsafe_code)]`.
+2. **Vendor and generate.** `cargo xtask vendor` copies `apps/` (a specification only, never
+   compiled), its generated `progs.c`/`progs.h`, and `doc/man1/` into `abi/openssl-3.6/`, and
+   `cargo xtask codegen` generates the option tables from them.
+3. **The switch happens when 11.1 is complete.** Until then our binary is installed as
+   `target/dist/bin/openssl-rs` and tested alongside upstream's; `target/dist/bin/openssl`, what
+   `test-apps` and the recipes use by default, stays upstream's relinked binary.
+4. **The exclusions stand:** timings, interactive sessions, and TTY prompts aren't
+   byte-compared, but their runs must succeed with the same exit codes and behavior.

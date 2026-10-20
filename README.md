@@ -90,6 +90,8 @@ crates/
   rustyssl-quic/      (later phase) QUIC transport for the SSL QUIC API
   rustyssl-capi/      THE FFI LAYER: every extern "C" export, handle tables, BIO, callbacks,
                       OSSL_PARAM, ex_data, ERR queue, CRYPTO_malloc, the ASN1_ITEM template engine
+  rustyssl-ossl/      the CLI's bindings: safe wrappers over the public C API (generated externs, loaded at run time)
+  rustyssl-cli/       the `openssl` command-line tool (ADR 0007), `#![forbid(unsafe_code)]`
 libs/
   libcrypto/          static archive, linked into libcrypto.so.3 by `cargo xtask dist`; contains the WHOLE implementation
   libssl/             static archive of generated forwarders, linked into libssl.so.3; no implementation of its own
@@ -137,8 +139,9 @@ Key design decisions:
 
 ## Security rules (non-negotiable)
 
-1. **`unsafe` only in `rustyssl-capi`** and the `libs/*` shims. Every other crate has
-   `#![forbid(unsafe_code)]`. Each `unsafe` block needs a `// SAFETY:` comment, enforced
+1. **`unsafe` only in `rustyssl-capi`, the `libs/*` shims, and `rustyssl-ossl`** (the
+   `openssl` CLI's FFI wrappers over the public C API, [ADR 0007](docs/adr/0007-openssl-cli.md)).
+   Every other crate has `#![forbid(unsafe_code)]`. Each `unsafe` block needs a `// SAFETY:` comment, enforced
    by `clippy::undocumented_unsafe_blocks = "deny"`.
 2. **Treat the FFI boundary as hostile input.** Turn raw pointer and length pairs into
    slices exactly once, at the boundary, after checking them. Never truncate with `as`

@@ -5963,8 +5963,12 @@ CLI, both for users and for the upstream test recipes.
 
 Progress (2026-10-20): the design is [ADR 0007](adr/0007-openssl-cli.md). It covers how the
 CLI reaches the library, its packaging, the generated option tables, the three-run golden tests,
-and the split into a first infrastructure fork (F0) and six command-group forks (G1–G6). It has
-four open decisions for the user.
+and the split into a first infrastructure fork (F0) and six command-group forks (G1–G6). The
+user decided its four questions (2026-10-20): the CLI calls the public C API through
+`rustyssl-ossl`, the one crate besides capi and `libs/*` that may hold `unsafe` (rule 1 amended);
+`apps/` and `doc/man1/` are vendored and the option tables generated; our binary replaces
+upstream's `target/dist/bin/openssl` only when 11.1 is complete (until then it's `openssl-rs`);
+timings, interactive sessions and TTY prompts aren't byte-compared.
 
 ## Phase 12: Hardening, performance, release 1.0 → M7
 
