@@ -784,3 +784,15 @@ impl ConnRec {
         }
     }
 }
+
+/// Whether QUIC can use suite `c` (`SSL_QUIC` in OpenSSL's table: the GCM suites and
+/// ChaCha20-Poly1305).
+pub(crate) fn quic_suite(c: &rustyssl_tls::suites::Cipher) -> bool {
+    [
+        rustyssl_abi::TLS1_3_CK_AES_128_GCM_SHA256,
+        rustyssl_abi::TLS1_3_CK_AES_256_GCM_SHA384,
+        rustyssl_abi::TLS1_3_CK_CHACHA20_POLY1305_SHA256,
+    ]
+    .iter()
+    .any(|&id| u32::try_from(id).is_ok_and(|id| id == c.id))
+}

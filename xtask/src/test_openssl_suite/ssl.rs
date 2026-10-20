@@ -281,6 +281,32 @@ pub fn build(list: &List) -> Build {
              #pragma weak ossl_cipher_generic_gettable_params\n".to_owned(),
         ),
     ];
+    // The QUIC programs link the static libraries for OpenSSL's internal QUIC test server
+    // (`ossl_quic_tserver_*`), fault injector, fake time and threads. Relinked with the shared
+    // ones, they reference those functions weakly, so that they load on a library that doesn't
+    // export them; the tests that use them are `internal` in `ssl.txt`.
+    for (program, file, after) in QUIC_PROGRAMS {
+        if list.lines.iter().any(|l| l.program == *program) {
+            patches.push((
+                "test/build.info",
+                format!("DEPEND[{program}]=../libcrypto.a ../libssl.a libtestutil.a"),
+                format!("DEPEND[{program}]=../libcrypto ../libssl libtestutil.a"),
+            ));
+            let sources = [(*file, *after)]
+                .into_iter()
+                .chain(QUIC_HELPERS.iter().copied());
+            for (f, anchor) in sources {
+                let weak: String = QUIC_INTERNAL
+                    .iter()
+                    .map(|s| format!("#pragma weak {s}\n"))
+                    .collect();
+                let patch = (f, anchor.to_owned(), format!("{anchor}{weak}"));
+                if !patches.contains(&patch) {
+                    patches.push(patch);
+                }
+            }
+        }
+    }
     // The provider programs upstream links statically, relinked with the shared libraries (they
     // use only the public API).
     for program in RELINKED {
@@ -298,6 +324,124 @@ pub fn build(list: &List) -> Build {
         patches,
     }
 }
+
+/// The QUIC programs: each one's source, and the line after which its weak references go.
+const QUIC_PROGRAMS: &[(&str, &str, &str)] = &[
+    (
+        "quicapitest",
+        "test/quicapitest.c",
+        "#include \"internal/quic_txp.h\"\n",
+    ),
+    (
+        "quic_multistream_test",
+        "test/quic_multistream_test.c",
+        "#include \"internal/numbers.h\" /* UINT64_C */\n",
+    ),
+];
+
+/// The helpers both QUIC programs build, and the line of each after which its weak references
+/// go.
+const QUIC_HELPERS: &[(&str, &str)] = &[
+    (
+        "test/helpers/quictestlib.c",
+        "#include \"internal/tsan_assist.h\"\n",
+    ),
+    (
+        "test/helpers/noisydgrambio.c",
+        "#include \"../testutil.h\"\n",
+    ),
+    ("test/helpers/pktsplitbio.c", "#include \"../testutil.h\"\n"),
+];
+
+/// The internal functions the QUIC programs and their helpers call (libssl's QUIC test server,
+/// record layer and channel accessors; libcrypto's threads, time and packet writers).
+const QUIC_INTERNAL: &[&str] = &[
+    "ossl_crypto_condvar_broadcast",
+    "ossl_crypto_condvar_free",
+    "ossl_crypto_condvar_new",
+    "ossl_crypto_condvar_signal",
+    "ossl_crypto_condvar_wait",
+    "ossl_crypto_mutex_free",
+    "ossl_crypto_mutex_lock",
+    "ossl_crypto_mutex_new",
+    "ossl_crypto_mutex_unlock",
+    "ossl_crypto_thread_native_clean",
+    "ossl_crypto_thread_native_join",
+    "ossl_crypto_thread_native_start",
+    "ossl_qtx_flush_net",
+    "ossl_qtx_free",
+    "ossl_qtx_get_queue_len_bytes",
+    "ossl_qtx_get_queue_len_datagrams",
+    "ossl_qtx_new",
+    "ossl_qtx_set_mdpl",
+    "ossl_qtx_write_pkt",
+    "ossl_quic_attach_stream",
+    "ossl_quic_channel_get_diag_local_cid",
+    "ossl_quic_channel_get_diag_num_rx_ack",
+    "ossl_quic_channel_get_qsm",
+    "ossl_quic_channel_get_rx_key_epoch",
+    "ossl_quic_channel_get_tx_key_epoch",
+    "ossl_quic_channel_get0_engine",
+    "ossl_quic_channel_set_mutator",
+    "ossl_quic_channel_set_txku_threshold_override",
+    "ossl_quic_conn_get_channel",
+    "ossl_quic_detach_stream",
+    "ossl_quic_engine_set_inhibit_tick",
+    "ossl_quic_err_to_string",
+    "ossl_quic_frame_type_to_string",
+    "ossl_quic_listener_get_port",
+    "ossl_quic_port_get_num_incoming_channels",
+    "ossl_quic_provide_initial_secret",
+    "ossl_quic_set_diag_title",
+    "ossl_quic_set_override_now_cb",
+    "ossl_quic_set_write_buffer_size",
+    "ossl_quic_tserver_conclude",
+    "ossl_quic_tserver_free",
+    "ossl_quic_tserver_get_channel",
+    "ossl_quic_tserver_get_deadline",
+    "ossl_quic_tserver_get_short_header_conn_id_len",
+    "ossl_quic_tserver_get_terminate_cause",
+    "ossl_quic_tserver_get0_rbio",
+    "ossl_quic_tserver_get0_ssl_ctx",
+    "ossl_quic_tserver_has_read_ended",
+    "ossl_quic_tserver_is_handshake_confirmed",
+    "ossl_quic_tserver_is_term_any",
+    "ossl_quic_tserver_new",
+    "ossl_quic_tserver_new_ticket",
+    "ossl_quic_tserver_ping",
+    "ossl_quic_tserver_pop_incoming_stream",
+    "ossl_quic_tserver_read",
+    "ossl_quic_tserver_set_handshake_mutator",
+    "ossl_quic_tserver_set_max_early_data",
+    "ossl_quic_tserver_set_msg_callback",
+    "ossl_quic_tserver_set_plain_packet_mutator",
+    "ossl_quic_tserver_set_psk_find_session_cb",
+    "ossl_quic_tserver_shutdown",
+    "ossl_quic_tserver_stream_has_peer_reset_stream",
+    "ossl_quic_tserver_stream_has_peer_stop_sending",
+    "ossl_quic_tserver_stream_new",
+    "ossl_quic_tserver_tick",
+    "ossl_quic_tserver_write",
+    "ossl_quic_tx_packetiser_check_unvalidated_credit",
+    "ossl_quic_tx_packetiser_get_next_pn",
+    "ossl_quic_wire_decode_frame_path_response",
+    "ossl_quic_wire_decode_pkt_hdr",
+    "ossl_quic_wire_decode_transport_param_bytes",
+    "ossl_quic_wire_encode_frame_new_conn_id",
+    "ossl_quic_wire_encode_padding",
+    "ossl_quic_wire_encode_pkt_hdr",
+    "ossl_quic_wire_encode_transport_param_bytes",
+    "ossl_quic_wire_peek_frame_header",
+    "ossl_time_now",
+    "WPACKET_cleanup",
+    "WPACKET_close",
+    "WPACKET_finish",
+    "WPACKET_get_total_written",
+    "WPACKET_init",
+    "WPACKET_memcpy",
+    "WPACKET_put_bytes__",
+    "WPACKET_start_sub_packet_len__",
+];
 
 /// Programs upstream links with the static libcrypto that the list's runs relink with the shared
 /// one.

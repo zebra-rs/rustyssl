@@ -71,6 +71,19 @@ tls13ticket_test {src}/apps/server.pem {src}/apps/server.pem
 # before it, so it runs once, as one subtest)
 whole tls13groupselection_test {src}/apps/server.pem {src}/apps/server.pem
 rpktest {src}/test/certs
+# QUIC (Phase 10): 75-test_quicapi.t and 70-test_quic_multistream.t. Their tests that use
+# OpenSSL's internal QUIC test server (ossl_quic_tserver_*), its fault injector, fake time, or
+# other internal QUIC functions are `internal` below.
+quicapitest default {src}/test/default-recordpadding.cnf {src}/test/certs {src}/test/recipes/75-test_quicapi_data
+quic_multistream_test {src}/test/certs/servercert.pem {src}/test/certs/serverkey.pem
+# quicapitest: the tests whose server is the internal test server (qtest_create_quic_objects,
+# ossl_quic_tserver_*), with its fault injector or fake time, or that read the internal channel,
+# port, packetiser or record layer (ossl_quic_conn_get_channel, ossl_quic_listener_get_port,
+# ossl_qtx_*).
+internal quicapitest test_quic_write_read test_fin_only_blocking test_version test_ssl_trace test_bio_ssl test_back_pressure test_multiple_dgrams test_non_io_retry test_quic_psk test_client_auth test_alpn test_noisy_dgram test_bw_limit test_get_shutdown test_tparam test_session_cb test_early_ticks test_new_token test_quic_amplification_limit test_reject_stream_gc test_quic_resize_txe test_pending_limit
+# quic_multistream_test: its scripts run against the internal test server, with internal threads
+# (ossl_crypto_thread_native_*).
+internal quic_multistream_test test_script
 # DTLS (Phase 8): 80-test_dtls.t, 80-test_dtlsv1listen.t, 80-test_dtls_mtu.t, 70-test_bad_dtls.t
 dtlstest {src}/apps/server.pem {src}/apps/server.pem
 dtlsv1listentest
@@ -108,7 +121,6 @@ skip tls13secretstest compiles its own copy of ssl/tls13_enc.c over libssl's pri
 skip ssl_old_test 80-test_ssl_old.t drives it with certificates the openssl tool makes, in Perl
 skip cert_comp_test certificate compression (zlib, brotli, zstd) is off in the default build
 skip ssl_cert_table_internal_test an internal test (03-test_internal_ssl_cert_table.t)
-skip quicapitest QUIC (75-test_quicapi.t and the other quic recipes) is a later phase
 skip TLSProxy the 70-test_*.t recipes that drive s_server and s_client through Perl's TLSProxy aren't test programs
 
 # Provider programs (libcrypto's, run here for the same per-subtest isolation). {suite} is the

@@ -333,6 +333,7 @@ fn method_kind(m: &Method) -> cipherstring::Method {
             m.version,
             TLS_ANY_VERSION | TLS1_2_VERSION | DTLS_ANY_VERSION | DTLS1_2_VERSION
         ),
+        no_ciphers: m.quic,
     }
 }
 
@@ -487,7 +488,8 @@ ffi_export! {
         let s = &mut *st;
         let Some(n) = create(&available, method, &mut s.ciphers, rule, &mut s.cert) else { return 0 };
         drop(st);
-        if n == 0 {
+        // A method without suites of its own (QUIC's) has nothing to match.
+        if n == 0 && !method.quic {
             err::raise(ERR_LIB_SSL, SSL_R_NO_CIPHER_MATCH, "SSL_CTX_set_cipher_list");
             return 0;
         }
@@ -517,7 +519,7 @@ ffi_export! {
         let sst = &mut *st;
         let Some(n) = create(&available, method, &mut sst.ciphers, rule, &mut sst.cert) else { return 0 };
         drop(st);
-        if n == 0 {
+        if n == 0 && !method.quic {
             err::raise(ERR_LIB_SSL, SSL_R_NO_CIPHER_MATCH, "SSL_set_cipher_list");
             return 0;
         }
@@ -1089,7 +1091,13 @@ ffi_export! {
         // SAFETY: the caller's two octets.
         let b = unsafe { core::slice::from_raw_parts(ptr_, 2) };
         let Some(&[hi, lo]) = b.get(..2) else { return ptr::null() };
-        suites::by_protocol_id(u16::from_be_bytes([hi, lo])).map_or(ptr::null(), cipher_ptr)
+        let found = suites::by_protocol_id(u16::from_be_bytes([hi, lo]));
+        // QUIC's method knows only the suites QUIC can use (`ossl_quic_get_cipher_by_char`).
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(ssl) }.is_some() {
+            return found.filter(|c| super::quic::quic_suite(c)).map_or(ptr::null(), cipher_ptr);
+        }
+        found.map_or(ptr::null(), cipher_ptr)
     }
 }
 
