@@ -396,6 +396,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustyssl-cli"
+version = "0.1.0"
+dependencies = [
+ "rustyssl-ossl",
+]
+
+[[package]]
 name = "rustyssl-conf"
 version = "0.1.0"
 
@@ -445,6 +452,14 @@ dependencies = [
 
 [[package]]
 name = "rustyssl-libssl"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "rustyssl-abi",
+]
+
+[[package]]
+name = "rustyssl-ossl"
 version = "0.1.0"
 dependencies = [
  "libc",

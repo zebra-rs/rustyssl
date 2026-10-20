@@ -299,9 +299,9 @@ fn configure(work: &Path, tarball: &Path, version: &str, target: &str) -> Result
         "apps/progs.c",
         "apps/progs.h",
     ])
-        .current_dir(&src)
-        .env_clear()
-        .env("PATH", &path);
+    .current_dir(&src)
+    .env_clear()
+    .env("PATH", &path);
     run_logged(&mut make, &log)?;
 
     // The export lists, from OpenSSL's own resolver, invoked as the Linux Makefile does. Its
