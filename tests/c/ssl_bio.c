@@ -506,8 +506,41 @@ static void test_split_line(void)
     }
 }
 
+/*
+ * Both ends write through a buffering BIO (BIO_f_buffer over the pair): the handshake goes on
+ * only because the library flushes the write BIO after each flight (statem_flush), as it
+ * does; nothing reaches the pair before a flush.
+ */
+static void test_buffered_wbio(void)
+{
+    SSL_CTX *cctx = client_ctx(), *sctx = server_ctx();
+    SSL *c = SSL_new(cctx), *s = SSL_new(sctx);
+    BIO *a = NULL, *b = NULL, *ca, *sb;
+    int r;
+
+    printf("# a buffering write BIO on both ends\n");
+    BIO_new_bio_pair(&a, 0, &b, 0);
+    ca = BIO_push(BIO_new(BIO_f_buffer()), a);
+    sb = BIO_push(BIO_new(BIO_f_buffer()), b);
+    BIO_up_ref(a);
+    BIO_up_ref(b);
+    SSL_set_bio(c, a, ca);
+    SSL_set_bio(s, b, sb);
+    SSL_set_connect_state(c);
+    SSL_set_accept_state(s);
+    r = run(c, s, 0);
+    printf("  handshake %s, %s\n", r == 0 ? "done" : "failed", SSL_get_version(c));
+    check(r == 0, "the handshake through buffering write BIOs");
+    errors();
+    SSL_free(c);
+    SSL_free(s);
+    SSL_CTX_free(cctx);
+    SSL_CTX_free(sctx);
+}
+
 int main(void)
 {
+    test_buffered_wbio();
     test_pair();
     test_set_ssl();
     test_constructors();

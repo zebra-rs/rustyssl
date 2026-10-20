@@ -2468,15 +2468,13 @@ mod tests {
         // SAFETY: the context; a zeroed state of the GCM functions' size, alive below.
         unsafe { EVP_CIPHER_CTX_set_cipher_data(ctx, state.as_mut_ptr().cast()) };
         let max = c_int::try_from(GCM_MAX_IV).unwrap_or(c_int::MAX);
-        // SAFETY: the context with its GCM state; the command takes no pointer.
-        assert_eq!(unsafe { aes_gcm_ctrl(ctx, EVP_CTRL_AEAD_SET_IVLEN, max, ptr::null_mut()) }, 1);
-        // SAFETY: as above.
-        assert_eq!(
-            unsafe { aes_gcm_ctrl(ctx, EVP_CTRL_AEAD_SET_IVLEN, max + 1, ptr::null_mut()) },
-            0
-        );
-        // SAFETY: as above.
-        assert_eq!(unsafe { aes_gcm_ctrl(ctx, EVP_CTRL_AEAD_SET_IVLEN, 0, ptr::null_mut()) }, 0);
+        let set = |n: c_int| {
+            // SAFETY: the context with its GCM state; the command takes no pointer.
+            unsafe { aes_gcm_ctrl(ctx, EVP_CTRL_AEAD_SET_IVLEN, n, ptr::null_mut()) }
+        };
+        assert_eq!(set(max), 1);
+        assert_eq!(set(max + 1), 0);
+        assert_eq!(set(0), 0);
         // SAFETY: the state is the test's own; the context no longer refers to it.
         unsafe { EVP_CIPHER_CTX_set_cipher_data(ctx, ptr::null_mut()) };
         // SAFETY: made above.

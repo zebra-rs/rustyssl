@@ -28,8 +28,8 @@ use std::ffi::CString;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use rustyssl_abi::{
-    BIO, BIO_CTRL_EOF, BIO_FLAGS_READ, BIO_FLAGS_RWS, BIO_FLAGS_SHOULD_RETRY, ERR_LIB_SSL,
-    ERR_R_INTERNAL_ERROR, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED, SSL, SSL_AD_CLOSE_NOTIFY,
+    BIO, BIO_CTRL_EOF, BIO_CTRL_FLUSH, BIO_FLAGS_READ, BIO_FLAGS_RWS, BIO_FLAGS_SHOULD_RETRY,
+    ERR_LIB_SSL, ERR_R_INTERNAL_ERROR, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED, SSL, SSL_AD_CLOSE_NOTIFY,
     SSL_AD_REASON_OFFSET, SSL_CB_ACCEPT_EXIT, SSL_CB_CONNECT_EXIT, SSL_MODE_AUTO_RETRY,
     SSL_NOTHING, SSL_OP_IGNORE_UNEXPECTED_EOF, SSL_R_UNEXPECTED_EOF_WHILE_READING, SSL_READING,
     SSL_RECEIVED_SHUTDOWN, SSL_WRITING, stack_st_X509,
@@ -133,6 +133,9 @@ pub(crate) struct Driver {
     pub(crate) out: Vec<u8>,
     /// What's left to write of the record at the front of `out` (0: a record starts there).
     pub(crate) out_record_left: usize,
+    /// The core reached a flush point (`statem_flush`): once `out` is written, the write BIO
+    /// is flushed.
+    pub(crate) flush_wanted: bool,
     /// DTLS: the lengths of the datagrams in `out`, in order.
     pub(crate) out_dgrams: std::collections::VecDeque<usize>,
     /// TLS: the lengths of the writes `out` holds, in order (a record each, or what the
@@ -622,6 +625,9 @@ pub(crate) fn push_output(d: &mut Driver, c: &mut Connection) {
             d.out_dgrams.push_back(dg.len());
             d.out.extend_from_slice(&dg);
         }
+        // `statem_flush`: the write BIO is flushed once the datagrams are written.
+        let (_, marks) = c.take_output_and_flushes();
+        d.flush_wanted |= !marks.is_empty();
         return;
     }
     let buffered = c.write_buffered();
@@ -632,7 +638,10 @@ pub(crate) fn push_output(d: &mut Driver, c: &mut Connection) {
         for record in records(piece) {
             bbio_write(d, record);
         }
+        // `statem_flush`: the buffering BIO's flush writes what it holds and flushes the write
+        // BIO after it.
         bbio_flush(d);
+        d.flush_wanted = true;
         at = at.max(mark);
     }
     let rest = out.get(at.min(out.len())..).unwrap_or_default();
@@ -647,6 +656,7 @@ pub(crate) fn push_output(d: &mut Driver, c: &mut Connection) {
             d.bbuf.extend_from_slice(record);
         }
         bbio_flush(d);
+        d.flush_wanted = true;
     } else {
         for record in records(rest) {
             unit(d, record);
@@ -797,7 +807,13 @@ pub(crate) unsafe fn flush(x: &Ssl) -> Flush {
             if st.drv.out.is_empty() {
                 st.drv.out_record_left = 0;
                 st.drv.out_units.clear();
-                return Flush::Done;
+                if !st.drv.flush_wanted {
+                    return Flush::Done;
+                }
+                let wbio = st.wbio;
+                drop(st);
+                // SAFETY: the caller's guarantee.
+                return unsafe { flush_bio(x, wbio) };
             }
             if st.drv.out_record_left == 0 {
                 st.drv.out_record_left = if st.method.dtls {
@@ -848,6 +864,29 @@ pub(crate) unsafe fn flush(x: &Ssl) -> Flush {
         let out = &mut st.drv.out;
         out.drain(..done.min(out.len()));
     }
+}
+
+/// `statem_flush`: `BIO_flush` on the write BIO, with no lock held; one that asks to be retried
+/// leaves the flush wanted, to run again before the core goes on.
+///
+/// # Safety
+/// As for [`flush`].
+unsafe fn flush_bio(x: &Ssl, wbio: *mut BIO) -> Flush {
+    if wbio.is_null() {
+        return Flush::Error;
+    }
+    // SAFETY: the connection's BIO; no lock is held.
+    if unsafe { BIO_ctrl(wbio, BIO_CTRL_FLUSH, 0, ptr::null_mut()) } > 0 {
+        x.state().drv.flush_wanted = false;
+        return Flush::Done;
+    }
+    // SAFETY: as above.
+    if unsafe { BIO_test_flags(wbio, BIO_FLAGS_SHOULD_RETRY) } != 0 {
+        x.state().rwstate = SSL_WRITING;
+        return Flush::Retry;
+    }
+    x.state().drv.flush_wanted = false;
+    Flush::Error
 }
 
 /// The length of the TLS record at the front of `out` (header included), or all of `out` when
