@@ -472,6 +472,28 @@ static void test_methods(void)
     errors();
 }
 
+/* A public key with an even modulus: no Montgomery form, so the public operations fail. */
+static void test_even_modulus(void)
+{
+    RSA *r = RSA_new();
+    BIGNUM *n = bn(KEY_N);
+    unsigned char from[256], to[256];
+    int size;
+
+    printf("# an even modulus\n");
+    BN_clear_bit(n, 0);
+    check(RSA_set0_key(r, n, bn(KEY_E), NULL) == 1, "the key");
+    size = RSA_size(r);
+    memset(from, 0x5c, sizeof(from));
+    check(RSA_public_encrypt(20, from, to, r, RSA_PKCS1_PADDING) == -1, "no encryption");
+    errors();
+    memset(from, 0, sizeof(from));
+    from[size - 1] = 1;
+    check(RSA_public_decrypt(size, from, to, r, RSA_NO_PADDING) == -1, "no verification");
+    errors();
+    RSA_free(r);
+}
+
 int main(void)
 {
     RSA *r;
@@ -480,6 +502,7 @@ int main(void)
     check(RAND_set0_public(NULL, known_drbg(51)) == 1
           && RAND_set0_private(NULL, known_drbg(52)) == 1, "known generators");
     test_paddings();
+    test_even_modulus();
     r = make_key();
     test_pss(r);
     test_sign(r);
