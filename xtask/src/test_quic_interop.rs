@@ -16,9 +16,11 @@
 //! (`test/quic-openssl-docker/`): `quic-hq-interop` and `quic-hq-interop-server` for the HTTP/0.9
 //! cases, curl (with OpenSSL's QUIC backend and nghttp3) as the HTTP/3 client and
 //! `ossl-nghttp3-demo-server` as the HTTP/3 server. They're compiled from the reference's source
-//! against its headers, and each run loads either the reference's libraries or rustyssl's. The
-//! client's download directory is the one change to their source: it's `$DOWNLOADS`, not
-//! `/downloads`.
+//! (curl from its pin, 8.18.0, the last release with that backend) against the reference's
+//! headers, and each run loads either the reference's libraries or rustyssl's. Two changes to
+//! their source: the hq client's download directory is `$DOWNLOADS`, not `/downloads`, and the
+//! demo server's connection state starts zeroed (it frees an uninitialized pointer otherwise).
+//! curl is given the CA with `--cacert`, as its own default bundle would take precedence.
 //!
 //! **The peers** are built from sources pinned by commit and SHA-256 (`tests/quic-interop/
 //! pins.txt`), each on a TLS stack of its own:
@@ -212,6 +214,51 @@ fn with_lib<'a>(cmd: &'a mut Command, lib: &Path) -> &'a mut Command {
 struct Ours {
     side: Side,
     hq: PathBuf,
+    /// curl and `ossl-nghttp3-demo-server`, for http3.
+    h3: H3,
+}
+
+/// Our HTTP/3 endpoints: curl's binary and OpenSSL's nghttp3 demo server.
+#[derive(Clone)]
+pub(crate) struct H3 {
+    pub(crate) curl: PathBuf,
+    pub(crate) server: PathBuf,
+}
+
+/// curl's command fetching `urls` into `downloads` over HTTP/3 in parallel, as OpenSSL's
+/// `run_endpoint.sh` runs it (a config file of `--http3-only -o FILE --url URL` per request),
+/// trusting `ca`.
+pub(crate) fn curl_command(
+    curl: &Path,
+    dir: &Path,
+    ca: &Path,
+    urls: &[String],
+    downloads: &Path,
+) -> Command {
+    let mut config = String::from("--verbose\n--parallel\n");
+    for (i, url) in urls.iter().enumerate() {
+        if i > 0 {
+            config.push_str("--next\n");
+        }
+        let name = url.rsplit('/').next().unwrap_or_default();
+        let _ = writeln!(
+            config,
+            "--http3-only\n-o \"{}\"\n--url {url}",
+            downloads.join(name).display()
+        );
+    }
+    let curlrc = dir.join("curlrc");
+    // Written here; a failure shows as curl failing to read it.
+    let _ = fs::write(&curlrc, config);
+    let mut c = Command::new(curl);
+    // The CA explicitly: curl's own default bundle takes precedence over SSL_CERT_FILE.
+    c.arg("--cacert")
+        .arg(ca)
+        .arg("--config")
+        .arg(&curlrc)
+        .env("SSL_CERT_FILE", ca)
+        .current_dir(dir);
+    c
 }
 
 impl Endpoint for Ours {
@@ -221,19 +268,28 @@ impl Endpoint for Ours {
 
     fn supports(&self, role: Role, testcase: &str) -> bool {
         match role {
-            // Its run_endpoint.sh: http3 needs curl and the demo server (a later step here).
             Role::Client => matches!(
                 testcase,
-                "handshake" | "transfer" | "retry" | "resumption" | "chacha20"
+                "handshake" | "transfer" | "retry" | "resumption" | "chacha20" | "http3"
             ),
             Role::Server => matches!(
                 testcase,
-                "handshake" | "transfer" | "retry" | "resumption" | "chacha20"
+                "handshake" | "transfer" | "retry" | "resumption" | "chacha20" | "http3"
             ),
         }
     }
 
     fn server(&self, run: &Run<'_>, testcase: &str) -> Command {
+        if testcase == "http3" {
+            let mut c = Command::new(&self.h3.server);
+            with_lib(&mut c, &self.side.lib);
+            c.arg(run.port.to_string())
+                .arg(run.pki.join("cert.pem"))
+                .arg(run.pki.join("priv.key"))
+                .env("FILEPREFIX", format!("{}/", run.www.display()))
+                .current_dir(run.dir);
+            return c;
+        }
         let mut c = Command::new(self.hq.join("quic-hq-interop-server"));
         with_lib(&mut c, &self.side.lib);
         c.arg(run.port.to_string())
@@ -254,6 +310,17 @@ impl Endpoint for Ours {
     }
 
     fn client(&self, run: &Run<'_>, testcase: &str) -> Vec<Command> {
+        if testcase == "http3" {
+            let mut c = curl_command(
+                &self.h3.curl,
+                run.dir,
+                &run.pki.join("ca.pem"),
+                &run.urls(),
+                run.downloads,
+            );
+            with_lib(&mut c, &self.side.lib);
+            return vec![c];
+        }
         // A request file per invocation: all the files, or (resumption) one per connection.
         let batches: Vec<Vec<String>> = if testcase == "resumption" {
             run.files.iter().map(|f| vec![f.clone()]).collect()
@@ -926,6 +993,137 @@ fn build_quiche(root: &Path, dir: &Path, pins: &[Pin], log: &Path) -> Result<Pat
     Ok(target.join("release"))
 }
 
+/// nghttp3, a static library installed into a prefix; returns the prefix.
+fn build_nghttp3(dir: &Path, pins: &[Pin], log: &Path) -> Result<PathBuf> {
+    let nghttp3 = fetch(dir, pin(pins, "nghttp3")?)?;
+    submodule(dir, pins, "nghttp3-sfparse", &nghttp3.join("lib/sfparse"))?;
+    let prefix = dir.join("build/nghttp3/prefix");
+    cmake(
+        &nghttp3,
+        &dir.join("build/nghttp3/build"),
+        &[
+            "-DENABLE_LIB_ONLY=ON".to_owned(),
+            "-DBUILD_TESTING=OFF".to_owned(),
+            "-DENABLE_SHARED_LIB=OFF".to_owned(),
+            "-DENABLE_STATIC_LIB=ON".to_owned(),
+            "-DCMAKE_BUILD_TYPE=RelWithDebInfo".to_owned(),
+            format!("-DCMAKE_INSTALL_PREFIX={}", prefix.display()),
+        ],
+        true,
+        log,
+    )?;
+    Ok(prefix)
+}
+
+/// Our HTTP/3 endpoints, built against the reference: OpenSSL's `ossl-nghttp3-demo-server`
+/// (`demos/http3/`) and curl (`--with-openssl-quic`, nghttp3), both with nghttp3 static.
+pub(crate) fn build_h3(reference: &Path, dir: &Path, pins: &[Pin], log: &Path) -> Result<H3> {
+    let prefix = build_nghttp3(dir, pins, log)?;
+    let out = dir.join("build/h3");
+    fs::create_dir_all(&out)?;
+    let demos = reference.join("src/demos/http3");
+    let server = out.join("ossl-nghttp3-demo-server");
+    // Its connection state starts uninitialized, and the first reset frees whatever pointer the
+    // stack held there (on macOS, an abort before it serves anything): start it zeroed.
+    let source = fs::read_to_string(demos.join("ossl-nghttp3-demo-server.c"))?;
+    let old = "    struct h3ssl h3ssl;\n";
+    if !source.contains(old) {
+        return Err("ossl-nghttp3-demo-server.c: its connection state has changed".into());
+    }
+    let patched = out.join("ossl-nghttp3-demo-server.c");
+    fs::write(
+        &patched,
+        source.replace(old, "    struct h3ssl h3ssl = { 0 };\n"),
+    )?;
+    let cc = std::env::var("CC").unwrap_or_else(|_| "cc".to_owned());
+    run_logged(
+        Command::new(&cc)
+            .args(["-O1", "-w", "-I"])
+            .arg(reference.join("include"))
+            .arg("-I")
+            .arg(demos.clone())
+            .arg("-I")
+            .arg(prefix.join("include"))
+            .arg(&patched)
+            .arg(demos.join("ossl-nghttp3.c"))
+            .arg(prefix.join("lib/libnghttp3.a"))
+            .arg("-L")
+            .arg(reference.join("lib"))
+            .args(["-lssl", "-lcrypto", "-o"])
+            .arg(&server),
+        log,
+    )?;
+    Ok(H3 {
+        curl: build_curl(reference, dir, pins, &prefix, log)?,
+        server,
+    })
+}
+
+/// curl from the pinned tree, configured with OpenSSL's QUIC stack against the reference
+/// (`--with-openssl-quic`) and nghttp3, without the optional libraries; once per pin.
+fn build_curl(
+    reference: &Path,
+    dir: &Path,
+    pins: &[Pin],
+    nghttp3: &Path,
+    log: &Path,
+) -> Result<PathBuf> {
+    let tree = fetch(dir, pin(pins, "curl")?)?;
+    let build = dir.join("build/curl");
+    let curl = build.join("src/curl");
+    let options = [
+        format!("--with-openssl={}", reference.display()),
+        "--with-openssl-quic".to_owned(),
+        format!("--with-nghttp3={}", nghttp3.display()),
+        "--disable-shared".to_owned(),
+        "--disable-ldap".to_owned(),
+        "--disable-docs".to_owned(),
+        "--without-libpsl".to_owned(),
+        "--without-brotli".to_owned(),
+        "--without-zstd".to_owned(),
+        "--without-libidn2".to_owned(),
+        "--without-nghttp2".to_owned(),
+        "--without-librtmp".to_owned(),
+    ];
+    let stamp = build.join("rustyssl-built");
+    let key = format!("{}\n{}", tree.display(), options.join("\n"));
+    if fs::read_to_string(&stamp).ok().as_deref() == Some(key.as_str()) && curl.exists() {
+        return Ok(curl);
+    }
+    println!("Building curl (log: {})...", log.display());
+    // A release tarball ships configure; a commit's tree is generated first.
+    if !tree.join("configure").exists() {
+        let mut autoreconf = Command::new("autoreconf");
+        autoreconf.arg("-fi").current_dir(&tree);
+        // Homebrew installs libtoolize as glibtoolize.
+        if Command::new("libtoolize")
+            .arg("--version")
+            .output()
+            .is_err()
+        {
+            autoreconf.env("LIBTOOLIZE", "glibtoolize");
+        }
+        run_logged(&mut autoreconf, log)?;
+    }
+    fresh_dir(&build)?;
+    run_logged(
+        Command::new(tree.join("configure"))
+            .args(&options)
+            .env("PKG_CONFIG_PATH", nghttp3.join("lib/pkgconfig"))
+            .current_dir(&build),
+        log,
+    )?;
+    let jobs = std::thread::available_parallelism().map_or(4, |n| n.get());
+    run_logged(
+        Command::new("make")
+            .arg(format!("-j{jobs}"))
+            .current_dir(&build),
+        log,
+    )?;
+    fs::write(&stamp, key)?;
+    Ok(curl)
+}
+
 /// The line that starts what the driver appends to ngtcp2's `examples/CMakeLists.txt`.
 const NGTCP2_HQ_MARKER: &str = "\n# rustyssl test-quic-interop:";
 
@@ -965,8 +1163,7 @@ fn submodule(dir: &Path, pins: &[Pin], name: &str, place: &Path) -> Result {
 /// nghttp3 and ngtcp2's `ossl` examples (with the HTTP/0.9 ones) built against the reference;
 /// the directory holding them.
 fn build_ngtcp2(reference: &Path, dir: &Path, pins: &[Pin], log: &Path) -> Result<PathBuf> {
-    let nghttp3 = fetch(dir, pin(pins, "nghttp3")?)?;
-    submodule(dir, pins, "nghttp3-sfparse", &nghttp3.join("lib/sfparse"))?;
+    let prefix = build_nghttp3(dir, pins, log)?;
     let tree = fetch(dir, pin(pins, "ngtcp2")?)?;
     submodule(
         dir,
@@ -984,21 +1181,6 @@ fn build_ngtcp2(reference: &Path, dir: &Path, pins: &[Pin], log: &Path) -> Resul
         fs::write(&lists, format!("{upstream}{NGTCP2_HQ_TARGETS}"))?;
     }
     let build = dir.join("build/ngtcp2");
-    let prefix = build.join("prefix");
-    cmake(
-        &nghttp3,
-        &build.join("nghttp3"),
-        &[
-            "-DENABLE_LIB_ONLY=ON".to_owned(),
-            "-DBUILD_TESTING=OFF".to_owned(),
-            "-DENABLE_SHARED_LIB=OFF".to_owned(),
-            "-DENABLE_STATIC_LIB=ON".to_owned(),
-            "-DCMAKE_BUILD_TYPE=RelWithDebInfo".to_owned(),
-            format!("-DCMAKE_INSTALL_PREFIX={}", prefix.display()),
-        ],
-        true,
-        log,
-    )?;
     // libev where Homebrew keeps it (it isn't on the default search path there).
     let mut search = vec![prefix.display().to_string()];
     for p in ["/opt/homebrew/opt/libev", "/usr/local/opt/libev"] {
@@ -1189,11 +1371,13 @@ pub fn run(args: &[String]) -> Result {
     let hq = build_hq(&reference, &dir.join("build"), &log)?;
     let pki = work.join("pki");
     make_pki(&reference, &pki)?;
+    let h3 = build_h3(&reference, &dir, &pins, &log)?;
     let ours: Vec<Ours> = sides
         .iter()
         .map(|s| Ours {
             side: s.clone(),
             hq: hq.clone(),
+            h3: h3.clone(),
         })
         .collect();
     let reference_lib = reference.join("lib");

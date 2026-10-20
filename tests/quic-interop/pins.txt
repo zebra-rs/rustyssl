@@ -15,6 +15,11 @@ pin ngtcp2-urlparse ngtcp2/urlparse c8168839c89fc5c5917c375e1bd6ffeddf3f7f88 8b6
 pin nghttp3 ngtcp2/nghttp3 dbfc24286138cb0b6490160e7ca87fe1ce6722a0 987c1f908cee3a708109a41c264a53728aebf91b32d1110182277df1181d21b5
 pin nghttp3-sfparse ngtcp2/sfparse 4b313cfd2e1b389ae632b36dcd50402307289af2 cc8256a65a03577654941839e100b3d61fe7f7d69f2a08f9b2f17a123b580b4c
 
+# curl: curl 8.18.0, our HTTP/3 client (--with-openssl-quic, with nghttp3), here and in
+# `test-consumers curl-h3`. The last release with that backend: 8.19.0 removed it (curl's
+# docs/DEPRECATE.md), leaving OpenSSL only under ngtcp2.
+pin curl curl/curl 2eebc58c4b8d68c98c8344381a9f6df4cca838fd 4741f67a4c6f158fb6d5c6c6cf90268f7767b9363b41edf9687a6a2bdb0b04e5
+
 # quic-go: quic-go v0.64.1's interop client and server (interop/), built in its module with its
 # go.sum.
 pin quic-go quic-go/quic-go ed90516797ec8ed7314c2b163797eca58fd5a2b8 d5230d1646575e4dcdb66b212f9458da2a3f38fadce3c01f2567ab65d5f41ab1
