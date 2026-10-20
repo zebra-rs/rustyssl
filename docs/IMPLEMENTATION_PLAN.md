@@ -5932,8 +5932,22 @@ are excluded as internal).
 The exit's harnesses are built (2026-10-20, fork D): `cargo xtask test-quic-interop` (the
 runner's core cases, locally, against quiche, ngtcp2, and quic-go; TEST_PLAN L7) and
 `cargo xtask test-consumers curl-h3` (curl 8.18.0 with `--with-openssl-quic`, the last curl
-with that backend). On the reference every supported run passes in both roles; rustyssl's
-runs wait for 10.2.
+with that backend). On the reference every supported run passes in both roles.
+
+**Exit status (2026-10-20): met.** Steps 10.1–10.3 are done; libssl implements all 603 exports
+and libcrypto all 5899.
+- `cargo xtask test-quic-interop`: rustyssl passes every case wherever the reference does,
+  against ngtcp2, quiche and quic-go in both roles (0-RTT, keyupdate as client and some quiche
+  cases are unsupported by an endpoint on both libraries).
+- `cargo xtask test-consumers curl-h3`: 12 of 12 on both libraries; `ngtcp2` (the third-party
+  API) 9 of 9.
+- Upstream: `quicapitest` 16 of 16 eligible subtests; `quic_multistream_test` is all internal
+  (OpenSSL's test server); the whole tree (`test-openssl-suite --all`, QUIC included) passes
+  4334 of 4334 eligible subtests on macOS.
+- `test-interop --peer quic`: 13 cases in all four pairings with the reference's QUIC demos
+  and `s_client -quic`.
+- Left: the Docker quic-interop-runner (a follow-up, the user's decision), and running these
+  suites on x86_64 Linux (only the GCC check against glibc and Miri's Linux target ran there).
 
 ## Phase 11: The `openssl` command-line tool
 
