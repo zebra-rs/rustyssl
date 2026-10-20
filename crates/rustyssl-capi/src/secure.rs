@@ -12,6 +12,9 @@
 //! aborts, as OpenSSL's assertions do.
 
 mod buddy;
+mod global;
+
+pub(crate) use global::{Allocator, scope};
 
 use core::ffi::{CStr, c_char, c_int, c_void};
 use core::ptr::{self, NonNull};
@@ -150,6 +153,11 @@ static INITIALIZED: AtomicBool = AtomicBool::new(false);
 /// The arena's address range, for `CRYPTO_secure_allocated`, which takes no lock.
 static START: AtomicUsize = AtomicUsize::new(0);
 static END: AtomicUsize = AtomicUsize::new(0);
+
+/// Whether the secure heap is set up.
+pub(crate) fn initialized() -> bool {
+    INITIALIZED.load(Ordering::Acquire)
+}
 
 /// Whether `block` lies in the arena.
 pub(crate) fn in_arena(block: *const c_void) -> bool {

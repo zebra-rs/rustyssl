@@ -96,6 +96,11 @@ mod rsa_meth;
 mod rsa_ops;
 mod rsa_pmeth;
 mod secure;
+
+/// Rust allocations go to the system allocator, or to the secure heap inside
+/// `secure::scope` (docs/adr/0005-secure-heap.md).
+#[global_allocator]
+static ALLOCATOR: secure::Allocator = secure::Allocator;
 mod self_test;
 mod sleep;
 mod srp;

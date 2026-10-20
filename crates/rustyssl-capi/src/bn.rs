@@ -109,7 +109,12 @@ impl Bignum {
             );
             return false;
         }
-        s.value = value;
+        // A secure number's digits live in the secure heap, as `BN_secure_new`'s do.
+        s.value = if s.flags & BN_FLG_SECURE != 0 {
+            crate::secure::scope(|| value.clone())
+        } else {
+            value
+        };
         true
     }
 
@@ -124,6 +129,9 @@ impl Bignum {
                 "bn_expand_internal",
             );
             return None;
+        }
+        if s.flags & BN_FLG_SECURE != 0 {
+            return Some(crate::secure::scope(|| f(&mut s.value)));
         }
         Some(f(&mut s.value))
     }
