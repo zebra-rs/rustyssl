@@ -869,6 +869,23 @@ pub(crate) unsafe fn flush(x: &Ssl) -> Flush {
     }
 }
 
+/// [`flush`], except in a read (`reading`) outside a handshake while an application write
+/// waits to be retried: `ssl3_read_bytes` leaves that write (`wpend`) to `SSL_write`'s retry and
+/// reads, so a peer that won't read until it has been answered isn't waited for.
+///
+/// # Safety
+/// As for [`flush`].
+unsafe fn flush_for(x: &Ssl, reading: bool) -> Flush {
+    if reading {
+        let st = x.state();
+        if st.drv.wpend.is_some() && !st.in_init {
+            return Flush::Done;
+        }
+    }
+    // SAFETY: the caller's guarantee.
+    unsafe { flush(x) }
+}
+
 /// `statem_flush`: `BIO_flush` on the write BIO, with no lock held; one that asks to be retried
 /// leaves the flush wanted, to run again before the core goes on.
 ///
@@ -1164,7 +1181,7 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
     }
     let stop = loop {
         // SAFETY: the caller's guarantee.
-        match unsafe { flush(x) } {
+        match unsafe { flush_for(x, reading) } {
             Flush::Done => {}
             Flush::Retry => break Stop::Retry,
             Flush::Error => break Stop::Syscall,
@@ -1349,7 +1366,7 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
             Event::NeedInput => {
                 // What was written goes out before waiting for the peer (`statem_flush`).
                 // SAFETY: as above.
-                match unsafe { flush(x) } {
+                match unsafe { flush_for(x, reading) } {
                     Flush::Done => {}
                     Flush::Retry => break Stop::Retry,
                     Flush::Error => break Stop::Syscall,
@@ -1447,7 +1464,7 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
             }
             Event::HandshakeDone => {
                 // SAFETY: as above.
-                match unsafe { flush(x) } {
+                match unsafe { flush_for(x, reading) } {
                     Flush::Done => {}
                     Flush::Retry => break Stop::Retry,
                     Flush::Error => break Stop::Syscall,
@@ -1502,7 +1519,7 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
             Event::AppData => break Stop::AppData,
             Event::Idle => {
                 // SAFETY: as above.
-                match unsafe { flush(x) } {
+                match unsafe { flush_for(x, reading) } {
                     Flush::Done => break Stop::Idle,
                     Flush::Retry => break Stop::Retry,
                     Flush::Error => break Stop::Syscall,

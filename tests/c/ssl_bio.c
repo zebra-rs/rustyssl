@@ -588,9 +588,54 @@ static void test_closed_before_tickets(void)
     SSL_CTX_free(sctx);
 }
 
+/*
+ * A write the peer hasn't made room for waits for SSL_write's retry: meanwhile SSL_read reads
+ * (WANT_READ), it doesn't try that write again (WANT_WRITE), so two ends that each read before
+ * writing more don't wait for each other (ssl_old_test's BIO pairs).
+ */
+static void test_read_with_write_pending(void)
+{
+    SSL_CTX *sctx = server_ctx(), *cctx = client_ctx();
+    SSL *c = SSL_new(cctx), *s = SSL_new(sctx);
+    BIO *a = NULL, *b = NULL;
+    static char data[4000], buf[8192];
+    int r, total = 0, rounds;
+
+    printf("# a read while a write waits\n");
+    BIO_new_bio_pair(&a, 1024, &b, 1024);
+    SSL_set_bio(c, a, a);
+    SSL_set_bio(s, b, b);
+    SSL_set_connect_state(c);
+    SSL_set_accept_state(s);
+    check(run(c, s, 0) == 0, "the handshake");
+    r = SSL_read(c, buf, sizeof(buf));
+    printf("  the client reads the tickets: %d -> %d\n", r, SSL_get_error(c, r));
+    memset(data, 'x', sizeof(data));
+    r = SSL_write(c, data, sizeof(data));
+    printf("  the client writes more than fits: %d -> %d\n", r, SSL_get_error(c, r));
+    r = SSL_read(c, buf, sizeof(buf));
+    printf("  then reads: %d -> %d\n", r, SSL_get_error(c, r));
+    check(SSL_get_error(c, r) == SSL_ERROR_WANT_READ, "the read waits for input, not for the write");
+    for (rounds = 0; rounds < 32 && total < (int)sizeof(data); rounds++) {
+        r = SSL_read(s, buf, sizeof(buf));
+        if (r > 0)
+            total += r;
+        r = SSL_write(c, data, sizeof(data));
+        if (r > 0)
+            printf("  the retried write: %d\n", r);
+    }
+    check(total == (int)sizeof(data), "the server read it all");
+    errors();
+    SSL_free(c);
+    SSL_free(s);
+    SSL_CTX_free(cctx);
+    SSL_CTX_free(sctx);
+}
+
 int main(void)
 {
     test_buffered_wbio();
+    test_read_with_write_pending();
     test_closed_before_tickets();
     test_pair();
     test_set_ssl();

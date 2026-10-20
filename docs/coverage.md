@@ -691,7 +691,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BN_bntest_rand` | libcrypto | `openssl/bn.h` | `bn` |
 | `BN_check_prime` | libcrypto | `openssl/bn.h` | `bn_prime` |
 | `BN_clear` | libcrypto | `openssl/bn.h` | `bn` |
-| `BN_clear_bit` | libcrypto | `openssl/bn.h` | `bn` |
+| `BN_clear_bit` | libcrypto | `openssl/bn.h` | `bn`, `rsa_ops` |
 | `BN_clear_free` | libcrypto | `openssl/bn.h` | `bn`, `ecdsa`, `rsa_asn1`, `srp`, `ssl_srp` |
 | `BN_cmp` | libcrypto | `openssl/bn.h` | `bn`, `bn_mod`, `dh_lib`, `dsa_lib`, `evp_dsa_kmgmt`, `evp_pkey_rsa`, `evp_rsa`, `rsa_asn1`, `rsa_ops`, `srp`, `x509_pubkey` |
 | `BN_consttime_swap` | libcrypto | `openssl/bn.h` | `bn` |
@@ -863,7 +863,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `CMS_EnvelopedData_dup` | libcrypto | `openssl/cms.h` | `cms_data` |
 | `CMS_EnvelopedData_it` | libcrypto | `openssl/cms.h` | `cms_data`, `cms_env` |
 | `CMS_ReceiptRequest_create0` | libcrypto | `openssl/cms.h` | `cms_data`, `cms_sign` |
-| `CMS_ReceiptRequest_create0_ex` | libcrypto | `openssl/cms.h` | `cms_data` |
+| `CMS_ReceiptRequest_create0_ex` | libcrypto | `openssl/cms.h` | `cms_data`, `cms_sign` |
 | `CMS_ReceiptRequest_free` | libcrypto | `openssl/cms.h` | `cms_data`, `cms_sign` |
 | `CMS_ReceiptRequest_get0_values` | libcrypto | `openssl/cms.h` | `cms_data` |
 | `CMS_ReceiptRequest_it` | libcrypto | `openssl/cms.h` | `cms_data` |
@@ -2667,7 +2667,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_seed_cfb128` | libcrypto | `openssl/evp.h` | `evp_cipher_names` |
 | `EVP_seed_ecb` | libcrypto | `openssl/evp.h` | `evp_cipher_names` |
 | `EVP_seed_ofb` | libcrypto | `openssl/evp.h` | `evp_cipher_names` |
-| `EVP_set_default_properties` | libcrypto | `openssl/evp.h` | `fetch`, `properties`, `provider_ext` |
+| `EVP_set_default_properties` | libcrypto | `openssl/evp.h` | `cms_sign`, `fetch`, `properties`, `provider_ext` |
 | `EVP_set_pw_prompt` | libcrypto | `openssl/evp.h` | `ui` |
 | `EVP_sha1` | libcrypto | `openssl/evp.h` | `asn1_item_sign`, `bio_evp`, `dh_check`, `ecdsa`, `engine`, `evp_cipher_etm`, `evp_derive`, `evp_dsa_sig`, `evp_kdf`, `evp_mac`, `evp_md_meth`, `evp_md_names`, `evp_pkey_ops`, `evp_rsa`, `evp_rsa_legacy`, `evp_seal`, `evp_signature`, `ocsp`, `pbe`, `pem_crypt`, `pkcs12`, `pkcs7`, `rsa_ops`, `ssl_dane`, `store`, `x509_attr_p8`, `x509_cert`, `x509_crl`, `x509_name`, `x509_purpose` |
 | `EVP_sha224` | libcrypto | `openssl/evp.h` | `evp_md_meth`, `evp_md_names` |
@@ -3856,7 +3856,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `PEM_read_bio_Parameters` | libcrypto | `openssl/pem.h` | `pem_pkey` |
 | `PEM_read_bio_Parameters_ex` | libcrypto | `openssl/pem.h` | `pem_pkey` |
 | `PEM_read_bio_PrivateKey` | libcrypto | `openssl/pem.h` | `asn1_item_sign`, `cmp`, `cms_env`, `cms_sign`, `crmf`, `custom_methods`, `evp_seal`, `ocsp`, `pem_pkey`, `pkcs12`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `pkcs8_crypt`, `ssl_apis`, `ssl_bio`, `ssl_check_chain`, `ssl_client_cert_engine`, `ssl_ct`, `ssl_ctrl_more`, `ssl_ctx`, `ssl_custom`, `ssl_dane`, `ssl_eap`, `ssl_early`, `ssl_errors`, `ssl_flights`, `ssl_handshake`, `ssl_handshake_reads`, `ssl_io`, `ssl_ktls`, `ssl_lists`, `ssl_misc`, `ssl_padding`, `ssl_requests`, `ssl_rpk`, `ssl_sess_cache`, `ssl_shutdown`, `ssl_stateless`, `ssl_stitched`, `ssl_strings`, `ssl_ticket_key`, `ssl_tickets`, `ssl_trace`, `ts`, `ui`, `x509_cert`, `x509_crl`, `x509_req`, `x509_spki`, `x509v3_crld`, `x509v3_san` |
-| `PEM_read_bio_PrivateKey_ex` | libcrypto | `openssl/pem.h` | `pem_pkey`, `ssl_libctx` |
+| `PEM_read_bio_PrivateKey_ex` | libcrypto | `openssl/pem.h` | `cms_sign`, `pem_pkey`, `ssl_libctx` |
 | `PEM_read_bio_RSAPrivateKey` | libcrypto | `openssl/pem.h` | `pem_pkey` |
 | `PEM_read_bio_RSAPublicKey` | libcrypto | `openssl/pem.h` | `pem_pkey` |
 | `PEM_read_bio_RSA_PUBKEY` | libcrypto | `openssl/pem.h` | `pem_pkey` |
@@ -3900,7 +3900,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `PEM_write_bio` | libcrypto | `openssl/pem.h` | `pem` |
 | `PEM_write_bio_ASN1_stream` | libcrypto | `openssl/asn1.h` | `pkcs7_stream` |
 | `PEM_write_bio_CMS` | libcrypto | `openssl/cms.h` | `cms_data` |
-| `PEM_write_bio_CMS_stream` | libcrypto | `openssl/cms.h` | `cms_data` |
+| `PEM_write_bio_CMS_stream` | libcrypto | `openssl/cms.h` | `cms_data`, `cms_env` |
 | `PEM_write_bio_DHparams` | libcrypto | `openssl/pem.h` | `dh_asn1` |
 | `PEM_write_bio_DHxparams` | libcrypto | `openssl/pem.h` | `dh_asn1` |
 | `PEM_write_bio_DSAPrivateKey` | libcrypto | `openssl/pem.h` | `pem_write_pkey` |
@@ -4326,8 +4326,8 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `RSA_print_fp` | libcrypto | `openssl/rsa.h` | `rsa_print` |
 | `RSA_private_decrypt` | libcrypto | `openssl/rsa.h` | `rsa_lib` |
 | `RSA_private_encrypt` | libcrypto | `openssl/rsa.h` | `rsa_lib` |
-| `RSA_public_decrypt` | libcrypto | `openssl/rsa.h` | `rsa_lib` |
-| `RSA_public_encrypt` | libcrypto | `openssl/rsa.h` | `rsa_lib` |
+| `RSA_public_decrypt` | libcrypto | `openssl/rsa.h` | `rsa_lib`, `rsa_ops` |
+| `RSA_public_encrypt` | libcrypto | `openssl/rsa.h` | `rsa_lib`, `rsa_ops` |
 | `RSA_security_bits` | libcrypto | `openssl/rsa.h` | `rsa_lib` |
 | `RSA_set0_crt_params` | libcrypto | `openssl/rsa.h` | `evp_pkey_rsa`, `rsa_asn1`, `rsa_lib`, `rsa_ops`, `rsa_print` |
 | `RSA_set0_factors` | libcrypto | `openssl/rsa.h` | `evp_pkey_rsa`, `rsa_asn1`, `rsa_lib`, `rsa_ops`, `rsa_print` |
@@ -4340,7 +4340,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `RSA_setup_blinding` | libcrypto | `openssl/rsa.h` | `rsa_lib` |
 | `RSA_sign` | libcrypto | `openssl/rsa.h` | `evp_pkey_rsa`, `rsa_ops` |
 | `RSA_sign_ASN1_OCTET_STRING` | libcrypto | `openssl/rsa.h` | `rsa_ops` |
-| `RSA_size` | libcrypto | `openssl/rsa.h` | `rsa_lib` |
+| `RSA_size` | libcrypto | `openssl/rsa.h` | `rsa_lib`, `rsa_ops` |
 | `RSA_test_flags` | libcrypto | `openssl/rsa.h` | `rsa_lib`, `x509_pubkey` |
 | `RSA_up_ref` | libcrypto | `openssl/rsa.h` | `evp_pkey_rsa`, `rsa_asn1`, `rsa_lib`, `rsa_print` |
 | `RSA_verify` | libcrypto | `openssl/rsa.h` | `rsa_ops` |
@@ -6231,7 +6231,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `SSL_CTX_use_serverinfo` | libssl | `openssl/ssl.h` | `ssl_custom` |
 | `SSL_CTX_use_serverinfo_ex` | libssl | `openssl/ssl.h` | `ssl_custom` |
 | `SSL_CTX_use_serverinfo_file` | libssl | `openssl/ssl.h` | `ssl_custom` |
-| `SSL_SESSION_dup` | libssl | `openssl/ssl.h` | `ssl_early`, `ssl_session` |
+| `SSL_SESSION_dup` | libssl | `openssl/ssl.h` | `ssl_early`, `ssl_sess_cache`, `ssl_session` |
 | `SSL_SESSION_free` | libssl | `openssl/ssl.h` | `ssl_apis`, `ssl_ctrl_more`, `ssl_early`, `ssl_handshake_reads`, `ssl_psk`, `ssl_rpk`, `ssl_sess_cache`, `ssl_sess_fatal`, `ssl_session`, `ssl_srp`, `ssl_strings`, `ssl_ticket_key`, `ssl_tickets` |
 | `SSL_SESSION_get0_alpn_selected` | libssl | `openssl/ssl.h` | `ssl_session` |
 | `SSL_SESSION_get0_cipher` | libssl | `openssl/ssl.h` | `ssl_sess_cache`, `ssl_session` |
