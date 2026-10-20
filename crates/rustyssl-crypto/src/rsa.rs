@@ -102,6 +102,8 @@ pub enum Reason {
     FetchFailed,
     /// `ERR_R_BN_LIB`.
     BnLib,
+    /// `BN_R_NO_INVERSE`, in the BN library: an even modulus has no Montgomery form.
+    NoInverse,
 }
 
 /// An error entry to raise: the OpenSSL function that raises it, its reason, and whether it

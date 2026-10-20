@@ -120,7 +120,8 @@ impl Key {
         Ok((n, e))
     }
 
-    /// `f^e mod n` for `f < n`.
+    /// `f^e mod n` for `f < n` and an odd `n` (the public operations' `BN_MONT_CTX_set` of `n`
+    /// fails first for an even one: `BN_mod_inverse`'s `BN_R_NO_INVERSE`).
     fn public_op(n: &BigNum, e: &BigNum, f: &BigNum) -> Option<BigNum> {
         exp_mod(f, e, n).ok()
     }
@@ -409,6 +410,9 @@ impl Key {
         if bn::ucmp(&f, n).is_ge() {
             return fail(F, Reason::DataTooLargeForModulus);
         }
+        if !n.is_odd() {
+            return fail("BN_mod_inverse", Reason::NoInverse);
+        }
         let Some(ret) = Self::public_op(n, e, &f) else {
             return silent();
         };
@@ -615,6 +619,9 @@ impl Key {
         };
         if bn::ucmp(&f, n).is_ge() {
             return fail(F, Reason::DataTooLargeForModulus);
+        }
+        if !n.is_odd() {
+            return fail("BN_mod_inverse", Reason::NoInverse);
         }
         let Some(mut ret) = Self::public_op(n, e, &f) else {
             return silent();

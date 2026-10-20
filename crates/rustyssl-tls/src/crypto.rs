@@ -166,6 +166,8 @@ pub enum CipherAlg {
     DesEde3Cbc,
     /// SEED-CBC.
     SeedCbc,
+    /// IDEA-CBC (the legacy provider's).
+    IdeaCbc,
     /// SM4-CBC.
     Sm4Cbc,
     /// No encryption (the NULL suites).
@@ -181,6 +183,7 @@ impl CipherAlg {
             | Self::Camellia128Cbc
             | Self::Aria128Cbc
             | Self::SeedCbc
+            | Self::IdeaCbc
             | Self::Sm4Cbc => 16,
             Self::Aes256Cbc | Self::Camellia256Cbc | Self::Aria256Cbc => 32,
             Self::DesEde3Cbc => 24,
@@ -192,7 +195,7 @@ impl CipherAlg {
     #[must_use]
     pub const fn block_len(self) -> usize {
         match self {
-            Self::DesEde3Cbc => 8,
+            Self::DesEde3Cbc | Self::IdeaCbc => 8,
             Self::Null => 0,
             _ => 16,
         }
@@ -214,6 +217,29 @@ pub trait Cipher: Send {
     fn pipeline(&self) -> bool {
         false
     }
+}
+
+/// OpenSSL's "stitched" CBC-and-HMAC cipher for TLS 1.0–1.2 MAC-then-encrypt (a CBC cipher
+/// flagged `EVP_CIPH_FLAG_AEAD_CIPHER`, driven by `EVP_CTRL_AEAD_TLS1_AAD`), such as an
+/// engine's AES-128-CBC-HMAC-SHA1: it MACs, pads, and encrypts a record itself, and on the way
+/// in decrypts it and checks its padding and MAC. Keyed in one direction, it keeps its own CBC
+/// chain.
+pub trait Stitched: Send {
+    /// Seals `body` in place given the record's 13-octet MAC header (sequence number, type,
+    /// version, and `body`'s length): `body` is the explicit IV block (TLS 1.1 and later), then
+    /// the payload, and grows by the MAC and padding.
+    ///
+    /// # Errors
+    /// The cipher failed.
+    fn seal(&mut self, header: &[u8; 13], body: &mut Vec<u8>) -> Result<()>;
+
+    /// Opens `body` (the whole record body) in place given the record's 13-octet header (its
+    /// length is `body`'s); the cipher checks the padding and the MAC. Returns the MAC's
+    /// length, which the caller strips with the padding.
+    ///
+    /// # Errors
+    /// The padding or the MAC doesn't check, or the cipher failed.
+    fn open(&mut self, header: &[u8; 13], body: &mut [u8]) -> Result<usize>;
 }
 
 /// A group the providers offer (their `TLS-GROUP` capability).
@@ -384,6 +410,22 @@ pub trait Provider {
     /// # Errors
     /// The algorithm isn't available, or the key is wrong.
     fn cipher(&self, alg: CipherAlg, key: &[u8], encrypt: bool) -> Result<Box<dyn Cipher>>;
+
+    /// A stitched CBC-and-HMAC cipher for `alg` with `mac`, keyed with `key`, `mac_key`, and
+    /// `iv`, when one replaces the separate cipher and MAC (`ssl_cipher_get_evp`: AES-128/256
+    /// with SHA-1 or SHA-256, MAC-then-encrypt). `None` keeps them separate.
+    fn stitched(
+        &self,
+        alg: CipherAlg,
+        mac: HashAlg,
+        key: &[u8],
+        mac_key: &[u8],
+        iv: &[u8],
+        encrypt: bool,
+    ) -> Option<Box<dyn Stitched>> {
+        let _ = (alg, mac, key, mac_key, iv, encrypt);
+        None
+    }
 
     /// TLS 1.0–1.2's MAC of a decrypted MAC-then-encrypt CBC record, in constant time: the HMAC
     /// keyed with `key` of the 13-octet `header` (sequence number, type, version, length) and

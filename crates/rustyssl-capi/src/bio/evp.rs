@@ -798,21 +798,25 @@ ffi_callback! {
     }
 }
 
-/// `BIO_CTRL_FLUSH`: writes what is pending, finishes the cipher and writes that, then flushes
-/// the next BIO.
-fn enc_flush(
-    object: &super::Bio,
-    st: &mut Enc,
-    cmd: c_int,
-    num: c_long,
-    ptr: *mut c_void,
-) -> c_long {
+/// What a cipher filter's control does once its state is back in place. OpenSSL's filter keeps
+/// its context in place throughout, so a BIO further down the chain may call back into it (an
+/// ASN.1 filter's suffix finishing a streamed AuthEnvelopedData asks for its context).
+enum Then {
+    /// Returns this.
+    Done(c_long),
+    /// Passes the control to the next BIO; with `retry`, copies its retry flags.
+    Next { retry: bool },
+}
+
+/// `BIO_CTRL_FLUSH`: writes what is pending, finishes the cipher and writes that; then the
+/// next BIO is flushed.
+fn enc_flush(object: &super::Bio, st: &mut Enc) -> Then {
     loop {
         while st.buf_len != st.buf_off {
             let pend = st.buf_len - st.buf_off;
             let i = enc_write_body(object, st, None);
             if i < 0 || st.buf_len - st.buf_off == pend {
-                return c_long::from(i);
+                return Then::Done(c_long::from(i));
             }
         }
         if st.finished {
@@ -823,12 +827,10 @@ fn enc_flush(
         let ret = st.finish();
         st.ok = ret;
         if ret <= 0 {
-            return c_long::from(ret);
+            return Then::Done(c_long::from(ret));
         }
     }
-    let ret = ctrl_next(object.next(), cmd, num, ptr);
-    super::copy_next_retry(object);
-    ret
+    Then::Next { retry: true }
 }
 
 ffi_callback! {
@@ -839,8 +841,7 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn enc_ctrl(b: *mut BIO, cmd: c_int, num: c_long, ptr: *mut c_void) -> c_long
     where failure = 0, library = ERR_LIB_BIO
     {
-        with_state(b, 0, |object, st: &mut Enc| {
-            let next = object.next();
+        let then = with_state(b, Then::Done(0), |object, st: &mut Enc| {
             let cipher = st.cipher.0;
             match cmd {
                 BIO_CTRL_RESET => {
@@ -850,24 +851,26 @@ ffi_callback! {
                     let enc = unsafe { EVP_CIPHER_CTX_is_encrypting(cipher) };
                     // SAFETY: as above; no new cipher, key, or IV.
                     if unsafe { EVP_CipherInit_ex(cipher, ptr::null(), ptr::null_mut(), ptr::null(), ptr::null(), enc) } == 0 {
-                        return 0;
+                        return Then::Done(0);
                     }
-                    ctrl_next(next, cmd, num, ptr)
+                    Then::Next { retry: false }
                 }
                 BIO_CTRL_EOF => {
-                    if st.cont <= 0 { 1 } else { ctrl_next(next, cmd, num, ptr) }
+                    if st.cont <= 0 { Then::Done(1) } else { Then::Next { retry: false } }
                 }
                 BIO_CTRL_WPENDING | BIO_CTRL_PENDING => {
                     let ret = st.buf_len - st.buf_off;
-                    if ret <= 0 { ctrl_next(next, cmd, num, ptr) } else { c_long::try_from(ret).unwrap_or(c_long::MAX) }
+                    if ret <= 0 {
+                        Then::Next { retry: false }
+                    } else {
+                        Then::Done(c_long::try_from(ret).unwrap_or(c_long::MAX))
+                    }
                 }
-                BIO_CTRL_FLUSH => enc_flush(object, st, cmd, num, ptr),
-                BIO_C_GET_CIPHER_STATUS => c_long::from(st.ok),
+                BIO_CTRL_FLUSH => enc_flush(object, st),
+                BIO_C_GET_CIPHER_STATUS => Then::Done(c_long::from(st.ok)),
                 BIO_C_DO_STATE_MACHINE => {
                     object.clear_retry_flags();
-                    let ret = ctrl_next(next, cmd, num, ptr);
-                    super::copy_next_retry(object);
-                    ret
+                    Then::Next { retry: true }
                 }
                 BIO_C_GET_CIPHER_CTX => {
                     let out = ptr.cast::<*mut EVP_CIPHER_CTX>();
@@ -876,7 +879,7 @@ ffi_callback! {
                         unsafe { out.write(cipher) };
                     }
                     object.init.store(1, Ordering::Relaxed);
-                    1
+                    Then::Done(1)
                 }
                 BIO_CTRL_DUP => {
                     let dbio = ptr.cast::<BIO>();
@@ -890,11 +893,23 @@ ffi_callback! {
                             d.init.store(1, Ordering::Relaxed);
                         }
                     }
-                    c_long::from(ret)
+                    Then::Done(c_long::from(ret))
                 }
-                _ => ctrl_next(next, cmd, num, ptr),
+                _ => Then::Next { retry: false },
             }
-        })
+        });
+        match then {
+            Then::Done(ret) => ret,
+            Then::Next { retry } => {
+                // SAFETY: the caller's BIO, live while its method runs.
+                let Some(object) = (unsafe { object(b) }) else { return 0 };
+                let ret = ctrl_next(object.next(), cmd, num, ptr);
+                if retry {
+                    super::copy_next_retry(object);
+                }
+                ret
+            }
+        }
     }
 }
 

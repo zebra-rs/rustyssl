@@ -11,9 +11,9 @@ use core::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use rustyssl_abi::{
-    BIGNUM, CRYPTO_EX_DATA, CRYPTO_EX_INDEX_RSA, ERR_R_INIT_FAIL, RSA_ASN1_VERSION_MULTI,
-    RSA_FLAG_NO_BLINDING, RSA_FLAG_NON_FIPS_ALLOW, RSA_FLAG_TYPE_MASK, RSA_FLAG_TYPE_RSA,
-    RSA_FLAG_TYPE_RSASSAPSS, RSA_METHOD,
+    BIGNUM, BN_R_NO_INVERSE, CRYPTO_EX_DATA, CRYPTO_EX_INDEX_RSA, ERR_LIB_BN, ERR_R_INIT_FAIL,
+    RSA_ASN1_VERSION_MULTI, RSA_FLAG_NO_BLINDING, RSA_FLAG_NON_FIPS_ALLOW, RSA_FLAG_TYPE_MASK,
+    RSA_FLAG_TYPE_RSA, RSA_FLAG_TYPE_RSASSAPSS, RSA_METHOD,
 };
 use rustyssl_abi::{
     ERR_LIB_RSA, ERR_R_BN_LIB, ERR_R_FETCH_FAILED, ERR_R_INTERNAL_ERROR, EVP_MD, EVP_MD_CTX,
@@ -691,6 +691,7 @@ pub(crate) fn reason_code(reason: Reason) -> c_int {
         Reason::Internal => ERR_R_INTERNAL_ERROR,
         Reason::FetchFailed => ERR_R_FETCH_FAILED,
         Reason::BnLib => ERR_R_BN_LIB,
+        Reason::NoInverse => BN_R_NO_INVERSE,
     }
 }
 
@@ -705,6 +706,7 @@ pub(crate) fn raise_all(raised: &[Entry]) {
                 e.func,
                 &format!("expected: {expected} retrieved: {retrieved}"),
             ),
+            Reason::NoInverse => err::raise(ERR_LIB_BN, BN_R_NO_INVERSE, e.func),
             r => err::raise(ERR_LIB_RSA, reason_code(r), e.func),
         }
         err::clear_last_constant_time(e.clear);

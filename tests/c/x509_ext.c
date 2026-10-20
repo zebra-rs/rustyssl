@@ -18,6 +18,7 @@
 #include <openssl/err.h>
 #include <openssl/objects.h>
 #include <openssl/x509.h>
+#include <openssl/x509v3.h>
 
 static int failures = 0;
 static int number = 0;
@@ -277,6 +278,35 @@ static void test_stack(void)
     X509_EXTENSION_free(ku2);
 }
 
+/* keyUsage's names: 3.6 accepts contentCommitment for bit 1 and prints it as Non Repudiation. */
+static void test_key_usage_names(void)
+{
+    static const char *const values[] = {
+        "contentCommitment", "nonRepudiation", "Content Commitment",
+        "digitalSignature, contentCommitment, keyCertSign", "noSuchUsage"
+    };
+    size_t i;
+
+    printf("# keyUsage names\n");
+    for (i = 0; i < sizeof(values) / sizeof(values[0]); i++) {
+        X509_EXTENSION *ex = X509V3_EXT_conf_nid(NULL, NULL, NID_key_usage, values[i]);
+        BIO *mem = BIO_new(BIO_s_mem());
+        char *text = NULL;
+        long n;
+
+        printf("  %s:\n", values[i]);
+        show("ext", ex);
+        if (ex != NULL && X509V3_EXT_print(mem, ex, 0, 0) == 1) {
+            n = BIO_get_mem_data(mem, &text);
+            printf("  printed: %.*s\n", (int)n, text);
+        }
+        errors();
+        BIO_free(mem);
+        X509_EXTENSION_free(ex);
+    }
+    check(1, "keyUsage names parsed and printed");
+}
+
 int main(void)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -284,6 +314,7 @@ int main(void)
     test_make();
     test_decode();
     test_stack();
+    test_key_usage_names();
     printf("1..%d\n", number);
     return failures == 0 ? 0 : 1;
 }

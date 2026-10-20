@@ -287,6 +287,17 @@ static void bad_record_type(int dir, int n, unsigned char *buf, int *len)
         buf[0] = 0x63;
 }
 
+static void foreign_session_id(int dir, int n, unsigned char *buf, int *len)
+{
+    /*
+     * The ServerHello's echoed session ID (after the record and handshake headers, the version,
+     * and the random): one octet changed, so the client refuses it once it has read it, and
+     * its alert carries the connection's version rather than the ClientHello's TLS 1.0.
+     */
+    if (dir == 1 && n == 0 && *len > 44 && buf[43] == 32)
+        buf[44] ^= 0x01;
+}
+
 static void wrong_version(int dir, int n, unsigned char *buf, int *len)
 {
     (void)len;
@@ -503,6 +514,10 @@ static void test_handshakes(void)
     c = client_ctx(1);
     s = server_ctx();
     scenario("a wrong record version", c, s, wrong_version);
+
+    c = client_ctx(1);
+    s = server_ctx();
+    scenario("a ServerHello with another session ID (TLS 1.3)", c, s, foreign_session_id);
 
     c = client_ctx(1);
     s = server_ctx();

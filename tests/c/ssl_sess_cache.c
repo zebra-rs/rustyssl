@@ -224,7 +224,9 @@ static int server_new_cb(SSL *ssl, SSL_SESSION *s)
 }
 
 static int get_calls = 0;
+static int get_any = 0;
 
+/* The external cache: its one session for its ID (for any ID with get_any, a broken cache). */
 static SSL_SESSION *get_cb(SSL *ssl, const unsigned char *id, int len, int *copy)
 {
     unsigned int n;
@@ -235,7 +237,7 @@ static SSL_SESSION *get_cb(SSL *ssl, const unsigned char *id, int len, int *copy
     if (server_last == NULL)
         return NULL;
     have = SSL_SESSION_get_id(server_last, &n);
-    if ((int)n != len || memcmp(have, id, n) != 0)
+    if (!get_any && ((int)n != len || memcmp(have, id, n) != 0))
         return NULL;
     *copy = 1;
     return server_last;
@@ -549,6 +551,21 @@ static void test_external(void)
     second = handshake(cctx, sctx, first, 1);
     printf("  get_cb calls %d\n", get_calls);
     stats("server", sctx);
+    {
+        /* The cache returns its session for another ID: not resumed (3.6). */
+        static const unsigned char other[16] = { 0xde, 0xad, 0xbe, 0xef, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
+        SSL_SESSION *forged = SSL_SESSION_dup(second), *third;
+
+        printf("  the cache answers another ID with its session\n");
+        check(forged != NULL && SSL_SESSION_set1_id(forged, other, sizeof(other)) == 1, "a session with another ID");
+        get_any = 1;
+        third = handshake(cctx, sctx, forged, 0);
+        get_any = 0;
+        printf("  get_cb calls %d\n", get_calls);
+        stats("server", sctx);
+        SSL_SESSION_free(forged);
+        SSL_SESSION_free(third);
+    }
     server_keeps = 0;
     SSL_SESSION_free(first);
     SSL_SESSION_free(second);

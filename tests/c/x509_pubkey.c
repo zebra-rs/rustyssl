@@ -286,6 +286,48 @@ static void test_rsa(void)
     X509_PUBKEY_free(y);
 }
 
+/*
+ * A SubjectPublicKeyInfo whose algorithm is X.500's rsa (2.5.8.1.1) rather than rsaEncryption:
+ * it decodes as an RSA key, and the key encodes again as rsaEncryption.
+ */
+static void test_rsa_x500(void)
+{
+    RSA *r = RSA_new();
+    X509_PUBKEY *x = X509_PUBKEY_new();
+    unsigned char *spki = NULL, *der = NULL, *key;
+    const unsigned char *pk = NULL, *p;
+    int pklen = 0, n;
+    EVP_PKEY *k;
+
+    RSA_set0_key(r, hexbn(RSA_N), hexbn("010001"), NULL);
+    n = i2d_RSA_PUBKEY(r, &spki);
+    p = spki;
+    d2i_X509_PUBKEY(&x, &p, n);
+    X509_PUBKEY_get0_param(NULL, &pk, &pklen, NULL, x);
+    key = OPENSSL_malloc(pklen);
+    memcpy(key, pk, pklen);
+    check(X509_PUBKEY_set0_param(x, OBJ_nid2obj(NID_rsa), V_ASN1_NULL, NULL, key, pklen) == 1,
+          "an SPKI with X.500's rsa");
+    n = i2d_X509_PUBKEY(x, &der);
+    hex("rsa SPKI", der, n);
+    p = der;
+    k = d2i_PUBKEY(NULL, &p, n);
+    check(k != NULL, "it decodes");
+    if (k != NULL) {
+        printf("  id %d base %d bits %d, RSA flags type %d\n", EVP_PKEY_get_id(k),
+               EVP_PKEY_get_base_id(k), EVP_PKEY_get_bits(k),
+               EVP_PKEY_get0_RSA(k) != NULL
+                   ? RSA_test_flags(EVP_PKEY_get0_RSA(k), RSA_FLAG_TYPE_MASK) : -1);
+        pubkey_der("encoded again", k);
+    }
+    errors();
+    EVP_PKEY_free(k);
+    OPENSSL_free(spki);
+    OPENSSL_free(der);
+    X509_PUBKEY_free(x);
+    RSA_free(r);
+}
+
 /* RFC 6979's DSA-1024 key's parameters and public key. */
 static DSA *rfc_dsa(void)
 {
@@ -480,6 +522,7 @@ int main(void)
 {
     test_structure();
     test_rsa();
+    test_rsa_x500();
     test_dsa();
     test_dh();
     test_ec();

@@ -1,0 +1,23 @@
+# The whole upstream test tree (`cargo xtask test-openssl-suite --all`): what isn't eligible.
+#
+# `skip <recipe> <reason>`: a recipe not run at all, because it can't apply to rustyssl.
+# `internal <recipe> [#n ...] <reason>`: subtests (all, without numbers) that read OpenSSL's
+# private structures, which can't pass on another layout. Subtests that run a program needing
+# the libraries' internal functions are found from the programs and need no line here.
+
+# Programs that read libssl's private structures (as tests/openssl-suite/ssl.txt lists them): each
+# recipe runs its program as one subtest, so the program's other tests can't count either here;
+# test-openssl-suite --ssl runs them one by one.
+internal test_sslbuffers #1 sslbuffertest's test_func reads the private SSL_CONNECTION's record buffers (and crashes on another layout)
+internal test_dtls_mtu #1 dtls_mtu_test's run_mtu_tests reads the private SSL_CONNECTION's DTLS state
+internal test_ssl_new #26 26-tls13_client_auth's post-handshake-auth iterations: ssl_test's handshake.c takes the server's private SSL_CONNECTION (SSL_CONNECTION_FROM_SSL_ONLY, and sets its post_handshake_auth); its other iterations pass under test-openssl-suite --ssl
+skip test_tls13secrets tls13secretstest compiles its own copy of ssl/tls13_enc.c over libssl's private SSL_CONNECTION
+
+# Programs that read libcrypto's private structures.
+internal test_rand #3 drbgtest's prov_rand reads the private EVP_RAND_CTX's algctx as the default provider's PROV_DRBG (reseed counters and times, its parent), and crashes on another layout
+
+# QUIC (Phase 10): programs that need the QUIC API, which rustyssl doesn't implement yet.
+skip test_ssl_ctx ssl_ctx_test runs as one subtest and its QUIC iterations need OSSL_QUIC_client_method (Phase 10); its others pass under test-openssl-suite --ssl
+
+# docs/DEVIATIONS.md: the library's version text carries build metadata (+rustyssl.<version>).
+skip test_cipherlist the recipe skips itself when the library's version differs from the programs' build version (regression testing), as rustyssl's +rustyssl.<version> does; cipherlist_test passes under test-openssl-suite --ssl

@@ -492,25 +492,18 @@ fn psk_ske(c: &Connection, mt: u8, ccs: bool) -> bool {
 /// # Errors
 /// No transition: `SSL_R_UNEXPECTED_MESSAGE` with an unexpected-message alert.
 pub(crate) fn read_transition(c: &mut Connection, mt: u8) -> Result<()> {
-    let leaving_hello = c.st.hand_state == st(abi::TLS_ST_CW_CLNT_HELLO);
+    let from_hello = c.st.hand_state == st(abi::TLS_ST_CW_CLNT_HELLO);
     let ok = if c.is_tls13() {
         read_transition13(c, mt)?
     } else {
         read_transition12(c, mt)
     };
     if ok {
-        if leaving_hello && !c.cfg.dtls {
-            // While the client is in TLS_ST_CW_CLNT_HELLO its records (the first ClientHello,
-            // an alert refusing what came instead of a ServerHello) carry TLS 1.0; from the
-            // ServerHello on they carry the connection's version, the client's highest until
-            // the ServerHello picks one, TLS 1.3's as TLS 1.2 (`ssl3_write_bytes`,
-            // `ssl3_dispatch_alert`): an alert refusing the ServerHello's version among them.
-            let v = c.neg.version;
-            c.rw.version = if v >= crate::consts::version::TLS1_3 {
-                crate::consts::version::TLS1_2
-            } else {
-                v
-            };
+        if from_hello && !c.cfg.dtls {
+            // Out of the ClientHello's state, the client's records (an alert answering the
+            // ServerHello among them) carry the connection's version: OpenSSL writes TLS 1.0
+            // only while in `TLS_ST_CW_CLNT_HELLO` (`ssl3_dispatch_alert`, `ssl3_write_bytes`).
+            client_records_at_version(c);
         }
         Ok(())
     } else if c.cfg.dtls && is_ccs(c) {
@@ -523,6 +516,20 @@ pub(crate) fn read_transition(c: &mut Connection, mt: u8) -> Result<()> {
             abi::SSL_R_UNEXPECTED_MESSAGE,
         ))
     }
+}
+
+/// A TLS client's records from now on carry its version (the ClientHello's highest until the
+/// ServerHello chooses one), TLS 1.3's as TLS 1.2. DTLS's records keep theirs.
+fn client_records_at_version(c: &mut Connection) {
+    if c.cfg.dtls {
+        return;
+    }
+    let v = c.neg.version;
+    c.rw.version = if v >= crate::consts::version::TLS1_3 {
+        crate::consts::version::TLS1_2
+    } else {
+        v
+    };
 }
 
 /// The read transitions before TLS 1.3 is chosen, and in TLS 1.2 and earlier.
@@ -986,12 +993,7 @@ pub(crate) fn post_work(c: &mut Connection, p: &dyn Provider, _wst: Work) -> Res
         if c.hs.sh.early_data_state == EarlyDataState::Connecting {
             // The records after the ClientHello (the compatibility ChangeCipherSpec, early
             // data) carry the connection's version, TLS 1.3's as TLS 1.2 (`ssl3_write_bytes`).
-            let v = c.neg.version;
-            c.rw.version = if !c.cfg.dtls && v >= crate::consts::version::TLS1_3 {
-                crate::consts::version::TLS1_2
-            } else {
-                v
-            };
+            client_records_at_version(c);
         }
         if c.hs.sh.early_data_state == EarlyDataState::Connecting && max_early > 0 {
             if !middlebox(c) {

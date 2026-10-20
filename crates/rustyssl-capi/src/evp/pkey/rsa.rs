@@ -882,8 +882,9 @@ ffi_callback! {
             unsafe { crate::asn1::string::ASN1_STRING_free(str_) };
             return 0;
         }
+        // The method's own type (`pkey->ameth->pkey_id`): an alias's key is RSA's.
         // SAFETY: the caller's key.
-        let id = unsafe { super::EVP_PKEY_get_id(pkey) };
+        let id = unsafe { super::EVP_PKEY_get_base_id(pkey) };
         // SAFETY: no preconditions.
         let obj = unsafe { crate::objects::OBJ_nid2obj(id) };
         // SAFETY: the caller's structure takes the object, parameter, and octets.
@@ -926,8 +927,10 @@ ffi_callback! {
             unsafe { free(r) };
             return 0;
         };
+        // The ASN.1 method's own type (`pkey->ameth->pkey_id`), not an alias such as X.500's
+        // `rsa` (2.5.8.1.1): the key becomes an RSA key, as on OpenSSL.
         // SAFETY: the caller's key.
-        let id = unsafe { super::EVP_PKEY_get_id(pkey) };
+        let id = unsafe { super::EVP_PKEY_get_base_id(pkey) };
         let kind = match id {
             EVP_PKEY_RSA => RSA_FLAG_TYPE_RSA,
             EVP_PKEY_RSA_PSS => RSA_FLAG_TYPE_RSASSAPSS,
@@ -1018,8 +1021,9 @@ ffi_callback! {
             unsafe { crate::asn1::string::ASN1_STRING_free(str_) };
             return 0;
         }
+        // The method's own type (`pkey->ameth->pkey_id`): an alias's key is RSA's.
         // SAFETY: the caller's key.
-        let id = unsafe { super::EVP_PKEY_get_id(pkey) };
+        let id = unsafe { super::EVP_PKEY_get_base_id(pkey) };
         // SAFETY: no preconditions.
         let obj = unsafe { crate::objects::OBJ_nid2obj(id) };
         // SAFETY: the caller's structure takes the object, parameter, and octets.
@@ -1048,8 +1052,9 @@ ffi_callback! {
         if r.is_null() {
             return 0;
         }
+        // The method's own type (`pkey->ameth->pkey_id`): an alias's key is RSA's.
         // SAFETY: the caller's key.
-        let id = unsafe { super::EVP_PKEY_get_id(pkey) };
+        let id = unsafe { super::EVP_PKEY_get_base_id(pkey) };
         // SAFETY: the caller's key takes the new one.
         unsafe { EVP_PKEY_assign(pkey, id, r.cast()) };
         1
@@ -1069,8 +1074,9 @@ ffi_callback! {
         if r.is_null() {
             return 0;
         }
+        // The method's own type (`pkey->ameth->pkey_id`): an alias's key is RSA's.
         // SAFETY: the caller's key.
-        let id = unsafe { super::EVP_PKEY_get_id(pkey) };
+        let id = unsafe { super::EVP_PKEY_get_base_id(pkey) };
         // SAFETY: the caller's key takes the new one.
         unsafe { EVP_PKEY_assign(pkey, id, r.cast()) };
         1
