@@ -1,0 +1,93 @@
+# `openssl pkey` (cargo xtask test-apps: upstream's tool on the reference, then ours on
+# rustyssl and on the reference). Keys from the reference's test/ tree. Encrypted output is
+# random, so it goes through `| check` (decrypted by upstream's tool on the reference).
+pkey -help
+pkey -h -in x
+pkey -in {src}/test/testrsa.pem
+pkey -in {src}/test/testrsa.pem -text
+pkey -in {src}/test/testrsa.pem -text -noout
+pkey -in {src}/test/testrsa.pem -text_pub
+pkey -in {src}/test/testrsa.pem -text -text_pub
+pkey -in {src}/test/testrsa.pem -pubout
+pkey -in {src}/test/testrsa.pem -pubout -text
+pkey -in {src}/test/testrsa.pem -traditional
+pkey -in {src}/test/testrsa.pem -traditional -noout
+pkey -in {src}/test/testrsa.pem -traditional -pubout
+pkey -in {src}/test/testrsa.pem -outform DER
+pkey -in {src}/test/testrsa.pem -outform DER -traditional
+pkey -in {src}/test/testrsa.pem -outform DER -pubout
+pkey -in {src}/test/testrsa.pem -outform DER -text
+pkey -in {src}/test/testrsa.pem -outform PEM -noout -check
+pkey -in {src}/test/testrsa.pem -noout -pubcheck
+pkey -in {src}/test/testrsa.pem -check
+pkey -in {src}/test/testrsapub.pem -pubin
+pkey -in {src}/test/testrsapub.pem -pubin -text
+pkey -in {src}/test/testrsapub.pem -pubin -check
+pkey -in {src}/test/testrsapub.pem -pubin -pubcheck -noout
+pkey -in {src}/test/testrsapub.pem -pubin -outform DER
+pkey -in {src}/test/testrsapub.pem
+pkey -in {src}/test/testrsapss.pem -text
+pkey -in {src}/test/testdsa.pem
+pkey -in {src}/test/testdsa.pem -text_pub
+pkey -in {src}/test/testdsa.pem -check -noout
+pkey -in {src}/test/testdsapub.pem -pubin -text
+pkey -in {src}/test/testec-p256.pem
+pkey -in {src}/test/testec-p256.pem -text
+pkey -in {src}/test/testec-p256.pem -traditional
+pkey -in {src}/test/testec-p256.pem -check
+pkey -in {src}/test/testec-p256.pem -ec_conv_form compressed -pubout
+pkey -in {src}/test/testec-p256.pem -ec_conv_form hybrid -text_pub
+pkey -in {src}/test/testec-p256.pem -ec_conv_form uncompressed -pubout -outform DER
+pkey -in {src}/test/testec-p256.pem -ec_param_enc explicit -pubout
+pkey -in {src}/test/testec-p256.pem -ec_param_enc explicit -text_pub
+pkey -in {src}/test/testec-p256.pem -ec_param_enc named_curve -traditional
+pkey -in {src}/test/testec-p256.pem -ec_param_enc bad
+pkey -in {src}/test/testec-p256.pem -ec_conv_form bad
+pkey -in {src}/test/testrsa.pem -ec_conv_form compressed
+pkey -in {src}/test/testecpub-p256.pem -pubin -text
+pkey -in {src}/test/testec-sm2.pem -text
+pkey -in {src}/test/tested25519.pem -text
+pkey -in {src}/test/tested25519.pem -pubout -outform DER
+pkey -in {src}/test/tested448.pem -check
+pkey -in {src}/test/testmldsa44.pem -text_pub
+pkey -in {src}/test/certs/key-pass-12345.pem -passin pass:12345
+pkey -in {src}/test/certs/key-pass-12345.pem -passin pass:wrong
+pkey -in {src}/test/certs/key-pass-12345.pem -passin file:{txt}
+pkey -in {src}/test/certs/key-pass-12345.pem -passin nosuch:x
+pkey -in {src}/test/certs/key-pass-12345.pem -passin env:RUSTYSSL_NO_SUCH_VAR
+pkey -passin pass:12345 < {src}/test/certs/key-pass-12345.pem
+pkey < {src}/test/testrsa.pem
+pkey -inform PEM -in {src}/test/testrsa.pem -noout
+pkey -inform DER -in {src}/test/testrsa.pem -noout
+pkey -inform DER -in {src}/test/testrsa_withattrs.der -text_pub -noout
+pkey -inform ENGINE -in {src}/test/testrsa.pem
+pkey -inform XYZ -in {src}/test/testrsa.pem
+pkey -outform ENGINE -in {src}/test/testrsa.pem
+pkey -in {src}/test/testx509.pem
+pkey -in {src}/test/testx509.pem -pubin
+pkey -in /nonexistent/key.pem
+pkey -in {txt}
+pkey -in {src}/test/testrsa.pem -out {dir}/pkey-out.pem | pkey -in {dir}/pkey-out.pem -noout -text_pub
+pkey -in {src}/test/testrsa.pem -out /nonexistent/dir/out.pem
+pkey -in {src}/test/testrsa.pem -aes128 -passout pass:secret | pkey -passin pass:secret -text_pub -noout
+pkey -in {src}/test/testrsa.pem -aes-256-cbc -passout pass:secret -traditional | pkey -passin pass:secret -noout -check
+pkey -in {src}/test/testrsa.pem -des3 -passout pass:secret -pubout
+pkey -in {src}/test/testrsa.pem -aes128 -passout pass:secret -noout
+pkey -in {src}/test/testrsa.pem -aes128 -passout pass:secret -outform DER
+pkey -in {src}/test/testrsa.pem -passout pass:secret
+pkey -in {src}/test/testrsa.pem -aes-128-gcm -passout pass:x
+pkey -in {src}/test/testrsa.pem -aes-128-xts -passout pass:x
+pkey -in {src}/test/testrsa.pem -nosuchcipher
+pkey -in {src}/test/testrsa.pem -aes128 -des3 -passout pass:x
+pkey -in {src}/test/testrsa.pem -engine /nonexistent/eng.so -noout
+pkey -in {src}/test/testrsa.pem -provider default -noout -check
+pkey -in {src}/test/testrsa.pem -provider /nonexistent/prov.so
+pkey -in {src}/test/testrsa.pem -provider-path {dir} -provider default -noout
+pkey -in {src}/test/testrsa.pem -provparam default:x=y -noout
+pkey -in {src}/test/testrsa.pem -provparam bad -noout
+pkey -in {src}/test/testrsa.pem -propquery provider=default -noout -check
+pkey -in {src}/test/testrsa.pem -propquery provider=nosuch -noout -check
+pkey -in {src}/test/testrsa.pem extra
+pkey -in
+pkey -nosuchoption
+pkey -check=1

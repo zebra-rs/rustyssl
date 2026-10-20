@@ -37,7 +37,7 @@ pub mod version;
 // pub mod pkcs12;
 // pub mod pkcs7;
 // pub mod pkcs8;
-// pub mod pkey;
+pub mod pkey;
 // pub mod pkeyparam;
 // pub mod pkeyutl;
 // pub mod prime;
@@ -96,7 +96,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "pkcs12" => pkcs12::main,
         // "pkcs7" => pkcs7::main,
         // "pkcs8" => pkcs8::main,
-        // "pkey" => pkey::main,
+        "pkey" => pkey::main,
         // "pkeyparam" => pkeyparam::main,
         // "pkeyutl" => pkeyutl::main,
         // "prime" => prime::main,
