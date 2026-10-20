@@ -1,0 +1,6 @@
+# The whole upstream test tree (`cargo xtask test-openssl-suite --all`): what isn't eligible.
+#
+# `skip <recipe> <reason>`: a recipe not run at all, because it can't apply to rustyssl.
+# `internal <recipe> [#n ...] <reason>`: subtests (all, without numbers) that read OpenSSL's
+# private structures, which can't pass on another layout. Subtests that run a program needing
+# the libraries' internal functions are found from the programs and need no line here.
