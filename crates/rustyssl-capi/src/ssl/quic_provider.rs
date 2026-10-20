@@ -137,6 +137,7 @@ mod tests {
     /// RFC 9001, Appendix A.2 (client Initial, AES-128) and A.5 (ChaCha20) masks, the same as
     /// the transport's own provider computes.
     #[test]
+    #[cfg_attr(miri, ignore = "fetches the ciphers, which loads the configuration")]
     fn masks_match_rfc9001() {
         let p = provider();
         let hp = p
@@ -160,6 +161,7 @@ mod tests {
     /// A packet protected through EVP opens with the transport's test provider and back, and
     /// the RFC 9001 client Initial (A.2) is reproduced byte for byte.
     #[test]
+    #[cfg_attr(miri, ignore = "fetches the ciphers, which loads the configuration")]
     fn packet_protection_over_evp() {
         let p = provider();
         let dcid = hex("8394c8f03e515708");
