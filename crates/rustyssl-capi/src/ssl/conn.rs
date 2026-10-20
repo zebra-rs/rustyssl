@@ -221,6 +221,8 @@ impl Drop for SslState {
 
 /// A connection (`SSL`, shared by reference).
 pub(crate) struct Ssl {
+    /// What a QUIC object is (`super::quic`); first, so it goes before the state it uses.
+    pub(crate) quic: std::sync::OnceLock<super::quic::Quic>,
     references: AtomicI32,
     /// The verification parameters (owned), at a fixed address for `SSL_get0_param`.
     pub(crate) param: *mut X509_VERIFY_PARAM,
@@ -312,6 +314,21 @@ ffi_export! {
     /// `ctx` is NULL or a live context.
     pub unsafe extern "C" fn rustyssl_private_SSL_new(ctx: *mut SSL_CTX) -> *mut SSL
     where failure = ptr::null_mut(), library = ERR_LIB_SSL
+    {
+        // SAFETY: the caller's guarantee.
+        if !ctx.is_null() && let Some(r) = unsafe { super::quic::api::ssl_new(ctx) } {
+            return r;
+        }
+        // SAFETY: as above.
+        unsafe { new_ssl(ctx) }
+    }
+}
+
+/// `SSL_new`'s TLS object (also the base of every QUIC object), or NULL.
+///
+/// # Safety
+/// `ctx` is NULL or a live context.
+pub(crate) unsafe fn new_ssl(ctx: *mut SSL_CTX) -> *mut SSL {
     {
         const F: &str = "SSL_new";
         // SAFETY: the caller's guarantee.
@@ -451,6 +468,7 @@ ffi_export! {
         // SAFETY: as above.
         unsafe { ctx::rustyssl_private_SSL_CTX_up_ref(ctx) };
         let s = SSL::new_handle(Ssl {
+            quic: std::sync::OnceLock::new(),
             references: AtomicI32::new(1),
             param,
             // SAFETY: an all-zero `CRYPTO_EX_DATA` is the empty one `CRYPTO_new_ex_data` fills.
@@ -458,7 +476,9 @@ ffi_export! {
             state: Mutex::new(state),
         });
         // SAFETY: the new connection.
-        let Some(x) = (unsafe { ssl(s) }) else { return ptr::null_mut() };
+        let Some(x) = (unsafe { ssl(s) }) else {
+            return ptr::null_mut();
+        };
         // SAFETY: the new connection and its own application data.
         if unsafe { CRYPTO_new_ex_data(CRYPTO_EX_INDEX_SSL, s.cast(), x.ex_data()) } == 0 {
             // SAFETY: the new connection's only reference.
@@ -529,6 +549,10 @@ ffi_export! {
     where failure = ptr::null_mut(), library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return ptr::null_mut();
+        }
+        // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return ptr::null_mut() };
         let (old, target) = {
             let st = x.state();
@@ -574,6 +598,10 @@ ffi_export! {
     where failure = (), library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::set_role(s, false);
+        }
+        // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return };
         let old = {
             let mut st = x.state();
@@ -609,6 +637,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_set_accept_state(s: *mut SSL)
     where failure = (), library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::set_role(s, true);
+        }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return };
         let old = {
@@ -646,6 +678,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_clear(s: *mut SSL) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::clear(s);
+        }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else {
             err::raise(ERR_LIB_SSL, SSL_R_NO_METHOD_SPECIFIED, "SSL_clear");
@@ -734,6 +770,10 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if let Some(q) = unsafe { super::quic::of(s) } {
+            return super::quic::api::quic_version(q);
+        }
+        // SAFETY: the caller's guarantee.
         unsafe { ssl(s) }.map_or(0, |x| x.state().version)
     }
 }
@@ -746,6 +786,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_client_version(s: *const SSL) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if let Some(q) = unsafe { super::quic::of(s) } {
+            return super::quic::api::quic_version(q);
+        }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
         let st = x.state();
@@ -785,7 +829,12 @@ ffi_export! {
     where failure = ptr::null(), library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
-        unsafe { ssl(s) }.map_or(ptr::null(), |x| protocol_name(x.state().version).as_ptr())
+        unsafe { ssl(s) }.map_or(ptr::null(), |x| {
+            if x.quic.get().is_some() {
+                return c"QUICv1".as_ptr();
+            }
+            protocol_name(x.state().version).as_ptr()
+        })
     }
 }
 
@@ -811,20 +860,20 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
-        unsafe { ssl(s) }.map_or(0, |x| c_int::from(!x.state().method.dtls))
+        unsafe { ssl(s) }.map_or(0, |x| c_int::from(!x.state().method.dtls && x.quic.get().is_none()))
     }
 }
 
 ffi_export! {
-    /// Whether the connection is QUIC: never (QUIC isn't built yet, and no method makes one).
+    /// Whether the object is a QUIC one (a connection, stream, or listener).
     ///
     /// # Safety
     /// `s` is NULL or a live connection.
     pub unsafe extern "C" fn rustyssl_private_SSL_is_quic(s: *const SSL) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
-        let _ = s;
-        0
+        // SAFETY: the caller's guarantee.
+        c_int::from(unsafe { super::quic::of(s) }.is_some())
     }
 }
 
@@ -907,6 +956,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_want(s: *const SSL) -> c_int
     where failure = SSL_NOTHING, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::want(s);
+        }
         // SAFETY: the caller's guarantee.
         unsafe { ssl(s) }.map_or(SSL_NOTHING, |x| x.state().rwstate)
     }
@@ -1193,6 +1246,12 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some()
+            && c_int::from(mode) != rustyssl_abi::TLSEXT_max_fragment_length_DISABLED
+        {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
         if !ctx::mfl_ok(mode, "SSL_set_tlsext_max_fragment_length") {
             return 0;
@@ -1210,6 +1269,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_set_block_padding_ex(s: *mut SSL, app_block_size: usize, hs_block_size: usize) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() && (app_block_size > 1 || hs_block_size > 1) {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
         let (Some(a), Some(h)) = (ctx::padding(app_block_size), ctx::padding(hs_block_size)) else { return 0 };
@@ -1242,6 +1305,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_set_record_padding_callback(s: *mut SSL, cb: RecordPaddingCb) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
         let mut st = x.state();
@@ -1463,6 +1530,10 @@ ffi_export! {
     where failure = (), library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return;
+        }
+        // SAFETY: the caller's guarantee.
         if let Some(x) = unsafe { ssl(s) } {
             x.state().read_ahead = yes;
         }
@@ -1477,6 +1548,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_get_read_ahead(s: *const SSL) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         unsafe { ssl(s) }.map_or(0, |x| x.state().read_ahead)
     }
@@ -1493,6 +1568,10 @@ ffi_export! {
     where failure = ptr::null_mut(), library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::net_bio(s, false);
+        }
+        // SAFETY: the caller's guarantee.
         unsafe { ssl(s) }.map_or(ptr::null_mut(), |x| x.state().rbio)
     }
 }
@@ -1506,6 +1585,10 @@ ffi_export! {
     where failure = ptr::null_mut(), library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::net_bio(s, true);
+        }
+        // SAFETY: the caller's guarantee.
         unsafe { ssl(s) }.map_or(ptr::null_mut(), |x| x.state().wbio)
     }
 }
@@ -1518,6 +1601,11 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_set0_rbio(s: *mut SSL, rbio: *mut BIO)
     where failure = (), library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::quic::api::set0_net_bio(s, rbio, false) };
+        }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return };
         let old = core::mem::replace(&mut x.state().rbio, rbio);
@@ -1534,6 +1622,11 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_set0_wbio(s: *mut SSL, wbio: *mut BIO)
     where failure = (), library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::quic::api::set0_net_bio(s, wbio, true) };
+        }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return };
         let old = core::mem::replace(&mut x.state().wbio, wbio);
@@ -1554,11 +1647,13 @@ ffi_export! {
     where failure = (), library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
-        let Some(x) = (unsafe { ssl(s) }) else { return };
-        let (cur_r, cur_w) = {
-            let st = x.state();
-            (st.rbio, st.wbio)
-        };
+        if unsafe { ssl(s) }.is_none() {
+            return;
+        }
+        // SAFETY: as above.
+        let cur_r = unsafe { rustyssl_private_SSL_get_rbio(s) };
+        // SAFETY: as above.
+        let cur_w = unsafe { rustyssl_private_SSL_get_wbio(s) };
         if rbio == cur_r && wbio == cur_w {
             return;
         }
@@ -1642,10 +1737,16 @@ ffi_export! {
     }
 }
 
-/// A new socket BIO over `fd`, not closing it; NULL (with `ERR_R_BUF_LIB`) on failure.
-fn socket_bio(fd: c_int, f: &str) -> *mut BIO {
-    // SAFETY: no preconditions.
-    let m = unsafe { crate::bio::sock::BIO_s_socket() };
+/// A new socket BIO over `fd` (a datagram one for QUIC), not closing it; NULL (with
+/// `ERR_R_BUF_LIB`) on failure.
+fn socket_bio(fd: c_int, quic: bool, f: &str) -> *mut BIO {
+    let m = if quic {
+        // SAFETY: no preconditions.
+        unsafe { crate::bio::dgram::BIO_s_datagram() }
+    } else {
+        // SAFETY: no preconditions.
+        unsafe { crate::bio::sock::BIO_s_socket() }
+    };
     // SAFETY: the built-in method.
     let b = unsafe { BIO_new(m) };
     if b.is_null() {
@@ -1674,10 +1775,12 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        let quic = unsafe { super::quic::of(s) }.is_some();
+        // SAFETY: the caller's guarantee.
         if unsafe { ssl(s) }.is_none() {
             return 0;
         }
-        let b = socket_bio(fd, "SSL_set_fd");
+        let b = socket_bio(fd, quic, "SSL_set_fd");
         if b.is_null() {
             return 0;
         }
@@ -1687,13 +1790,18 @@ ffi_export! {
     }
 }
 
-/// Whether `b` is a socket BIO over `fd`.
+/// Whether `b` is a socket BIO (a datagram one for QUIC) over `fd`.
 ///
 /// # Safety
 /// `b` is NULL or a live BIO.
-unsafe fn is_socket_of(b: *mut BIO, fd: c_int) -> bool {
+unsafe fn is_socket_of(b: *mut BIO, fd: c_int, quic: bool) -> bool {
+    let want = if quic {
+        rustyssl_abi::BIO_TYPE_DGRAM
+    } else {
+        BIO_TYPE_SOCKET
+    };
     // SAFETY: the caller's BIO.
-    !b.is_null() && unsafe { BIO_method_type(b) } == BIO_TYPE_SOCKET && {
+    !b.is_null() && unsafe { BIO_method_type(b) } == want && {
         // SAFETY: as above; NULL asks for the descriptor only.
         let got = unsafe { BIO_ctrl(b, BIO_C_GET_FD, 0, ptr::null_mut()) };
         got == c_long::from(fd)
@@ -1710,13 +1818,15 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        let quic = unsafe { super::quic::of(s) }.is_some();
+        // SAFETY: the caller's guarantee.
         if unsafe { ssl(s) }.is_none() {
             return 0;
         }
         // SAFETY: as above.
         let rbio = unsafe { rustyssl_private_SSL_get_rbio(s) };
         // SAFETY: the connection's BIO, or NULL.
-        if unsafe { is_socket_of(rbio, fd) } {
+        if unsafe { is_socket_of(rbio, fd, quic) } {
             // SAFETY: as above.
             if unsafe { BIO_up_ref(rbio) } == 0 {
                 return 0;
@@ -1724,7 +1834,7 @@ ffi_export! {
             // SAFETY: as above; the new reference.
             unsafe { rustyssl_private_SSL_set0_wbio(s, rbio) };
         } else {
-            let b = socket_bio(fd, "SSL_set_wfd");
+            let b = socket_bio(fd, quic, "SSL_set_wfd");
             if b.is_null() {
                 return 0;
             }
@@ -1745,13 +1855,15 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        let quic = unsafe { super::quic::of(s) }.is_some();
+        // SAFETY: the caller's guarantee.
         if unsafe { ssl(s) }.is_none() {
             return 0;
         }
         // SAFETY: as above.
         let wbio = unsafe { rustyssl_private_SSL_get_wbio(s) };
         // SAFETY: the connection's BIO, or NULL.
-        if unsafe { is_socket_of(wbio, fd) } {
+        if unsafe { is_socket_of(wbio, fd, quic) } {
             // SAFETY: as above.
             if unsafe { BIO_up_ref(wbio) } == 0 {
                 return 0;
@@ -1759,7 +1871,7 @@ ffi_export! {
             // SAFETY: as above; the new reference.
             unsafe { rustyssl_private_SSL_set0_rbio(s, wbio) };
         } else {
-            let b = socket_bio(fd, "SSL_set_rfd");
+            let b = socket_bio(fd, quic, "SSL_set_rfd");
             if b.is_null() {
                 return 0;
             }
@@ -1782,6 +1894,13 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_ctrl(s: *mut SSL, cmd: c_int, larg: c_long, parg: *mut c_void) -> c_long
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some()
+            // SAFETY: as above.
+            && let Some(r) = unsafe { super::quic::api::ctrl(s, cmd, larg, parg) }
+        {
+            return r;
+        }
         // The commands' errors come from OpenSSL's `ssl3_ctrl`.
         const F: &str = "ssl3_ctrl";
         // SAFETY: the caller's guarantee.
@@ -1888,7 +2007,8 @@ ffi_export! {
             SSL_CTRL_GET_RAW_CIPHERLIST => TLS_CIPHER_LEN,
             SSL_CTRL_SET_MIN_PROTO_VERSION | SSL_CTRL_SET_MAX_PROTO_VERSION => {
                 let Ok(v) = c_int::try_from(larg) else { return 0 };
-                let method_version = st.defltmeth.version;
+                // QUIC's methods take no bounds (`OSSL_QUIC_ANY_VERSION`: a version-inflexible one).
+                let method_version = if st.defltmeth.quic { 0 } else { st.defltmeth.version };
                 if cmd == SSL_CTRL_SET_MIN_PROTO_VERSION {
                     c_long::from(check_allowed_versions(v, st.max_proto_version) != 0 && set_version_bound(method_version, v, &mut st.min_proto_version) != 0)
                 } else {

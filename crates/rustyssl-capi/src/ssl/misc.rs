@@ -252,6 +252,11 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if let Some(q) = unsafe { super::quic::of(s) } {
+            // SAFETY: as above.
+            return unsafe { super::quic::api::handle_events(q) };
+        }
+        // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { super::conn::ssl(s) }) else { return 1 };
         if !x.state().method.dtls {
             return 1;
@@ -271,6 +276,11 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_get_event_timeout(s: *mut SSL, tv: *mut timeval, is_infinite: *mut c_int) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if let Some(q) = unsafe { super::quic::of(s) } {
+            // SAFETY: as above.
+            return unsafe { super::quic::api::event_timeout(q, tv, is_infinite) };
+        }
         // SAFETY: the caller's guarantee.
         if let Some(x) = unsafe { super::conn::ssl(s) }
             && !tv.is_null()
@@ -317,6 +327,10 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if let Some(q) = unsafe { super::quic::of(s) } {
+            return super::quic::api::net_read_desired(q);
+        }
+        // SAFETY: the caller's guarantee.
         c_int::from(unsafe { rustyssl_private_SSL_want(s) } == SSL_READING)
     }
 }
@@ -330,6 +344,10 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if let Some(q) = unsafe { super::quic::of(s) } {
+            return super::quic::api::net_write_desired(q);
+        }
+        // SAFETY: the caller's guarantee.
         c_int::from(unsafe { rustyssl_private_SSL_want(s) } == SSL_WRITING)
     }
 }
@@ -339,9 +357,13 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_set_blocking_mode(_s: *mut SSL, _blocking: c_int) -> c_int
+    pub unsafe extern "C" fn rustyssl_private_SSL_set_blocking_mode(s: *mut SSL, blocking: c_int) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if let Some(q) = unsafe { super::quic::of(s) } {
+            return super::quic::api::set_blocking(q, blocking);
+        }
         0
     }
 }
@@ -351,9 +373,13 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_get_blocking_mode(_s: *mut SSL) -> c_int
+    pub unsafe extern "C" fn rustyssl_private_SSL_get_blocking_mode(s: *mut SSL) -> c_int
     where failure = -1, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if let Some(q) = unsafe { super::quic::of(s) } {
+            return super::quic::api::get_blocking(q);
+        }
         -1
     }
 }
@@ -363,9 +389,14 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_set1_initial_peer_addr(_s: *mut SSL, _peer_addr: *const BIO_ADDR) -> c_int
+    pub unsafe extern "C" fn rustyssl_private_SSL_set1_initial_peer_addr(s: *mut SSL, peer_addr: *const BIO_ADDR) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::quic::api::set_initial_peer(s, peer_addr) };
+        }
         0
     }
 }
@@ -375,9 +406,14 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_stream_conclude(_s: *mut SSL, _flags: u64) -> c_int
+    pub unsafe extern "C" fn rustyssl_private_SSL_stream_conclude(s: *mut SSL, flags: u64) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::quic::api::stream_conclude(s, flags) };
+        }
         0
     }
 }
@@ -387,9 +423,14 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_new_stream(_s: *mut SSL, _flags: u64) -> *mut SSL
+    pub unsafe extern "C" fn rustyssl_private_SSL_new_stream(s: *mut SSL, flags: u64) -> *mut SSL
     where failure = ptr::null_mut(), library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::quic::api::new_stream(s, flags) };
+        }
         ptr::null_mut()
     }
 }
@@ -399,9 +440,13 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_get0_listener(_s: *mut SSL) -> *mut SSL
+    pub unsafe extern "C" fn rustyssl_private_SSL_get0_listener(s: *mut SSL) -> *mut SSL
     where failure = ptr::null_mut(), library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::get0_listener(s);
+        }
         ptr::null_mut()
     }
 }
@@ -411,9 +456,13 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_get0_domain(_s: *mut SSL) -> *mut SSL
+    pub unsafe extern "C" fn rustyssl_private_SSL_get0_domain(s: *mut SSL) -> *mut SSL
     where failure = ptr::null_mut(), library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::get0_domain(s);
+        }
         ptr::null_mut()
     }
 }
@@ -423,9 +472,13 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_get_stream_type(_s: *mut SSL) -> c_int
+    pub unsafe extern "C" fn rustyssl_private_SSL_get_stream_type(s: *mut SSL) -> c_int
     where failure = BIDI, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::stream_type(s);
+        }
         BIDI
     }
 }
@@ -435,9 +488,13 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_get_stream_id(_s: *mut SSL) -> u64
+    pub unsafe extern "C" fn rustyssl_private_SSL_get_stream_id(s: *mut SSL) -> u64
     where failure = u64::MAX, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::stream_id(s);
+        }
         u64::MAX
     }
 }
@@ -447,9 +504,13 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_is_stream_local(_s: *mut SSL) -> c_int
+    pub unsafe extern "C" fn rustyssl_private_SSL_is_stream_local(s: *mut SSL) -> c_int
     where failure = -1, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::is_stream_local(s);
+        }
         -1
     }
 }
@@ -459,9 +520,13 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_set_default_stream_mode(_s: *mut SSL, _mode: u32) -> c_int
+    pub unsafe extern "C" fn rustyssl_private_SSL_set_default_stream_mode(s: *mut SSL, mode: u32) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::set_default_stream_mode(s, mode);
+        }
         0
     }
 }
@@ -471,9 +536,13 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_set_incoming_stream_policy(_s: *mut SSL, _policy: c_int, _aec: u64) -> c_int
+    pub unsafe extern "C" fn rustyssl_private_SSL_set_incoming_stream_policy(s: *mut SSL, policy: c_int, aec: u64) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::set_incoming_stream_policy(s, policy, aec);
+        }
         0
     }
 }
@@ -483,9 +552,14 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_accept_stream(_s: *mut SSL, _flags: u64) -> *mut SSL
+    pub unsafe extern "C" fn rustyssl_private_SSL_accept_stream(s: *mut SSL, flags: u64) -> *mut SSL
     where failure = ptr::null_mut(), library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::quic::api::accept_stream(s, flags) };
+        }
         ptr::null_mut()
     }
 }
@@ -495,9 +569,13 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_get_accept_stream_queue_len(_s: *mut SSL) -> usize
+    pub unsafe extern "C" fn rustyssl_private_SSL_get_accept_stream_queue_len(s: *mut SSL) -> usize
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::accept_stream_queue_len(s);
+        }
         0
     }
 }
@@ -507,9 +585,14 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_stream_reset(_s: *mut SSL, _args: *const SSL_STREAM_RESET_ARGS, _args_len: usize) -> c_int
+    pub unsafe extern "C" fn rustyssl_private_SSL_stream_reset(s: *mut SSL, args: *const SSL_STREAM_RESET_ARGS, args_len: usize) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::quic::api::stream_reset(s, args, args_len) };
+        }
         0
     }
 }
@@ -519,9 +602,13 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_get_stream_read_state(_s: *mut SSL) -> c_int
+    pub unsafe extern "C" fn rustyssl_private_SSL_get_stream_read_state(s: *mut SSL) -> c_int
     where failure = SSL_STREAM_STATE_NONE, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::stream_state(s, false);
+        }
         SSL_STREAM_STATE_NONE
     }
 }
@@ -531,9 +618,13 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_get_stream_write_state(_s: *mut SSL) -> c_int
+    pub unsafe extern "C" fn rustyssl_private_SSL_get_stream_write_state(s: *mut SSL) -> c_int
     where failure = SSL_STREAM_STATE_NONE, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::stream_state(s, true);
+        }
         SSL_STREAM_STATE_NONE
     }
 }
@@ -543,9 +634,14 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_get_stream_read_error_code(_s: *mut SSL, _app_error_code: *mut u64) -> c_int
+    pub unsafe extern "C" fn rustyssl_private_SSL_get_stream_read_error_code(s: *mut SSL, app_error_code: *mut u64) -> c_int
     where failure = -1, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::quic::api::stream_error_code(s, false, app_error_code) };
+        }
         -1
     }
 }
@@ -555,9 +651,14 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_get_stream_write_error_code(_s: *mut SSL, _app_error_code: *mut u64) -> c_int
+    pub unsafe extern "C" fn rustyssl_private_SSL_get_stream_write_error_code(s: *mut SSL, app_error_code: *mut u64) -> c_int
     where failure = -1, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::quic::api::stream_error_code(s, true, app_error_code) };
+        }
         -1
     }
 }
@@ -567,9 +668,14 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_get_conn_close_info(_s: *mut SSL, _info: *mut SSL_CONN_CLOSE_INFO, _info_len: usize) -> c_int
+    pub unsafe extern "C" fn rustyssl_private_SSL_get_conn_close_info(s: *mut SSL, info: *mut SSL_CONN_CLOSE_INFO, info_len: usize) -> c_int
     where failure = -1, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::quic::api::conn_close_info(s, info, info_len) };
+        }
         -1
     }
 }
@@ -579,9 +685,14 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_new_listener(_ctx: *mut SSL_CTX, _flags: u64) -> *mut SSL
+    pub unsafe extern "C" fn rustyssl_private_SSL_new_listener(ctx: *mut SSL_CTX, flags: u64) -> *mut SSL
     where failure = ptr::null_mut(), library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::api::is_quic_ctx(ctx) } {
+            // SAFETY: as above.
+            return unsafe { super::quic::api::new_listener(ctx, flags) };
+        }
         ptr::null_mut()
     }
 }
@@ -591,9 +702,13 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_new_listener_from(_s: *mut SSL, _flags: u64) -> *mut SSL
+    pub unsafe extern "C" fn rustyssl_private_SSL_new_listener_from(s: *mut SSL, flags: u64) -> *mut SSL
     where failure = ptr::null_mut(), library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::new_listener_from(s, flags);
+        }
         ptr::null_mut()
     }
 }
@@ -603,9 +718,14 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_new_from_listener(_s: *mut SSL, _flags: u64) -> *mut SSL
+    pub unsafe extern "C" fn rustyssl_private_SSL_new_from_listener(s: *mut SSL, flags: u64) -> *mut SSL
     where failure = ptr::null_mut(), library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::quic::api::new_from_listener(s, flags) };
+        }
         ptr::null_mut()
     }
 }
@@ -615,9 +735,14 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_accept_connection(_s: *mut SSL, _flags: u64) -> *mut SSL
+    pub unsafe extern "C" fn rustyssl_private_SSL_accept_connection(s: *mut SSL, flags: u64) -> *mut SSL
     where failure = ptr::null_mut(), library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::quic::api::accept_connection(s, flags) };
+        }
         ptr::null_mut()
     }
 }
@@ -627,9 +752,13 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_get_accept_connection_queue_len(_s: *mut SSL) -> usize
+    pub unsafe extern "C" fn rustyssl_private_SSL_get_accept_connection_queue_len(s: *mut SSL) -> usize
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::accept_queue_len(s);
+        }
         0
     }
 }
@@ -639,9 +768,13 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_listen(_s: *mut SSL) -> c_int
+    pub unsafe extern "C" fn rustyssl_private_SSL_listen(s: *mut SSL) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::listen(s);
+        }
         0
     }
 }
@@ -651,9 +784,14 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_new_domain(_ctx: *mut SSL_CTX, _flags: u64) -> *mut SSL
+    pub unsafe extern "C" fn rustyssl_private_SSL_new_domain(ctx: *mut SSL_CTX, flags: u64) -> *mut SSL
     where failure = ptr::null_mut(), library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::api::is_quic_ctx(ctx) } {
+            // SAFETY: as above.
+            return unsafe { super::quic::api::new_domain(ctx, flags) };
+        }
         ptr::null_mut()
     }
 }
@@ -669,6 +807,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_get0_connection(s: *mut SSL) -> *mut SSL
     where failure = ptr::null_mut(), library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::get0_connection(s);
+        }
         s
     }
 }
@@ -678,9 +820,13 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_is_connection(_s: *mut SSL) -> c_int
+    pub unsafe extern "C" fn rustyssl_private_SSL_is_connection(s: *mut SSL) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return c_int::from(super::quic::api::get0_connection(s) == s);
+        }
         1
     }
 }
@@ -694,6 +840,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_is_listener(s: *mut SSL) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return c_int::from(super::quic::api::get0_listener(s) == s);
+        }
         c_int::from(s.is_null())
     }
 }
@@ -706,6 +856,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_is_domain(s: *mut SSL) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return c_int::from(super::quic::api::get0_domain(s) == s);
+        }
         c_int::from(s.is_null())
     }
 }
@@ -715,9 +869,14 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_get_value_uint(_s: *mut SSL, _class: u32, _id: u32, _value: *mut u64) -> c_int
+    pub unsafe extern "C" fn rustyssl_private_SSL_get_value_uint(s: *mut SSL, class: u32, id: u32, value: *mut u64) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::quic::api::get_value(s, class, id, value) };
+        }
         err::raise(ERR_LIB_SSL, SSL_R_UNSUPPORTED_PROTOCOL, "SSL_get_value_uint");
         0
     }
@@ -728,9 +887,13 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_set_value_uint(_s: *mut SSL, _class: u32, _id: u32, _value: u64) -> c_int
+    pub unsafe extern "C" fn rustyssl_private_SSL_set_value_uint(s: *mut SSL, class: u32, id: u32, value: u64) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::set_value(s, class, id, value);
+        }
         err::raise(ERR_LIB_SSL, SSL_R_UNSUPPORTED_PROTOCOL, "SSL_set_value_uint");
         0
     }
@@ -741,9 +904,14 @@ ffi_export! {
     ///
     /// # Safety
     /// `s` is NULL or a live connection.
-    pub unsafe extern "C" fn rustyssl_private_SSL_shutdown_ex(s: *mut SSL, _flags: u64, _args: *const SSL_SHUTDOWN_EX_ARGS, _args_len: usize) -> c_int
+    pub unsafe extern "C" fn rustyssl_private_SSL_shutdown_ex(s: *mut SSL, flags: u64, args: *const SSL_SHUTDOWN_EX_ARGS, args_len: usize) -> c_int
     where failure = -1, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::quic::api::shutdown(s, flags, args, args_len) };
+        }
         // SAFETY: the caller's guarantee.
         unsafe { rustyssl_private_SSL_shutdown(s) }
     }

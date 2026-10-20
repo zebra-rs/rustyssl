@@ -12,6 +12,7 @@
 use core::ffi::{c_int, c_uchar, c_void};
 use core::ptr;
 use std::collections::VecDeque;
+use std::sync::Arc;
 
 use rustyssl_abi::{
     BIO, BIO_FLAGS_READ, BIO_FLAGS_RWS, BIO_FLAGS_SHOULD_RETRY, BIO_FLAGS_WRITE, ERR_LIB_SSL,
@@ -27,7 +28,7 @@ use rustyssl_abi::{
     SSL_WRITING, TLS1_3_VERSION, TLSEXT_TYPE_quic_transport_parameters,
 };
 use rustyssl_tls::conn::common::EarlyDataState;
-use rustyssl_tls::conn::{Answer, Direction, QuicSecret, QuicTlsConfig};
+use rustyssl_tls::conn::{Answer, Direction, QuicLevel, QuicSecret, QuicTlsConfig};
 use rustyssl_tls::error::Error as TlsError;
 
 use super::accessors::rustyssl_private_SSL_clear_options;
@@ -63,11 +64,28 @@ pub(crate) struct QuicTls {
     cbs: Callbacks,
     arg: *mut c_void,
     /// Whether `SSL_set_quic_tls_cbs` set the connection up (`sc->qtls`).
-    on: bool,
+    pub(crate) on: bool,
     /// The local transport parameters (a copy: OpenSSL keeps the caller's pointer).
-    params: Option<Vec<u8>>,
+    pub(crate) params: Option<Vec<u8>>,
     /// Whether early data is on (`ossl_quic_tls_set_early_data_enabled`).
     early_data: bool,
+    /// OpenSSL's own QUIC (`super::quic`): the transport in place of the callbacks.
+    pub(crate) sink: Option<Arc<dyn Sink>>,
+}
+
+/// The transport of OpenSSL's own QUIC, in place of the six callbacks (`quic_tls.c`'s
+/// internal ones). Called with no lock held.
+pub(crate) trait Sink: Send + Sync + core::fmt::Debug {
+    /// Handshake octets to send, all taken.
+    fn send(&self, data: &[u8]);
+    /// A secret; false fails the connection.
+    fn secret(&self, s: QuicSecret) -> bool;
+    /// An alert to send.
+    fn alert(&self, a: u8);
+    /// The next received CRYPTO octets and their level, if any.
+    fn recv(&self) -> Option<(QuicLevel, Vec<u8>)>;
+    /// The peer's transport parameters.
+    fn got_params(&self, params: &[u8]);
 }
 
 impl Default for QuicTls {
@@ -78,6 +96,7 @@ impl Default for QuicTls {
             on: false,
             params: None,
             early_data: false,
+            sink: None,
         }
     }
 }
@@ -211,6 +230,10 @@ fn callback_failed(x: &Ssl, function: &str, secret: bool) {
 /// # Safety
 /// `s` is the live connection behind `x`.
 pub(crate) unsafe fn pump(s: *mut SSL, x: &Ssl) -> Pumped {
+    let sink = x.state().quic.sink.clone();
+    if let Some(sink) = sink {
+        return pump_sink(x, &*sink);
+    }
     loop {
         let (item, cbs, arg, wbio) = {
             let mut st = x.state();
@@ -286,11 +309,60 @@ pub(crate) unsafe fn pump(s: *mut SSL, x: &Ssl) -> Pumped {
     }
 }
 
+/// [`pump`] into OpenSSL's own transport.
+fn pump_sink(x: &Ssl, sink: &dyn Sink) -> Pumped {
+    loop {
+        let item = {
+            let mut st = x.state();
+            st.drv.quic.sent = 0;
+            st.drv.quic.out.pop_front()
+        };
+        match item {
+            None => return Pumped::Done,
+            Some(Out::Crypto(d)) => sink.send(&d),
+            Some(Out::Alert(a)) => sink.alert(a),
+            Some(Out::Secret(q)) => {
+                if !sink.secret(q) {
+                    callback_failed(x, "quic_new_record_layer", true);
+                    return Pumped::Failed;
+                }
+            }
+        }
+    }
+}
+
 /// Reads a record from the stack into the core (`quic_read_record`), releasing it once copied.
 ///
 /// # Safety
 /// `s` is the live connection behind `x`.
 pub(crate) unsafe fn read(s: *mut SSL, x: &Ssl) -> Read {
+    let sink = x.state().quic.sink.clone();
+    if let Some(sink) = sink {
+        let Some((level, data)) = sink.recv() else {
+            x.state().rwstate = SSL_READING;
+            return Read::Retry;
+        };
+        let fed = {
+            let mut st = x.state();
+            st.drv
+                .tls
+                .as_mut()
+                .map(|c| c.feed_quic_crypto(level, &data))
+        };
+        return match fed {
+            Some(Ok(())) => Read::Got,
+            Some(Err(e)) => {
+                let mut st = x.state();
+                let prov = st.drv.provider.clone();
+                if let (Some(c), Some(p)) = (st.drv.tls.as_mut(), prov) {
+                    c.fail(&*p, e);
+                    st.in_init = c.in_init();
+                }
+                Read::Failed
+            }
+            None => Read::Failed,
+        };
+    }
     let (cbs, arg, rbio) = {
         let st = x.state();
         (st.quic.cbs, st.quic.arg, st.rbio)
@@ -345,6 +417,11 @@ pub(crate) unsafe fn read(s: *mut SSL, x: &Ssl) -> Read {
 /// # Safety
 /// `s` is the live connection behind `x`.
 pub(crate) unsafe fn got_params(s: *mut SSL, x: &Ssl, params: &[u8]) -> Answer {
+    let sink = x.state().quic.sink.clone();
+    if let Some(sink) = sink {
+        sink.got_params(params);
+        return Answer::Continue;
+    }
     let (f, arg) = {
         let st = x.state();
         (st.quic.cbs.got_params, st.quic.arg)

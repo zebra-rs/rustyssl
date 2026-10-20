@@ -1281,6 +1281,13 @@ ffi_export! {
         let Some(list) = rustyssl_tls::conn::common::ciphers::supported(&mut c, &*prov) else {
             return ptr::null_mut();
         };
+        // QUIC leaves out the suites it can't use (`ssl_cipher_disabled`).
+        // SAFETY: the caller's guarantee.
+        let list: Vec<_> = if unsafe { super::quic::of(s) }.is_some() {
+            list.into_iter().filter(|c| super::quic::quic_suite(c)).collect()
+        } else {
+            list
+        };
         if list.is_empty() {
             return ptr::null_mut();
         }

@@ -1,0 +1,21 @@
+# QUIC interop cases (cargo xtask test-interop --peer quic): name | server | client.
+# Servers: OpenSSL's guide demos quic-server-block and quic-server-non-block (an echo server on
+# 127.0.0.1, its demo certificate for "localhost"). Clients: the guide's quic-client-block and
+# quic-client-non-block (an HTTP/1.0 request, verified against the demo root), or `s_client`
+# with arguments (run as `s_client -quic -connect 127.0.0.1:<port> ...`, sending a line).
+# A server of `none` means no server: the network refuses the client.
+# Each case runs in four pairings; the reference/reference client output is the expectation.
+
+block | quic-server-block | quic-client-block
+block-nonblocking-client | quic-server-block | quic-client-non-block
+nonblocking-server | quic-server-non-block | quic-client-block
+nonblocking-both | quic-server-non-block | quic-client-non-block
+s_client | quic-server-block | s_client -alpn http/1.0 -servername localhost -verify_hostname localhost -verify_return_error -brief
+s_client-nonblocking-server | quic-server-non-block | s_client -alpn hq-interop -servername localhost -verify_hostname localhost -verify_return_error -brief
+s_client-chacha | quic-server-block | s_client -alpn http/1.0 -ciphersuites TLS_CHACHA20_POLY1305_SHA256 -servername localhost -brief
+s_client-aes128 | quic-server-block | s_client -alpn http/1.0 -ciphersuites TLS_AES_128_GCM_SHA256 -groups P-256 -servername localhost -brief
+s_client-no-alpn-match | quic-server-block | s_client -alpn h3 -servername localhost -brief
+s_client-unverified | quic-server-block | s_client -alpn http/1.0 -verify_return_error -brief
+refused | none | quic-client-block
+refused-nonblocking | none | quic-client-non-block
+refused-s_client | none | s_client -alpn http/1.0 -brief

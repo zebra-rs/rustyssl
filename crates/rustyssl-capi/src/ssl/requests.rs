@@ -70,6 +70,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_key_update(s: *mut SSL, updatetype: c_int) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::key_update(s, updatetype);
+        }
         const F: &str = "SSL_key_update";
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
@@ -111,6 +115,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_get_key_update_type(s: *const SSL) -> c_int
     where failure = SSL_KEY_UPDATE_NONE, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return rustyssl_abi::SSL_KEY_UPDATE_NONE;
+        }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return SSL_KEY_UPDATE_NONE };
         x.state().drv.tls.as_ref().map_or(SSL_KEY_UPDATE_NONE, |c| c.key_update_type())
@@ -158,6 +166,10 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         unsafe { renegotiate(s, true, "SSL_renegotiate") }
     }
 }
@@ -170,6 +182,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_renegotiate_abbreviated(s: *mut SSL) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         unsafe { renegotiate(s, false, "SSL_renegotiate_abbreviated") }
     }
@@ -184,6 +200,10 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
         c_int::from(x.state().drv.tls.as_ref().is_some_and(|c| c.renegotiate_pending()))
     }
@@ -197,6 +217,11 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_verify_client_post_handshake(s: *mut SSL) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            err::raise(ERR_LIB_SSL, rustyssl_abi::SSL_R_WRONG_SSL_VERSION, "SSL_verify_client_post_handshake");
+            return 0;
+        }
         const F: &str = "SSL_verify_client_post_handshake";
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };

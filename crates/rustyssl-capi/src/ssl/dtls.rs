@@ -405,6 +405,10 @@ ffi_export! {
     where failure = (), library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return;
+        }
+        // SAFETY: the caller's guarantee.
         if let Some(x) = unsafe { ssl(s) } {
             x.state().d1.timer_cb = cb;
         }
@@ -569,6 +573,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_DTLSv1_listen(s: *mut SSL, client: *mut BIO_ADDR) -> c_int
     where failure = -1, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return -1;
+        }
         use rustyssl_abi::{
             SSL_R_BIO_NOT_SET, SSL_R_COOKIE_GEN_CALLBACK_FAILURE,
             SSL_R_NO_VERIFY_COOKIE_CALLBACK, SSL_R_UNSUPPORTED_SSL_VERSION,

@@ -19,6 +19,7 @@ rustyssl-abi = { path = "../crates/rustyssl-abi" }
 rustyssl-asn1 = { path = "../crates/rustyssl-asn1" }
 rustyssl-capi = { path = "../crates/rustyssl-capi" }
 rustyssl-crypto = { path = "../crates/rustyssl-crypto" }
+rustyssl-quic = { path = "../crates/rustyssl-quic", features = ["test-provider"] }
 rustyssl-tls = { path = "../crates/rustyssl-tls", features = ["test-provider"] }
 
 [workspace]
@@ -668,5 +669,29 @@ doc = false
 [[bin]]
 name = "ssl_trace"
 path = "fuzz_targets/ssl_trace.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "quic_packet"
+path = "fuzz_targets/quic_packet.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "quic_frames"
+path = "fuzz_targets/quic_frames.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "quic_transport_params"
+path = "fuzz_targets/quic_transport_params.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "quic_port"
+path = "fuzz_targets/quic_port.rs"
 test = false
 doc = false
