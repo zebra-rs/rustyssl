@@ -307,6 +307,35 @@ static void test_servername_fallback(int other_has_cb)
     SSL_CTX_free(other);
 }
 
+static int status_type_cb(SSL *s, void *arg)
+{
+    (void)arg;
+    printf("  the server's status type in its certificate callback: %ld\n",
+           SSL_get_tlsext_status_type(s));
+    return 1;
+}
+
+/*
+ * A server's SSL_get_tlsext_status_type is what the ClientHello asked for: a certificate
+ * callback looks at it to decide whether to fetch an OCSP response (Node.js does).
+ */
+static void test_server_status_type(int request)
+{
+    SSL_CTX *cctx = client_ctx(), *sctx = server_ctx();
+    SSL *c, *s;
+
+    printf("# the server's status type, the client %s OCSP\n",
+           request ? "asking for" : "not asking for");
+    SSL_CTX_set_cert_cb(sctx, status_type_cb, NULL);
+    pair(cctx, sctx, &c, &s);
+    printf("  before the handshake: %ld\n", SSL_get_tlsext_status_type(s));
+    if (request)
+        SSL_set_tlsext_status_type(c, TLSEXT_STATUSTYPE_ocsp);
+    check(handshake(c, s), "the handshake");
+    printf("  after it: %ld\n", SSL_get_tlsext_status_type(s));
+    done(c, s, cctx, sctx);
+}
+
 static int hello_cb(SSL *s, int *al, void *arg)
 {
     (void)al;
@@ -687,6 +716,8 @@ int main(void)
     test_sni_switch(1, 0);
     test_servername_fallback(0);
     test_servername_fallback(1);
+    test_server_status_type(1);
+    test_server_status_type(0);
     test_hello_cb();
     test_status(TLS1_3_VERSION);
     test_status(TLS1_2_VERSION);

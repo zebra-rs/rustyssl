@@ -1934,7 +1934,15 @@ ffi_export! {
                 st.debug_arg = parg;
                 1
             }
-            SSL_CTRL_GET_TLSEXT_STATUS_REQ_TYPE => c_long::from(st.status_type),
+            SSL_CTRL_GET_TLSEXT_STATUS_REQ_TYPE => {
+                // A server's is what the ClientHello asked for (`s->ext.status_type`, reset at
+                // each handshake's start): a certificate callback asks it whether to staple.
+                let server_type = st
+                    .server
+                    .then(|| st.drv.tls.as_deref().map(|c| c.handshake().sh.status_type))
+                    .flatten();
+                c_long::from(server_type.unwrap_or(st.status_type))
+            }
             SSL_CTRL_SET_TLSEXT_STATUS_REQ_TYPE => {
                 st.status_type = c_int::try_from(larg).unwrap_or(-1);
                 1
