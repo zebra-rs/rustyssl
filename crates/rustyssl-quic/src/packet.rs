@@ -258,7 +258,9 @@ pub struct Keys {
 
 impl core::fmt::Debug for Keys {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("Keys").field("suite", &self.suite).finish_non_exhaustive()
+        f.debug_struct("Keys")
+            .field("suite", &self.suite)
+            .finish_non_exhaustive()
     }
 }
 
@@ -272,7 +274,15 @@ pub fn derive_key_material(
     secret: &[u8],
 ) -> Result<(Secret, Secret, Secret)> {
     let e = |_| Error::internal("key derivation");
-    let key = expand_label(p, suite.hash, secret, b"quic key", &[], suite.aead.key_len()).map_err(e)?;
+    let key = expand_label(
+        p,
+        suite.hash,
+        secret,
+        b"quic key",
+        &[],
+        suite.aead.key_len(),
+    )
+    .map_err(e)?;
     let iv = expand_label(p, suite.hash, secret, b"quic iv", &[], 12).map_err(e)?;
     let hp = expand_label(p, suite.hash, secret, b"quic hp", &[], suite.hp.key_len()).map_err(e)?;
     Ok((key, iv, hp))
@@ -315,10 +325,17 @@ impl Keys {
     pub fn next_phase(&self, p: &dyn Provider) -> Result<Self> {
         let e = |_| Error::internal("key update");
         let s = &self.suite;
-        let next = expand_label(p, s.hash, self.secret.bytes(), b"quic ku", &[], s.hash.len())
-            .map_err(e)?;
-        let key = expand_label(p, s.hash, next.bytes(), b"quic key", &[], s.aead.key_len())
-            .map_err(e)?;
+        let next = expand_label(
+            p,
+            s.hash,
+            self.secret.bytes(),
+            b"quic ku",
+            &[],
+            s.hash.len(),
+        )
+        .map_err(e)?;
+        let key =
+            expand_label(p, s.hash, next.bytes(), b"quic key", &[], s.aead.key_len()).map_err(e)?;
         let iv = expand_label(p, s.hash, next.bytes(), b"quic iv", &[], 12).map_err(e)?;
         Ok(Self {
             suite: self.suite,
@@ -348,8 +365,10 @@ impl Keys {
 pub fn initial_secrets(p: &dyn Provider, dcid: &[u8]) -> Result<(Secret, Secret)> {
     let e = |_| Error::internal("initial secrets");
     let initial = hkdf_extract(p, HashAlg::Sha256, &INITIAL_SALT_V1, dcid).map_err(e)?;
-    let client = expand_label(p, HashAlg::Sha256, initial.bytes(), b"client in", &[], 32).map_err(e)?;
-    let server = expand_label(p, HashAlg::Sha256, initial.bytes(), b"server in", &[], 32).map_err(e)?;
+    let client =
+        expand_label(p, HashAlg::Sha256, initial.bytes(), b"client in", &[], 32).map_err(e)?;
+    let server =
+        expand_label(p, HashAlg::Sha256, initial.bytes(), b"server in", &[], 32).map_err(e)?;
     Ok((client, server))
 }
 
@@ -430,7 +449,9 @@ pub fn remove_header_protection(
         .ok_or_else(bad)?
         .try_into()
         .map_err(|_| bad())?;
-    let mask = hp.mask(sample).map_err(|_| Error::internal("header protection"))?;
+    let mask = hp
+        .mask(sample)
+        .map_err(|_| Error::internal("header protection"))?;
     let [m0, m1, m2, m3, m4] = mask;
     let first = *pkt.first().ok_or_else(bad)?;
     let first = if first & 0x80 != 0 {
@@ -512,7 +533,8 @@ pub fn header_len(o: &Outgoing<'_>, payload_len: usize) -> usize {
         return 1usize.saturating_add(o.dcid.len()).saturating_add(o.pn_len);
     }
     let length = o.pn_len.saturating_add(payload_len).saturating_add(TAG_LEN);
-    let length_len = crate::wire::varint_len(u64::try_from(length).unwrap_or(u64::MAX)).unwrap_or(8);
+    let length_len =
+        crate::wire::varint_len(u64::try_from(length).unwrap_or(u64::MAX)).unwrap_or(8);
     let mut n = 1usize
         .saturating_add(4)
         .saturating_add(1)
@@ -550,7 +572,10 @@ pub fn protect(keys: &mut Keys, o: &Outgoing<'_>, payload: &[u8], out: &mut Vec<
         out.push(u8::try_from(o.scid.len()).map_err(|_| Error::internal("cid"))?);
         out.extend_from_slice(o.scid.as_bytes());
         if o.ty == PacketType::Initial {
-            put_varint(out, u64::try_from(o.token.len()).map_err(|_| Error::internal("token"))?)?;
+            put_varint(
+                out,
+                u64::try_from(o.token.len()).map_err(|_| Error::internal("token"))?,
+            )?;
             out.extend_from_slice(o.token);
         }
         let length = o
@@ -611,7 +636,9 @@ pub fn retry_tag(p: &dyn Provider, odcid: &ConnId, retry: &[u8]) -> Result<[u8; 
     let mut tag = Vec::new();
     aead.seal(&RETRY_NONCE_V1, &aad, &mut tag)
         .map_err(|_| Error::internal("retry tag"))?;
-    tag.as_slice().try_into().map_err(|_| Error::internal("retry tag"))
+    tag.as_slice()
+        .try_into()
+        .map_err(|_| Error::internal("retry tag"))
 }
 
 /// Whether a received Retry packet's tag verifies (compared in constant time).

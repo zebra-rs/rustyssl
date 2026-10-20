@@ -140,8 +140,9 @@ fn rfc9001_a5_chacha20_short_header() {
     assert_eq!(opened.payload, [0x01]);
     assert!(!opened.key_phase);
     // The key update secret ("quic ku").
-    let next = rustyssl_tls::keysched::expand_label(&p, HashAlg::Sha256, &secret, b"quic ku", &[], 32)
-        .unwrap();
+    let next =
+        rustyssl_tls::keysched::expand_label(&p, HashAlg::Sha256, &secret, b"quic ku", &[], 32)
+            .unwrap();
     assert_eq!(
         next.bytes(),
         hex("1223504755036d556342ee9361d253421a826c9ecdf3c7148684b36b714881f9")
@@ -205,13 +206,19 @@ fn protect_round_trips_and_key_phases() {
             *bad.last_mut().unwrap() ^= 1;
             let (loc, _) = locate(&bad, short_len).unwrap();
             let mut rx = Keys::new(&p, suite, &secret).unwrap();
-            assert_eq!(unprotect(&mut rx, loc.bytes, loc.pn_offset, None).unwrap(), None);
+            assert_eq!(
+                unprotect(&mut rx, loc.bytes, loc.pn_offset, None).unwrap(),
+                None
+            );
         }
     }
     // The next phase decrypts what the next phase encrypts, and not the old one's.
     let k0 = Keys::new(&p, suite, &secret).unwrap();
     let mut k1 = k0.next_phase(&p).unwrap();
-    let mut rx1 = Keys::new(&p, suite, &secret).unwrap().next_phase(&p).unwrap();
+    let mut rx1 = Keys::new(&p, suite, &secret)
+        .unwrap()
+        .next_phase(&p)
+        .unwrap();
     let o = Outgoing {
         ty: PacketType::OneRtt,
         dcid: &dcid,
@@ -224,9 +231,17 @@ fn protect_round_trips_and_key_phases() {
     let mut out = Vec::new();
     protect(&mut k1, &o, b"\x01\x01\x01\x01", &mut out).unwrap();
     let (loc, _) = locate(&out, 4).unwrap();
-    assert!(unprotect(&mut rx1, loc.bytes, loc.pn_offset, Some(8)).unwrap().is_some());
+    assert!(
+        unprotect(&mut rx1, loc.bytes, loc.pn_offset, Some(8))
+            .unwrap()
+            .is_some()
+    );
     let mut rx0 = Keys::new(&p, suite, &secret).unwrap();
-    assert!(unprotect(&mut rx0, loc.bytes, loc.pn_offset, Some(8)).unwrap().is_none());
+    assert!(
+        unprotect(&mut rx0, loc.bytes, loc.pn_offset, Some(8))
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[test]
@@ -236,7 +251,11 @@ fn coalesced_datagrams_and_version_negotiation() {
     let dcid = ConnId::new(&[9; 8]).unwrap();
     let scid = ConnId::new(&[8; 8]).unwrap();
     let mut dgram = Vec::new();
-    for ty in [PacketType::Initial, PacketType::Handshake, PacketType::OneRtt] {
+    for ty in [
+        PacketType::Initial,
+        PacketType::Handshake,
+        PacketType::OneRtt,
+    ] {
         let mut k = Keys::new(&p, suite, &[1; 32]).unwrap();
         let o = Outgoing {
             ty,
@@ -252,7 +271,14 @@ fn coalesced_datagrams_and_version_negotiation() {
     let (a, rest) = locate(&dgram, 8).unwrap();
     let (b, rest) = locate(rest, 8).unwrap();
     let (c, rest) = locate(rest, 8).unwrap();
-    assert_eq!((a.ty, b.ty, c.ty), (PacketType::Initial, PacketType::Handshake, PacketType::OneRtt));
+    assert_eq!(
+        (a.ty, b.ty, c.ty),
+        (
+            PacketType::Initial,
+            PacketType::Handshake,
+            PacketType::OneRtt
+        )
+    );
     assert!(rest.is_empty());
 
     // OpenSSL's test's version negotiation packet.

@@ -10,8 +10,8 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::arithmetic_side_effects)]
 
-// pub mod ackm;
-// pub mod cc;
+pub mod ackm;
+pub mod cc;
 // pub mod channel;
 // pub mod cid;
 pub mod crypto;

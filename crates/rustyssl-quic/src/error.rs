@@ -34,13 +34,21 @@ impl Error {
     /// PROTOCOL_VIOLATION.
     #[must_use]
     pub fn protocol(frame_type: u64, reason: &'static str) -> Self {
-        Self::new(rustyssl_abi::OSSL_QUIC_ERR_PROTOCOL_VIOLATION, frame_type, reason)
+        Self::new(
+            rustyssl_abi::OSSL_QUIC_ERR_PROTOCOL_VIOLATION,
+            frame_type,
+            reason,
+        )
     }
 
     /// FRAME_ENCODING_ERROR for a frame that doesn't decode.
     #[must_use]
     pub fn frame_encoding(frame_type: u64) -> Self {
-        Self::new(rustyssl_abi::OSSL_QUIC_ERR_FRAME_ENCODING_ERROR, frame_type, "decode error")
+        Self::new(
+            rustyssl_abi::OSSL_QUIC_ERR_FRAME_ENCODING_ERROR,
+            frame_type,
+            "decode error",
+        )
     }
 
     /// INTERNAL_ERROR.
@@ -52,14 +60,19 @@ impl Error {
     /// TRANSPORT_PARAMETER_ERROR.
     #[must_use]
     pub fn transport_param(reason: &'static str) -> Self {
-        Self::new(rustyssl_abi::OSSL_QUIC_ERR_TRANSPORT_PARAMETER_ERROR, 0, reason)
+        Self::new(
+            rustyssl_abi::OSSL_QUIC_ERR_TRANSPORT_PARAMETER_ERROR,
+            0,
+            reason,
+        )
     }
 
     /// CRYPTO_ERROR carrying TLS alert `alert` (RFC 9001, section 4.8).
     #[must_use]
     pub fn crypto(alert: u8, reason: &'static str) -> Self {
         Self {
-            code: code(rustyssl_abi::OSSL_QUIC_ERR_CRYPTO_ERR_BEGIN).saturating_add(u64::from(alert)),
+            code: code(rustyssl_abi::OSSL_QUIC_ERR_CRYPTO_ERR_BEGIN)
+                .saturating_add(u64::from(alert)),
             frame_type: 0,
             reason,
         }
@@ -68,7 +81,11 @@ impl Error {
 
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "QUIC error {:#x} (frame {:#x}): {}", self.code, self.frame_type, self.reason)
+        write!(
+            f,
+            "QUIC error {:#x} (frame {:#x}): {}",
+            self.code, self.frame_type, self.reason
+        )
     }
 }
 

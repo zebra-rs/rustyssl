@@ -425,7 +425,11 @@ pub fn decode_frame<'a>(r: &mut Reader<'a>) -> Result<Frame<'a>> {
         }
         t::RETIRE_CONNECTION_ID => Frame::RetireConnectionId(v(r)?),
         t::PATH_CHALLENGE | t::PATH_RESPONSE => {
-            let d: [u8; 8] = r.take(8).map_err(|_| bad())?.try_into().map_err(|_| bad())?;
+            let d: [u8; 8] = r
+                .take(8)
+                .map_err(|_| bad())?
+                .try_into()
+                .map_err(|_| bad())?;
             if ty == t::PATH_CHALLENGE {
                 Frame::PathChallenge(d)
             } else {
@@ -480,7 +484,10 @@ pub fn encode_frame(out: &mut Vec<u8>, f: &Frame<'_>) -> Result<()> {
             put_varint(out, count)?;
             put_varint(
                 out,
-                first.end.checked_sub(first.start).ok_or_else(|| Error::internal("ACK range"))?,
+                first
+                    .end
+                    .checked_sub(first.start)
+                    .ok_or_else(|| Error::internal("ACK range"))?,
             )?;
             let mut prev_start = first.start;
             for rg in ranges.iter().skip(1) {
@@ -491,7 +498,9 @@ pub fn encode_frame(out: &mut Vec<u8>, f: &Frame<'_>) -> Result<()> {
                 put_varint(out, gap)?;
                 put_varint(
                     out,
-                    rg.end.checked_sub(rg.start).ok_or_else(|| Error::internal("ACK range"))?,
+                    rg.end
+                        .checked_sub(rg.start)
+                        .ok_or_else(|| Error::internal("ACK range"))?,
                 )?;
                 prev_start = rg.start;
             }
@@ -833,7 +842,12 @@ impl TransportParams {
         if let Some(c) = &self.original_dcid {
             put_bytes(&mut out, tparam::ORIGINAL_DCID, c.as_bytes())?;
         }
-        put_int(&mut out, tparam::MAX_IDLE_TIMEOUT, self.max_idle_timeout, d.max_idle_timeout)?;
+        put_int(
+            &mut out,
+            tparam::MAX_IDLE_TIMEOUT,
+            self.max_idle_timeout,
+            d.max_idle_timeout,
+        )?;
         if let Some(t) = &self.stateless_reset_token {
             put_bytes(&mut out, tparam::STATELESS_RESET_TOKEN, t)?;
         }
@@ -862,10 +876,30 @@ impl TransportParams {
             self.initial_max_stream_data_uni,
             0,
         )?;
-        put_int(&mut out, tparam::INITIAL_MAX_STREAMS_BIDI, self.initial_max_streams_bidi, 0)?;
-        put_int(&mut out, tparam::INITIAL_MAX_STREAMS_UNI, self.initial_max_streams_uni, 0)?;
-        put_int(&mut out, tparam::ACK_DELAY_EXPONENT, self.ack_delay_exponent, d.ack_delay_exponent)?;
-        put_int(&mut out, tparam::MAX_ACK_DELAY, self.max_ack_delay, d.max_ack_delay)?;
+        put_int(
+            &mut out,
+            tparam::INITIAL_MAX_STREAMS_BIDI,
+            self.initial_max_streams_bidi,
+            0,
+        )?;
+        put_int(
+            &mut out,
+            tparam::INITIAL_MAX_STREAMS_UNI,
+            self.initial_max_streams_uni,
+            0,
+        )?;
+        put_int(
+            &mut out,
+            tparam::ACK_DELAY_EXPONENT,
+            self.ack_delay_exponent,
+            d.ack_delay_exponent,
+        )?;
+        put_int(
+            &mut out,
+            tparam::MAX_ACK_DELAY,
+            self.max_ack_delay,
+            d.max_ack_delay,
+        )?;
         if self.disable_active_migration {
             put_varint(&mut out, tparam::DISABLE_ACTIVE_MIGRATION)?;
             put_varint(&mut out, 0)?;
@@ -1024,10 +1058,14 @@ impl TransportParams {
             }
         }
         if p.initial_scid.is_none() {
-            return Err(Error::transport_param("initial_source_connection_id missing"));
+            return Err(Error::transport_param(
+                "initial_source_connection_id missing",
+            ));
         }
         if from_server && p.original_dcid.is_none() {
-            return Err(Error::transport_param("original_destination_connection_id missing"));
+            return Err(Error::transport_param(
+                "original_destination_connection_id missing",
+            ));
         }
         Ok(p)
     }
@@ -1049,7 +1087,10 @@ mod tests {
     fn rfc9000_appendix_a1_varints() {
         // RFC 9000, Appendix A.1's examples.
         let cases: &[(&[u8], u64)] = &[
-            (&[0xc2, 0x19, 0x7c, 0x5e, 0xff, 0x14, 0xe8, 0x8c], 151_288_809_941_952_652),
+            (
+                &[0xc2, 0x19, 0x7c, 0x5e, 0xff, 0x14, 0xe8, 0x8c],
+                151_288_809_941_952_652,
+            ),
             (&[0x9d, 0x7f, 0x3e, 0x7d], 494_878_333),
             (&[0x7b, 0xbd], 15_293),
             (&[0x25], 37),
@@ -1083,7 +1124,10 @@ mod tests {
             Frame::Ping,
             Frame::Ack {
                 ranges: vec![
-                    AckRange { start: 90, end: 100 },
+                    AckRange {
+                        start: 90,
+                        end: 100,
+                    },
                     AckRange { start: 50, end: 80 },
                     AckRange { start: 0, end: 10 },
                 ],
@@ -1093,21 +1137,51 @@ mod tests {
             Frame::Ack {
                 ranges: vec![AckRange { start: 3, end: 3 }],
                 ack_delay: 0,
-                ecn: Some(EcnCounts { ect0: 1, ect1: 2, ce: 3 }),
+                ecn: Some(EcnCounts {
+                    ect0: 1,
+                    ect1: 2,
+                    ce: 3,
+                }),
             },
-            Frame::ResetStream { id: 4, code: 5, final_size: 6 },
+            Frame::ResetStream {
+                id: 4,
+                code: 5,
+                final_size: 6,
+            },
             Frame::StopSending { id: 8, code: 9 },
-            Frame::Crypto { offset: 1000, data: b"hello" },
+            Frame::Crypto {
+                offset: 1000,
+                data: b"hello",
+            },
             Frame::NewToken { token: b"tok" },
-            Frame::Stream { id: 0, offset: 0, data: b"abc", fin: false },
-            Frame::Stream { id: 3, offset: 77, data: b"", fin: true },
+            Frame::Stream {
+                id: 0,
+                offset: 0,
+                data: b"abc",
+                fin: false,
+            },
+            Frame::Stream {
+                id: 3,
+                offset: 77,
+                data: b"",
+                fin: true,
+            },
             Frame::MaxData(1 << 40),
             Frame::MaxStreamData { id: 1, max: 2 },
-            Frame::MaxStreams { bidi: true, max: 100 },
-            Frame::MaxStreams { bidi: false, max: 0 },
+            Frame::MaxStreams {
+                bidi: true,
+                max: 100,
+            },
+            Frame::MaxStreams {
+                bidi: false,
+                max: 0,
+            },
             Frame::DataBlocked(9),
             Frame::StreamDataBlocked { id: 1, limit: 2 },
-            Frame::StreamsBlocked { bidi: false, limit: 3 },
+            Frame::StreamsBlocked {
+                bidi: false,
+                limit: 3,
+            },
             Frame::NewConnectionId {
                 seq: 2,
                 retire_prior_to: 1,
@@ -1117,8 +1191,18 @@ mod tests {
             Frame::RetireConnectionId(1),
             Frame::PathChallenge([1; 8]),
             Frame::PathResponse([2; 8]),
-            Frame::ConnectionClose { app: false, code: 10, frame_type: 6, reason: b"why" },
-            Frame::ConnectionClose { app: true, code: 0, frame_type: 0, reason: b"" },
+            Frame::ConnectionClose {
+                app: false,
+                code: 10,
+                frame_type: 6,
+                reason: b"why",
+            },
+            Frame::ConnectionClose {
+                app: true,
+                code: 0,
+                frame_type: 0,
+                reason: b"",
+            },
             Frame::HandshakeDone,
         ];
         for f in &frames {
@@ -1185,7 +1269,10 @@ mod tests {
         dup.extend_from_slice(&[0x04, 0x01, 0x05]);
         assert!(TransportParams::decode(&dup, true).is_err());
         // initial_source_connection_id is required.
-        let q = TransportParams { initial_scid: None, ..p.clone() };
+        let q = TransportParams {
+            initial_scid: None,
+            ..p.clone()
+        };
         assert!(TransportParams::decode(&q.encode().unwrap(), true).is_err());
         // An ack_delay_exponent above 20.
         let mut bad = p.encode().unwrap();

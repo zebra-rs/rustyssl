@@ -17,7 +17,9 @@ impl HeaderProtection for Hp {
     fn mask(&self, sample: &[u8; 16]) -> Result<[u8; 5]> {
         let mut block = *sample;
         match self {
-            Self::Aes(c) => c.encrypt_blocks(&mut block).map_err(|_| Error::internal())?,
+            Self::Aes(c) => c
+                .encrypt_blocks(&mut block)
+                .map_err(|_| Error::internal())?,
             Self::ChaCha(key) => {
                 // RFC 9001, section 5.4.4: the sample's first four octets are the block
                 // counter and the rest the nonce, the same words as OpenSSL's 16-octet IV.

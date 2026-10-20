@@ -459,6 +459,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustyssl-quic"
+version = "0.1.0"
+dependencies = [
+ "rustyssl-abi",
+ "rustyssl-crypto",
+ "rustyssl-tls",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
 name = "rustyssl-tls"
 version = "0.1.0"
 dependencies = [
