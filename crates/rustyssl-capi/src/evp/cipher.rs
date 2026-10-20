@@ -363,16 +363,12 @@ fn cache_constants(c: &mut Cipher) -> bool {
     if !ok {
         return false;
     }
-    let (Ok(b), Ok(i), Ok(k)) = (
-        c_int::try_from(blksz),
-        c_int::try_from(ivlen),
-        c_int::try_from(keylen),
-    ) else {
-        return false;
-    };
-    c.block_size = AtomicI32::new(b);
-    c.iv_len = AtomicI32::new(i);
-    c.key_len = AtomicI32::new(k);
+    // OpenSSL stores each as `(int)size`, so a provider's out-of-range size reads back
+    // negative (upstream's pbetest relies on a `SIZE_MAX` IV length reading as -1); every user
+    // of these treats a negative length as an error.
+    c.block_size = AtomicI32::new(c_int_of(blksz));
+    c.iv_len = AtomicI32::new(c_int_of(ivlen));
+    c.key_len = AtomicI32::new(c_int_of(keylen));
     let mut flags = c_ulong::from(mode);
     for (on, f) in [
         (aead != 0, EVP_CIPH_FLAG_AEAD_CIPHER),
@@ -398,6 +394,12 @@ fn cache_constants(c: &mut Cipher) -> bool {
     }
     c.flags = AtomicU64::new(flags);
     true
+}
+
+/// C's `(int)size` conversion: the low 32 bits, as two's complement.
+fn c_int_of(size: usize) -> c_int {
+    let low = u32::try_from(size & 0xffff_ffff).unwrap_or(u32::MAX);
+    c_int::from_ne_bytes(low.to_ne_bytes())
 }
 
 /// `set_legacy_nid` over each of the algorithm's names: the NID of the legacy cipher any of

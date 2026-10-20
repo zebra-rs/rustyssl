@@ -9,6 +9,7 @@
  * Built once against the vendored headers, then run against the reference OpenSSL and against
  * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4).
  */
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -193,8 +194,31 @@ static const OSSL_DISPATCH test_cipher[] = {
     { OSSL_FUNC_CIPHER_GETTABLE_CTX_PARAMS, (void (*)(void))t_gettable_ctx },
     OSSL_DISPATCH_END
 };
+/* Sizes out of an int's range, as upstream's pbetest gives: each reads back as C's `(int)size`. */
+static int bad_get_params(OSSL_PARAM params[])
+{
+    OSSL_PARAM *p;
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_MODE)) != NULL)
+        OSSL_PARAM_set_uint(p, EVP_CIPH_CBC_MODE);
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_KEYLEN)) != NULL)
+        OSSL_PARAM_set_size_t(p, ((size_t)1 << 32) + 32);
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IVLEN)) != NULL)
+        OSSL_PARAM_set_size_t(p, SIZE_MAX);
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_BLOCK_SIZE)) != NULL)
+        OSSL_PARAM_set_size_t(p, 16);
+    return 1;
+}
+static const OSSL_DISPATCH bad_cipher[] = {
+    { OSSL_FUNC_CIPHER_NEWCTX, (void (*)(void))t_newctx },
+    { OSSL_FUNC_CIPHER_FREECTX, (void (*)(void))t_freectx },
+    { OSSL_FUNC_CIPHER_CIPHER, (void (*)(void))t_update },
+    { OSSL_FUNC_CIPHER_GET_PARAMS, (void (*)(void))bad_get_params },
+    OSSL_DISPATCH_END
+};
 static const OSSL_ALGORITHM test_ciphers[] = {
     { "TEST-ALGID", "provider=algtest", test_cipher, NULL },
+    { "TEST-BAD-SIZES", "provider=algtest", bad_cipher, NULL },
     { NULL, NULL, NULL, NULL }
 };
 static const OSSL_ALGORITHM *test_query(void *provctx, int operation_id, int *no_cache)
@@ -418,6 +442,19 @@ static void own_provider(void)
     X509_ALGOR_free(alg);
     ASN1_TYPE_free(t);
     EVP_CIPHER_CTX_free(ctx);
+    EVP_CIPHER_free(c);
+
+    /* Out-of-range sizes are fetched, reading back negative or cut; scrypt PBES2 refuses. */
+    c = EVP_CIPHER_fetch(lib, "TEST-BAD-SIZES", NULL);
+    check(c != NULL, "fetched with out-of-range sizes");
+    printf("  iv %d, key %d, block %d\n", EVP_CIPHER_get_iv_length(c), EVP_CIPHER_get_key_length(c),
+           EVP_CIPHER_get_block_size(c));
+    check(EVP_CIPHER_get_iv_length(c) == -1 && EVP_CIPHER_get_key_length(c) == 32,
+          "C's (int) conversion of the sizes");
+    alg = PKCS5_pbe2_set_scrypt(c, data, 16, iv, 1024, 8, 1);
+    check(alg == NULL, "PKCS5_pbe2_set_scrypt: a negative IV length fails");
+    X509_ALGOR_free(alg);
+    errors();
     EVP_CIPHER_free(c);
     OSSL_PROVIDER_unload(prov);
     OSSL_LIB_CTX_free(lib);
