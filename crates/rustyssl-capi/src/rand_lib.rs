@@ -15,7 +15,8 @@
 //! and nonces of the DRBGs without a parent (the core's `get_user_entropy` and
 //! `get_user_nonce`).
 //!
-//! ENGINEs aren't supported: `RAND_set_rand_engine` takes only NULL (no ENGINE can be had).
+//! Until a method is set, the first use picks the default RAND engine's method if there is
+//! one (`ENGINE_set_default_RAND`), else the library's, and keeps it.
 
 use core::cell::{RefCell, UnsafeCell};
 use core::ffi::{CStr, c_char, c_double, c_int, c_uchar, c_uint, c_void};
@@ -34,6 +35,8 @@ use rustyssl_abi::{
     RAND_R_FUNC_NOT_IMPLEMENTED, RAND_R_UNABLE_TO_CREATE_DRBG, RAND_R_UNABLE_TO_FETCH_DRBG,
 };
 
+use crate::engine::table::ENGINE_get_default_RAND;
+use crate::engine::{ENGINE_finish, ENGINE_get_RAND, ENGINE_init};
 use crate::err::{self, ERR_pop_to_mark, ERR_set_mark};
 use crate::evp::rand::{
     EVP_RAND_CTX_free, EVP_RAND_CTX_new, EVP_RAND_CTX_settable_params, EVP_RAND_CTX_up_ref,
@@ -903,17 +906,68 @@ static OPENSSL_METH: MethodCell = MethodCell(UnsafeCell::new(RAND_METHOD {
     status: Some(drbg_status),
 }));
 
-/// `default_RAND_meth`: the application's method, or NULL for the library's.
+/// `default_RAND_meth`: the method in force, NULL until the first use picks one.
 static DEFAULT_METH: AtomicPtr<RAND_METHOD> = AtomicPtr::new(ptr::null_mut());
+
+/// `funct_ref`: the engine whose method is in force, with its functional reference.
+static FUNCT_REF: Mutex<Ptr<ENGINE>> = Mutex::new(Ptr(ptr::null_mut()));
+
+/// Makes `meth` the method in force, from `engine` (with its functional reference, or NULL),
+/// finishing the engine before it.
+fn set_method(meth: *const RAND_METHOD, engine: *mut ENGINE) {
+    let old = {
+        let mut f = FUNCT_REF.lock().unwrap_or_else(PoisonError::into_inner);
+        DEFAULT_METH.store(meth.cast_mut(), Ordering::Release);
+        core::mem::replace(&mut *f, Ptr(engine))
+    };
+    if !old.0.is_null() {
+        // SAFETY: the reference the method's engine held; no lock is held.
+        unsafe { ENGINE_finish(old.0) };
+    }
+}
 
 fn openssl_meth() -> *mut RAND_METHOD {
     OPENSSL_METH.0.get()
 }
 
-/// `RAND_get_rand_method`'s result: the method in force.
+/// `RAND_get_rand_method`'s result: the method in force, picked on the first use: the default
+/// RAND engine's, else the library's.
 fn method() -> *const RAND_METHOD {
     let m = DEFAULT_METH.load(Ordering::Acquire);
-    if m.is_null() { openssl_meth() } else { m }
+    if !m.is_null() {
+        return m;
+    }
+    // SAFETY: no preconditions; a functional reference, or NULL.
+    let e = unsafe { ENGINE_get_default_RAND() };
+    // SAFETY: NULL or the live engine.
+    let from_engine = if e.is_null() {
+        ptr::null()
+    } else {
+        unsafe { ENGINE_get_RAND(e) }
+    };
+    let (meth, engine) = if from_engine.is_null() {
+        if !e.is_null() {
+            // SAFETY: the reference taken above.
+            unsafe { ENGINE_finish(e) };
+        }
+        (openssl_meth().cast_const(), ptr::null_mut())
+    } else {
+        (from_engine, e)
+    };
+    let mut f = FUNCT_REF.lock().unwrap_or_else(PoisonError::into_inner);
+    let current = DEFAULT_METH.load(Ordering::Acquire);
+    if current.is_null() {
+        DEFAULT_METH.store(meth.cast_mut(), Ordering::Release);
+        *f = Ptr(engine);
+        return meth;
+    }
+    // Another thread picked first.
+    drop(f);
+    if !engine.is_null() {
+        // SAFETY: the reference taken above.
+        unsafe { ENGINE_finish(engine) };
+    }
+    current
 }
 
 /// The method in force, if it isn't the library's.
@@ -964,36 +1018,51 @@ ffi_export! {
     pub unsafe extern "C" fn RAND_set_rand_method(meth: *const RAND_METHOD) -> c_int
     where failure = 0, library = ERR_LIB_RAND
     {
-        DEFAULT_METH.store(meth.cast_mut(), Ordering::Release);
+        set_method(meth, ptr::null_mut());
         1
     }
 }
 
 ffi_export! {
-    /// With NULL, goes back to the library's method and returns 1. An ENGINE fails (0): none
-    /// can be had, as rustyssl has no ENGINE support.
+    /// Makes `engine`'s RAND method the one in force, keeping a functional reference to it;
+    /// with NULL, the next use picks again. Returns 1, or 0 if the engine can't be initialised
+    /// or has no RAND method.
     ///
     /// # Safety
-    /// `engine` is NULL.
+    /// `engine` is NULL or a live engine.
     pub unsafe extern "C" fn RAND_set_rand_engine(engine: *mut ENGINE) -> c_int
     where failure = 0, library = ERR_LIB_RAND
     {
+        let mut meth = ptr::null();
         if !engine.is_null() {
-            return 0;
+            // SAFETY: the caller's guarantee.
+            if unsafe { ENGINE_init(engine) } == 0 {
+                return 0;
+            }
+            // SAFETY: as above.
+            meth = unsafe { ENGINE_get_RAND(engine) };
+            if meth.is_null() {
+                // SAFETY: the reference taken above.
+                unsafe { ENGINE_finish(engine) };
+                return 0;
+            }
         }
-        DEFAULT_METH.store(ptr::null_mut(), Ordering::Release);
+        set_method(meth, engine);
         1
     }
 }
 
-/// `ossl_rand_cleanup_int`: the method's `cleanup`, then the library's method again; and the
+/// `ossl_rand_cleanup_int`: the method's `cleanup`, then no method (the next use picks again); and the
 /// default context's generators freed (`OPENSSL_cleanup`).
 pub(crate) fn cleanup() {
-    if let Some(cleanup) = any_method().and_then(|m| m.cleanup) {
+    // The method in force, without picking one.
+    // SAFETY: NULL, the library's static table, or a method kept valid while set.
+    let meth = unsafe { DEFAULT_METH.load(Ordering::Acquire).as_ref() };
+    if let Some(cleanup) = meth.and_then(|m| m.cleanup) {
         // SAFETY: the method's function.
         unsafe { cleanup() };
     }
-    DEFAULT_METH.store(ptr::null_mut(), Ordering::Release);
+    set_method(ptr::null(), ptr::null_mut());
     // SAFETY: the global context is never freed.
     if let Some(g) = unsafe { context(libctx::global()) } {
         let (primary, seed) = {
