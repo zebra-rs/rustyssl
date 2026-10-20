@@ -5841,13 +5841,60 @@ with disjoint files: A (the seam and 10.3), B (the transport), then C (10.2's AP
   streams each way, `disable_active_migration`, no 0-RTT. capi's `ssl/quic_provider.rs` gives
   the transport header protection over EVP. Our own bounds are in DEVIATIONS.md. The seam
   adapter (the trait over fork A's `Connection`) comes with 10.2.
-- [ ] **10.2 The OpenSSL QUIC API:**
+- [x] **10.2 The OpenSSL QUIC API:**
   - the client methods (3.2), the server and listener API (3.5)
   - the stream API (`SSL_new_stream`, `accept_stream`, `stream_conclude`, `stream_reset`,
     default stream mode, incoming stream policy)
   - `SSL_handle_events`, `get_event_timeout`, blocking and non-blocking, thread-assisted mode
   - `SSL_poll` and `SSL_get_value_*`/`SSL_set_value_*` (3.3)
   - `BIO_s_dgram_pair`, `BIO_sendmmsg`/`BIO_recvmmsg`
+
+  Done (2026-10-20, fork C, branch `quic-c`); libssl is at 603 of 603 exports.
+  - capi `ssl/quic.rs` (objects, engines, ticks), `ssl/quic/hs.rs` (the handshake layer),
+    `ssl/quic/api.rs` (`quic_impl.c`'s functions), `ssl/quic/poll.rs` (`SSL_poll`,
+    `SSL_inject_net_dgram`). A QUIC object is an `SSL` handle with a kind (connection, stream,
+    listener, domain). A connection is its own handshake layer, as OpenSSL's `qc->tls`: its TLS
+    state runs in QUIC mode through fork A's 10.3 path, with the transport behind an internal
+    sink in place of the six callbacks, so every TLS getter and callback works unchanged. The
+    driver runs between ticks with no lock held; the transport only queues (ADR 0006 section 3).
+  - One mutex per engine (a client connection's or a listener's port). A domain's listeners
+    each keep their own engine; the domain ticks them all.
+  - The network BIOs belong to the port. OpenSSL's network behavior is reproduced: source
+    addresses asked of every BIO, transient failures retried, a permanent failure failing the
+    port (`SSL_ERROR_SYSCALL`, the BIO's error restored on `PROTOCOL_IS_SHUTDOWN`).
+  - Blocking calls poll the socket and timers with no lock held; the thread method's assist
+    thread ticks at the timers and is joined when the connection is freed.
+  - The transport gained, for the API: packets deferred until their keys arrive (32, as
+    OpenSSL's QRX), the server's transport parameters given before its handshake starts,
+    outgoing connections on a listening port (`SSL_new_from_listener`), peeking, accepting by
+    direction, stream counts and buffer statistics, idle timeout values, net errors, and the
+    transport close a shutdown flush ends with.
+  - Libssl's QUIC branches elsewhere: options with QUIC's permitted masks, `SSL_ctrl`, versions,
+    no version bounds on QUIC methods, QUIC's suites only (`SSL_CIPHER_find`,
+    `SSL_get1_supported_ciphers`, TLS 1.3-only lists), datagram BIOs from `SSL_set_fd`, and the
+    TLS-only setters that do nothing on QUIC objects.
+  - Tests: `tests/c/quic_api.c` (objects, a connection over `BIO_s_dgram_pair`, a validating
+    listener, `SSL_new_from_listener`, streams both ways, states, values, `SSL_poll`, injected
+    datagrams, the close) and `tests/c/quic_blocking.c` (a blocking listener thread and a
+    thread-assisted blocking client over UDP sockets), identical on 3.6.5 and rustyssl.
+    `test-openssl-suite --ssl`: `quicapitest` passes all 16 eligible subtests and
+    `ssl_ctx_test` 25 of 25; `quic_multistream_test` is internal. `test-openssl-suite --all`:
+    the 27 QUIC recipes run (6 eligible subtests pass; the rest import OpenSSL's internals).
+    `test-interop --peer quic` (`tests/interop/quic.txt`): OpenSSL's guide QUIC demos and the
+    reference's `s_client -quic`, 13 of 13 cases in all four pairings (the reference's
+    `s_server` has no QUIC mode).
+  - Fork D's suites, with quic-d merged on a scratch branch: `test-quic-interop` passes every
+    case on rustyssl wherever it passes on the reference (ngtcp2, quiche, quic-go; both roles),
+    and `test-consumers curl-h3` passes 12 of 12 on both. Two bugs they found, each with a test
+    in `quic_api.c`: freeing a concluded stream reset it, cutting large transfers short
+    (`test_large_transfer`), and a stream made before the handshake with
+    `SSL_STREAM_FLAG_ADVANCE` didn't start the connection (`test_streams_before_handshake`,
+    curl's pattern). The http3 case against quic-go sometimes needs a second try on either
+    library: OpenSSL's demo server asserts when quic-go sends its request stream before its
+    control stream.
+  - Decisions (the user's, 2026-10-20, recorded in ADR 0006): the exit's interop is the local
+    `test-quic-interop` driver (fork D); upstream tests that need OpenSSL's internals are
+    excluded as internal.
 - [x] **10.3 Third-party QUIC stack API** (3.5: `SSL_set_quic_tls_cbs` and related), as used
   by ngtcp2 and others. Done (2026-10-20, fork A):
   - The seam: `rustyssl-tls/src/conn/quic.rs` (ADR 0006, section 1). Additions to the ADR's
@@ -5875,9 +5922,12 @@ with disjoint files: A (the seam and 10.3), B (the transport), then C (10.2's AP
     - A second `SSL_set_quic_tls_cbs` returns 0 (the extension is registered); the callbacks
       stay first-wins, as `tls_callbacks_from_dispatch` keeps them (see DEVIATIONS.md).
 
-**Exit:** the quic-interop-runner core cases pass against ngtcp2, quiche, and quic-go. curl
-HTTP/3 works over the OpenSSL QUIC backend. upstream `quicapitest` and
-`quic_multistream_test` pass.
+**Exit:** the quic-interop-runner core cases pass against ngtcp2, quiche, and quic-go (the
+user's decision: by the local `test-quic-interop` driver; the Docker runner is a follow-up).
+curl HTTP/3 works over the OpenSSL QUIC backend. Upstream `quicapitest` and
+`quic_multistream_test` pass where eligible (the user's decision: tests that need OpenSSL's
+internals, including all of `quic_multistream_test` and `quicapitest`'s test-server tests,
+are excluded as internal).
 
 ## Phase 11: The `openssl` command-line tool
 
