@@ -45,6 +45,10 @@ use rustyssl_tls::error::{Error, Result};
 
 use crate::bn::BN_free;
 use crate::bn::conv::BN_bin2bn;
+use crate::engine::ENGINE_finish;
+use crate::engine::table::{
+    ENGINE_get_cipher, ENGINE_get_cipher_engine, ENGINE_get_digest, ENGINE_get_digest_engine,
+};
 use crate::err::{ERR_pop_to_mark, ERR_set_mark};
 use crate::evp::asymcipher::{
     EVP_PKEY_decrypt, EVP_PKEY_decrypt_init, EVP_PKEY_encrypt, EVP_PKEY_encrypt_init,
@@ -642,8 +646,12 @@ impl EvpProvider {
             .ok_or_else(fail)
     }
 
-    /// A message digest by name, fetched.
+    /// A message digest by name: an engine's when one is registered for it (libssl's
+    /// `ssl_evp_md_fetch`, `tls_get_digest_from_engine`), else fetched.
     fn fetch_md(&self, name: &CStr) -> Result<Md> {
+        if let Some(md) = engine_digest(name) {
+            return Ok(Md(md.cast_mut()));
+        }
         // SAFETY: the library context; a NUL-terminated name; the property query.
         let md = unsafe { EVP_MD_fetch(self.libctx(), name.as_ptr(), self.propq()) };
         if md.is_null() {
@@ -1729,6 +1737,47 @@ fn encoded_public(k: &Pkey) -> Result<Vec<u8>> {
     Ok(v)
 }
 
+/// The digest an engine registered for `name`'s NID (`tls_get_digest_from_engine`): libssl
+/// prefers it to a fetched one, so an engine set as the default (`-engine ossltest`) runs the
+/// handshake's hashes. It's the engine's own object: freeing it does nothing.
+fn engine_digest(name: &CStr) -> Option<*const EVP_MD> {
+    // SAFETY: a NUL-terminated name.
+    let nid = unsafe { OBJ_sn2nid(name.as_ptr()) };
+    if nid == rustyssl_abi::NID_undef {
+        return None;
+    }
+    // SAFETY: no preconditions; a functional reference, or NULL.
+    let e = unsafe { ENGINE_get_digest_engine(nid) };
+    if e.is_null() {
+        return None;
+    }
+    // SAFETY: the engine just taken; the NID.
+    let md = unsafe { ENGINE_get_digest(e, nid) };
+    // SAFETY: releases the functional reference taken above.
+    unsafe { ENGINE_finish(e) };
+    (!md.is_null()).then_some(md)
+}
+
+/// The cipher an engine registered for `name`'s NID (`tls_get_cipher_from_engine`), as
+/// [`engine_digest`] for digests.
+fn engine_cipher(name: &CStr) -> Option<*const EVP_CIPHER> {
+    // SAFETY: a NUL-terminated name.
+    let nid = unsafe { OBJ_sn2nid(name.as_ptr()) };
+    if nid == rustyssl_abi::NID_undef {
+        return None;
+    }
+    // SAFETY: no preconditions; a functional reference, or NULL.
+    let e = unsafe { ENGINE_get_cipher_engine(nid) };
+    if e.is_null() {
+        return None;
+    }
+    // SAFETY: the engine just taken; the NID.
+    let c = unsafe { ENGINE_get_cipher(e, nid) };
+    // SAFETY: releases the functional reference taken above.
+    unsafe { ENGINE_finish(e) };
+    (!c.is_null()).then_some(c)
+}
+
 impl Provider for EvpProvider {
     fn hash(&self, alg: HashAlg) -> Result<Box<dyn Hash>> {
         let md = self.fetch_md(hash_name(alg))?;
@@ -1758,8 +1807,13 @@ impl Provider for EvpProvider {
         if key.len() != alg.key_len() {
             return Err(fail());
         }
-        // SAFETY: the library context; a NUL-terminated name; the property query.
-        let c = unsafe { EVP_CIPHER_fetch(self.libctx(), aead_name(alg).as_ptr(), self.propq()) };
+        let c = match engine_cipher(aead_name(alg)) {
+            Some(c) => c.cast_mut(),
+            // SAFETY: the library context; a NUL-terminated name; the property query.
+            None => unsafe {
+                EVP_CIPHER_fetch(self.libctx(), aead_name(alg).as_ptr(), self.propq())
+            },
+        };
         if c.is_null() {
             return Err(fail());
         }
@@ -1782,8 +1836,11 @@ impl Provider for EvpProvider {
         if key.len() != alg.key_len() {
             return Err(fail());
         }
-        // SAFETY: the library context; a NUL-terminated name; the property query.
-        let c = CipherPtr(unsafe { EVP_CIPHER_fetch(self.libctx(), name.as_ptr(), self.propq()) });
+        let c = CipherPtr(match engine_cipher(name) {
+            Some(c) => c.cast_mut(),
+            // SAFETY: the library context; a NUL-terminated name; the property query.
+            None => unsafe { EVP_CIPHER_fetch(self.libctx(), name.as_ptr(), self.propq()) },
+        });
         if c.0.is_null() {
             return Err(fail());
         }
