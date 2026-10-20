@@ -24,7 +24,7 @@ use crate::asn1::string::{ASN1_STRING_set, ASN1_STRING_set0};
 use crate::asn1::tpl::free::ASN1_item_free;
 use crate::asn1::tpl::items::{d2i, i2d, new_free};
 use crate::asn1::tpl::util::ASN1_item_unpack;
-use crate::asn1::tpl::util::{ASN1_item_digest, ASN1_item_pack};
+use crate::asn1::tpl::util::{ASN1_item_pack, item_digest_ex};
 use crate::evp::legacy_md::EVP_get_digestbyname;
 use crate::ffi::ffi_export;
 use crate::mem;
@@ -323,8 +323,25 @@ unsafe fn msg_sig_digest(
     }
     // SAFETY: no preconditions.
     let it = unsafe { super::attributes_verify_it() };
-    // SAFETY: the item; a live digest; the signer's attributes; room for any digest.
-    unsafe { ASN1_item_digest(it, md, si.signed_attrs.cast(), dig.as_mut_ptr(), diglen) != 0 }
+    // The digest is fetched in the signer's library context, with its properties.
+    // SAFETY: NULL or the signer's object's context, live with it.
+    let (libctx, propq) = unsafe { si.cms_ctx.as_ref() }
+        .map_or((ptr::null_mut(), ptr::null()), |c| {
+            (c.libctx, c.propq.cast_const())
+        });
+    // SAFETY: the item; a live digest; the signer's attributes; room for any digest; the
+    // context and properties.
+    unsafe {
+        item_digest_ex(
+            it,
+            md,
+            si.signed_attrs.cast(),
+            dig.as_mut_ptr(),
+            diglen,
+            libctx,
+            propq,
+        ) != 0
+    }
 }
 
 /// `ossl_cms_msgSigDigest_add1`: the digest of `src`'s signed attributes as `dest`'s
