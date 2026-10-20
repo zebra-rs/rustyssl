@@ -31,6 +31,9 @@
 //!   examples with the HTTP/0.9 codec, which only its autotools build defines, and only for
 //!   wolfSSL; the driver adds `osslhqclient` and `osslhqserver` to its cmake build from the same
 //!   sources.
+//! - `quic-go`: quic-go's interop client and server (`interop/`, on Go's crypto/tls), built in
+//!   its own module (they use its internal packages) with its `go.sum`. Their fixed paths (the
+//!   log, the certificate and key, `/www`, `/downloads`, port 443) become environment variables.
 //!
 //! **Checks.** A run passes when the client exits 0 and every requested file arrived with its
 //! contents. The runner's packet-trace checks (one handshake, a Retry sent, no certificate on
@@ -127,7 +130,7 @@ const CASES: &[Case] = &[
 ];
 
 /// The peers the command knows, as `--peer` names them.
-const PEERS: &[&str] = &["quiche", "ngtcp2"];
+const PEERS: &[&str] = &["quiche", "ngtcp2", "quic-go"];
 
 /// How long a client may run.
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(120);
@@ -482,6 +485,133 @@ impl Endpoint for Ngtcp2 {
             _ => vec![make(&urls)],
         }
     }
+}
+
+/// quic-go's interop programs (`interop/{client,server}/main.go`, driven by `TESTCASE`).
+struct QuicGo {
+    bin: PathBuf,
+}
+
+impl QuicGo {
+    fn program(&self, run: &Run<'_>, name: &str, testcase: &str) -> Command {
+        let mut c = Command::new(self.bin.join(name));
+        c.env("TESTCASE", testcase)
+            .env("QUIC_GO_LOG_LEVEL", "debug")
+            .env("INTEROP_LOG", run.dir.join(format!("quic-go-{name}.log")))
+            .current_dir(run.dir);
+        c
+    }
+}
+
+impl Endpoint for QuicGo {
+    fn name(&self) -> String {
+        "quic-go".to_owned()
+    }
+
+    fn supports(&self, role: Role, testcase: &str) -> bool {
+        match role {
+            Role::Client => matches!(
+                testcase,
+                "handshake"
+                    | "transfer"
+                    | "retry"
+                    | "keyupdate"
+                    | "chacha20"
+                    | "multiconnect"
+                    | "versionnegotiation"
+                    | "resumption"
+                    | "zerortt"
+                    | "http3"
+            ),
+            Role::Server => matches!(
+                testcase,
+                "versionnegotiation"
+                    | "handshake"
+                    | "retry"
+                    | "transfer"
+                    | "resumption"
+                    | "multiconnect"
+                    | "zerortt"
+                    | "chacha20"
+                    | "http3"
+            ),
+        }
+    }
+
+    fn server(&self, run: &Run<'_>, testcase: &str) -> Command {
+        let mut c = self.program(run, "server", testcase);
+        c.env("INTEROP_CERT", run.pki.join("cert.pem"))
+            .env("INTEROP_KEY", run.pki.join("priv.key"))
+            .env("INTEROP_WWW", run.www)
+            .env("INTEROP_LISTEN", format!("127.0.0.1:{}", run.port));
+        c
+    }
+
+    fn client(&self, run: &Run<'_>, testcase: &str) -> Vec<Command> {
+        let mut c = self.program(run, "client", testcase);
+        c.env("INTEROP_DOWNLOADS", run.downloads).args(run.urls());
+        vec![c]
+    }
+}
+
+/// quic-go's interop programs' fixed paths, and the variables that replace them.
+const QUIC_GO_PATCHES: &[(&str, &str, &str)] = &[
+    ("client", "\"/logs/log.txt\"", "os.Getenv(\"INTEROP_LOG\")"),
+    (
+        "client",
+        "\"/downloads\"",
+        "os.Getenv(\"INTEROP_DOWNLOADS\")",
+    ),
+    ("server", "\"/logs/log.txt\"", "os.Getenv(\"INTEROP_LOG\")"),
+    (
+        "server",
+        "\"/certs/cert.pem\"",
+        "os.Getenv(\"INTEROP_CERT\")",
+    ),
+    (
+        "server",
+        "\"/certs/priv.key\"",
+        "os.Getenv(\"INTEROP_KEY\")",
+    ),
+    ("server", "\"/www\"", "os.Getenv(\"INTEROP_WWW\")"),
+    ("server", "\":443\"", "os.Getenv(\"INTEROP_LISTEN\")"),
+];
+
+/// quic-go's interop client and server from the pinned tree (its fixed paths patched); the
+/// directory holding `client` and `server`.
+fn build_quic_go(dir: &Path, pins: &[Pin], log: &Path) -> Result<PathBuf> {
+    let tree = fetch(dir, pin(pins, "quic-go")?)?;
+    let build = dir.join("build/quic-go");
+    fs::create_dir_all(&build)?;
+    for program in ["client", "server"] {
+        let path = tree.join("interop").join(program).join("main.go");
+        let mut text = fs::read_to_string(&path)?;
+        for &(_, old, new) in QUIC_GO_PATCHES.iter().filter(|p| p.0 == program) {
+            // Already patched when the tree is reused.
+            if !text.contains(old) && !text.contains(new) {
+                return Err(format!("quic-go's interop/{program}: no {old} to patch").into());
+            }
+            text = text.replace(old, new);
+        }
+        fs::write(&path, text)?;
+        println!(
+            "Building quic-go's interop {program} (log: {})...",
+            log.display()
+        );
+        run_logged(
+            Command::new("go")
+                .args(["build", "-mod=readonly", "-o"])
+                .arg(build.join(program))
+                .arg(format!("./interop/{program}"))
+                .env("GOTOOLCHAIN", "local")
+                .env("GOFLAGS", "-modcacherw")
+                .env("GOMODCACHE", dir.join("build/go-mod"))
+                .env("GOCACHE", dir.join("build/go-cache"))
+                .current_dir(&tree),
+            log,
+        )?;
+    }
+    Ok(build)
 }
 
 /// A seeded generator for the files' names and contents (xorshift64*).
@@ -1075,6 +1205,9 @@ pub fn run(args: &[String]) -> Result {
             }),
             "ngtcp2" => Box::new(Ngtcp2 {
                 bin: build_ngtcp2(&reference, &dir, &pins, &log)?,
+            }),
+            "quic-go" => Box::new(QuicGo {
+                bin: build_quic_go(&dir, &pins, &log)?,
             }),
             _ => return Err(format!("unknown peer {peer_name}").into()),
         };
