@@ -347,6 +347,12 @@ impl Keys {
         })
     }
 
+    /// The header protection.
+    #[must_use]
+    pub fn hp(&self) -> &dyn HeaderProtection {
+        self.hp.as_ref()
+    }
+
     fn nonce(&self, pn: u64) -> [u8; 12] {
         let mut n = self.iv;
         let pnb = pn.to_be_bytes();

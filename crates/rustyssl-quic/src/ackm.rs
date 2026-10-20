@@ -246,8 +246,8 @@ impl<T> Default for Outcome<T> {
 pub enum Timeout<T> {
     /// Nothing to do yet.
     None,
-    /// Packets lost by the time threshold.
-    Lost(Vec<SentPacket<T>>),
+    /// Packets of a space lost by the time threshold.
+    Lost(Space, Vec<SentPacket<T>>),
     /// A PTO: send up to two ack-eliciting probes in `Space`.
     Probe(Space),
 }
@@ -567,7 +567,7 @@ impl<T: Clone> Ackm<T> {
     pub fn on_timeout(&mut self, now: Time) -> Timeout<T> {
         if let Some((t, s)) = self.earliest_loss_time() {
             if t <= now {
-                return Timeout::Lost(self.detect_lost(s, now));
+                return Timeout::Lost(s, self.detect_lost(s, now));
             }
             return Timeout::None;
         }
@@ -578,6 +578,28 @@ impl<T: Clone> Ackm<T> {
             }
             _ => Timeout::None,
         }
+    }
+
+    /// The PTO duration without backoff (OpenSSL's `ossl_ackm_get_pto_duration`): the base
+    /// plus the peer's max_ack_delay.
+    #[must_use]
+    pub fn pto_duration(&self) -> Duration {
+        self.rtt.pto_base().add(self.peer_max_ack_delay)
+    }
+
+    /// Takes every unacknowledged packet of `s` out of flight without a congestion event, to
+    /// send their contents again (after a Retry, OpenSSL's pseudo-loss).
+    pub fn pseudo_lose_all(&mut self, s: Space) -> Vec<SentPacket<T>> {
+        let sent = core::mem::take(&mut self.tx_mut(s).sent);
+        for p in sent.values() {
+            if p.in_flight {
+                self.cc.on_data_invalidated(p.size);
+            }
+        }
+        let sp = self.tx_mut(s);
+        sp.loss_time = None;
+        sp.time_of_last_ack_eliciting = None;
+        sent.into_values().collect()
     }
 
     /// Discards space `s` (its keys are gone): its packets leave flight without being lost.
@@ -644,6 +666,14 @@ impl<T: Clone> Ackm<T> {
         }
         let d = now.add(max_ack_delay);
         rx.flush_deadline = Some(rx.flush_deadline.map_or(d, |f| f.min(d)));
+    }
+
+    /// Makes `s` send an ACK frame at once.
+    pub fn force_ack(&mut self, s: Space) {
+        let rx = self.rx_mut(s);
+        if !rx.ranges.is_empty() {
+            rx.ack_desired = true;
+        }
     }
 
     /// Whether `s` should send an ACK frame now.
@@ -757,7 +787,7 @@ mod tests {
         let deadline = a.loss_detection_deadline(Time(100 * MS)).unwrap();
         assert!(deadline > Time(100 * MS));
         match a.on_timeout(deadline) {
-            Timeout::Lost(l) => assert_eq!(l.iter().map(|p| p.pn).collect::<Vec<_>>(), [3]),
+            Timeout::Lost(_, l) => assert_eq!(l.iter().map(|p| p.pn).collect::<Vec<_>>(), [3]),
             other => panic!("{other:?}"),
         }
         assert_eq!(a.bytes_in_flight(), 0);

@@ -12,21 +12,23 @@
 
 pub mod ackm;
 pub mod cc;
-// pub mod channel;
-// pub mod cid;
+pub mod channel;
+pub mod cid;
 pub mod crypto;
 pub mod error;
 pub mod fc;
 pub mod packet;
-// pub mod port;
+pub mod port;
 pub mod stream;
 pub mod time;
-// pub mod tls;
-// pub mod token;
-// pub mod txp;
+pub mod tls;
+pub mod token;
+pub mod txp;
 pub mod wire;
 
+pub use channel::{Channel, ChannelEvent, PeerAddr};
 pub use error::{Error, Result};
+pub use port::{ChannelId, Port, PortConfig, PortEvent};
 pub use time::Time;
 
 /// A provider for this crate's tests and the fuzz targets: `rustyssl-tls`'s test provider plus

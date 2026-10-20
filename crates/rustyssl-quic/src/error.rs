@@ -9,6 +9,14 @@ pub fn code(c: c_int) -> u64 {
     u64::from(c.unsigned_abs())
 }
 
+/// The terminate cause of an idle timeout (`OSSL_QUIC_LOCAL_ERR_IDLE_TIMEOUT`, all ones; never
+/// on the wire).
+#[allow(clippy::useless_conversion, reason = "c_ulong is u32 on some targets")]
+#[must_use]
+pub fn local_err_idle_timeout() -> u64 {
+    u64::from(rustyssl_abi::OSSL_QUIC_LOCAL_ERR_IDLE_TIMEOUT)
+}
+
 /// A connection error: what the endpoint sends in its CONNECTION_CLOSE (type 0x1c).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Error {
