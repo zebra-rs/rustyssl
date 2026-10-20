@@ -12,6 +12,8 @@ OpenSSL never depends on them.
 |---|---|---|---|
 | `CRYPTO_aligned_alloc` on macOS | adds `num + alignment` without checking, so a huge `num` wraps and gets a block smaller than requested | fails with null and `*freeptr` null | `mem::tests::aligned_allocations` |
 | `CRYPTO_secure_used`, `CRYPTO_secure_actual_size` | without a secure heap, lock a null lock and crash | return 0 | `tests/no_secure_heap.rs` |
+| Private keys with a secure heap too small for them (3.6.5) | the key's secure allocation fails, and so does the operation (a 4 KiB heap can't hold an ML-DSA-65 key) | the key goes to ordinary memory, zeroed when freed: a Rust allocation can't fail gracefully, and rustyssl's key copies need more of the heap than OpenSSL's private components, so failing would fail operations OpenSSL completes. Keys fill at most half the heap, leaving the rest for the library's own secure allocations (docs/adr/0005-secure-heap.md) | `tests/c/secure_heap_full.c` |
+| `EVP_PKEY_new_raw_private_key` for X25519, with a secure heap (3.6.5) | keeps the private key in ordinary memory | puts it in the secure heap, as for every other private key: the safer place for a secret | `tests/c/secure_heap_keys.c` (keys in general) |
 | `OPENSSL_cleanse(NULL, n)` | writes to null and crashes | does nothing | `mem::tests::cleanse_null_does_nothing` |
 | `CRYPTO_memcmp` with a null pointer and `len > 0` | reads from null and crashes | returns 1, unequal: fails closed | `mem::tests::memcmp_returns_zero_or_one` |
 | An allocator from `CRYPTO_set_mem_functions` that calls `CRYPTO_malloc` | recurses until the stack overflows | the nested call takes the default allocator | `tests/reentrant_allocator.rs` |

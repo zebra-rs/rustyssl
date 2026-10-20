@@ -347,15 +347,16 @@ Results on macOS (aarch64), 2026-10-19:
 | rust-openssl | 433 of 459 | 433 of 459 |
 | ruby/openssl | 594 of 598 | 594 of 598 |
 | pyca/cryptography | 4482 of 4482 (199 skipped) | 4482 of 4482 (199 skipped) |
-| Node.js (crypto, TLS) | 376 of 376 | 375 of 376 |
+| Node.js (crypto, TLS) | 376 of 376 | 376 of 376 |
 
-Node.js's one rustyssl-only failure is `test-crypto-secure-heap`: with `--secure-heap` it
-expects `CRYPTO_secure_used()` to grow while a Diffie-Hellman key exists, because OpenSSL
-keeps private keys (`BN_secure_new`, `BN_CTX_secure_new`) in the secure arena. rustyssl's
-arena (`CRYPTO_secure_malloc_init` and friends) is real, but secrets live in Rust-owned
-memory and `BN_FLG_SECURE` is only a flag, so nothing is allocated there. Reporting arena use
-without putting the keys there would claim work not done (rule 10), so this waits for secret
-storage to go through the arena (BIGNUM digits in capi, key material in `rustyssl-crypto`).
+Node.js's `test-crypto-secure-heap` passes since rustyssl keeps private keys in the secure
+heap when it's set up, as OpenSSL does (docs/adr/0005-secure-heap.md): with `--secure-heap` it
+expects `CRYPTO_secure_used()` to grow while a Diffie-Hellman key exists. It failed before,
+when secrets lived only in Rust-owned memory. `tests/c/secure_heap_keys.c` checks, on both
+libraries, which operations put memory in the heap (secure `BIGNUM`s, every private key made,
+copied, imported, or decoded) and which don't (ciphers, MACs, KDFs, the random generator,
+public keys); `tests/c/secure_heap_full.c`, that keys filling a small heap leave room for a new
+thread's random generator.
 
 Fixed on the way:
 - libssl flushes its write BIO at the state machine's flush points (a buffering write BIO
