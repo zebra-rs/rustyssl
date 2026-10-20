@@ -273,6 +273,34 @@ impl SendBuf {
         }
     }
 
+    /// Whether everything written so far (and the FIN, if marked) was acknowledged (OpenSSL's
+    /// `ossl_quic_sstream_is_totally_acked`).
+    #[must_use]
+    pub fn all_acked(&self) -> bool {
+        self.data.is_empty() && self.base == self.sent_end && (!self.fin || self.fin_acked)
+    }
+
+    /// The buffer's capacity (`ossl_quic_sstream_get_buffer_size`).
+    #[must_use]
+    pub fn capacity(&self) -> usize {
+        self.cap
+    }
+
+    /// Octets held, sent or not, until acknowledged (`ossl_quic_sstream_get_buffer_used`).
+    #[must_use]
+    pub fn used(&self) -> usize {
+        self.data.len()
+    }
+
+    /// Sets the capacity (never below what's held); false if that's not possible.
+    pub fn set_capacity(&mut self, cap: usize) -> bool {
+        if cap < self.data.len() {
+            return false;
+        }
+        self.cap = cap;
+        true
+    }
+
     /// Whether everything written, and the FIN, was acknowledged.
     #[must_use]
     pub fn is_totally_acked(&self) -> bool {
@@ -392,6 +420,30 @@ impl RecvBuf {
             }
         }
         (n, self.final_size == Some(self.read))
+    }
+
+    /// Copies what [`RecvBuf::read`] would read into `buf`, leaving it; returns the octets
+    /// copied and whether the end would be reached.
+    #[must_use]
+    pub fn peek(&self, buf: &mut [u8]) -> (usize, bool) {
+        let mut n = 0usize;
+        let mut off = self.read;
+        while n < buf.len() {
+            let Some(f) = self.frags.get(&off) else {
+                break;
+            };
+            let take = buf.len().saturating_sub(n).min(f.len());
+            if let (Some(dst), Some(src)) = (buf.get_mut(n..n.saturating_add(take)), f.get(..take))
+            {
+                dst.copy_from_slice(src);
+            }
+            n = n.saturating_add(take);
+            off = off.saturating_add(u64::try_from(take).unwrap_or(u64::MAX));
+            if take < f.len() {
+                break;
+            }
+        }
+        (n, self.final_size == Some(off))
     }
 
     /// The offset read so far.
@@ -782,10 +834,87 @@ impl StreamMap {
         Some(id)
     }
 
+    /// Whether every stream's written data was acknowledged or the stream reset (the end of
+    /// OpenSSL's shutdown flush).
+    #[must_use]
+    pub fn is_flushed(&self) -> bool {
+        self.streams.values().all(|s| {
+            s.send.as_ref().is_none_or(|p| {
+                matches!(p.state, SendState::ResetSent | SendState::ResetRecvd) || p.buf.all_acked()
+            })
+        })
+    }
+
+    /// How many more streams of a direction we may open now.
+    #[must_use]
+    pub fn local_avail(&self, uni: bool) -> u64 {
+        let d = if uni { UNI } else { BIDI };
+        self.local_limit[d].cwm().saturating_sub(self.next_local[d])
+    }
+
+    /// How many more streams of a direction the peer may open now.
+    #[must_use]
+    pub fn remote_avail(&self, uni: bool) -> u64 {
+        let d = if uni { UNI } else { BIDI };
+        self.remote_limit[d]
+            .cwm()
+            .saturating_sub(self.next_remote[d])
+    }
+
+    /// The send part of stream `id`, mutably (for its buffer's size).
+    pub fn send_part_mut(&mut self, id: u64) -> Option<&mut SendPart> {
+        self.streams.get_mut(&id).and_then(|s| s.send.as_mut())
+    }
+
     /// Streams waiting to be accepted.
     #[must_use]
     pub fn accept_queue_len(&self) -> usize {
         self.accept.len()
+    }
+
+    /// Streams of one direction waiting to be accepted.
+    #[must_use]
+    pub fn accept_queue_len_of(&self, uni: bool) -> usize {
+        self.accept.iter().filter(|&&id| is_uni(id) == uni).count()
+    }
+
+    /// Takes stream `id` out of the accept queue (OpenSSL's
+    /// `ossl_quic_stream_map_remove_from_accept_queue`), as [`StreamMap::accept`] does.
+    pub fn remove_from_accept_queue(&mut self, id: u64, now: Time) {
+        let before = self.accept.len();
+        self.accept.retain(|&a| a != id);
+        if self.accept.len() == before {
+            return;
+        }
+        let d = dir(id);
+        self.remote_limit[d].retire_count(1, now);
+        if self.remote_limit[d].has_cwm_changed(true) {
+            self.max_streams_want[d] = true;
+        }
+    }
+
+    /// The next incoming stream of one direction.
+    pub fn accept_of(&mut self, uni: bool, now: Time) -> Option<u64> {
+        let id = self.accept.iter().copied().find(|&id| is_uni(id) == uni)?;
+        self.remove_from_accept_queue(id, now);
+        Some(id)
+    }
+
+    /// Copies what [`StreamMap::recv`] would read, leaving it.
+    ///
+    /// # Errors
+    /// The stream has no receive part, or it was reset.
+    pub fn peek(&self, id: u64, buf: &mut [u8]) -> Result<(usize, bool)> {
+        let p = self
+            .streams
+            .get(&id)
+            .and_then(|s| s.recv.as_ref())
+            .ok_or_else(|| Error::internal("no such stream"))?;
+        match p.state {
+            RecvState::ResetRecvd | RecvState::ResetRead => Err(Error::internal("stream reset")),
+            RecvState::DataRead => Ok((0, true)),
+            _ => Ok(p.buf.peek(buf)),
+        }
     }
 
     fn send_part(&mut self, id: u64) -> Result<&mut SendPart> {

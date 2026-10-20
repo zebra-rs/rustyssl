@@ -12,21 +12,6 @@ use libc::timeval;
 use rustyssl_abi::*;
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_OSSL_QUIC_client_method() -> *const SSL_METHOD {
-    crate::stub::unimplemented("OSSL_QUIC_client_method")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_OSSL_QUIC_client_thread_method() -> *const SSL_METHOD {
-    crate::stub::unimplemented("OSSL_QUIC_client_thread_method")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_OSSL_QUIC_server_method() -> *const SSL_METHOD {
-    crate::stub::unimplemented("OSSL_QUIC_server_method")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_inject_net_dgram(
     _: *mut SSL,
     _: *const core::ffi::c_uchar,

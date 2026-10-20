@@ -34,6 +34,8 @@ pub const MAX_NAT_INTERVAL: Duration = Duration::from_millis(25_000);
 pub const PATH_RESPONSE_QLEN: usize = 32;
 /// The length of a client's random initial DCID (OpenSSL's `INIT_DCID_LEN`).
 pub const INIT_DCID_LEN: usize = 8;
+/// Packets kept until their keys arrive (OpenSSL's QRX `max_deferred`).
+pub const MAX_DEFERRED: usize = 32;
 /// A TLS alert (`SSL_AD_*`) the transport raises itself, as CRYPTO_ERROR 0x100 plus it.
 fn alert(a: core::ffi::c_int) -> u8 {
     u8::try_from(a).unwrap_or(u8::MAX)
@@ -128,6 +130,9 @@ pub struct Channel {
     state: State,
     hs: Box<dyn Handshake>,
     hs_failed: bool,
+    /// Packets that arrived before their space's keys, to process once they come (OpenSSL's
+    /// deferred URXEs).
+    deferred: VecDeque<Vec<u8>>,
     peer: PeerAddr,
     local_cid: ConnId,
     /// Client: the DCID of its first Initial. Server: the client's original DCID.
@@ -249,6 +254,7 @@ impl Channel {
             state: State::Active,
             hs,
             hs_failed: false,
+            deferred: VecDeque::new(),
             peer,
             local_cid,
             init_dcid: init_dcid.clone(),
@@ -397,6 +403,10 @@ impl Channel {
             );
             return Ok(ch);
         }
+        // Our parameters are known now: a handshake that answers the client's at once (as
+        // OpenSSL's, which runs to its EncryptedExtensions in one go) sends these.
+        let tp = ch.local_tp.encode()?;
+        ch.hs.set_transport_params(tp);
         ch.hs.start();
         Ok(ch)
     }
@@ -612,6 +622,53 @@ impl Channel {
     }
 
     fn pump_tls(&mut self, p: &dyn Provider, now: Time) {
+        for _ in 0..8 {
+            self.pump_tls_once(p, now);
+            if !self.retry_deferred(p, now) {
+                break;
+            }
+        }
+    }
+
+    /// Whether a space's packets can be read now.
+    fn has_rx_keys(&self, s: Space) -> bool {
+        match s {
+            Space::Initial => self.initial_keys.is_some(),
+            Space::Handshake => self.hs_rx.is_some(),
+            Space::Application => self.app_rx.is_some(),
+        }
+    }
+
+    /// Processes the deferred packets whose keys arrived; whether any was.
+    fn retry_deferred(&mut self, p: &dyn Provider, now: Time) -> bool {
+        if self.deferred.is_empty() || matches!(self.state, State::Terminated | State::Draining) {
+            return false;
+        }
+        let waiting = core::mem::take(&mut self.deferred);
+        let mut any = false;
+        let cid_len = self.local_cid.len();
+        for d in waiting {
+            let Ok((pkt, _)) = packet::locate(&d, cid_len) else {
+                continue;
+            };
+            let ready = pkt.ty.space().is_some_and(|s| self.has_rx_keys(s));
+            if !ready {
+                if self.deferred.len() < MAX_DEFERRED {
+                    self.deferred.push_back(d.clone());
+                }
+                continue;
+            }
+            if self.handle_packet(p, now, &pkt) {
+                any = true;
+            }
+            if self.state == State::Terminated {
+                break;
+            }
+        }
+        any
+    }
+
+    fn pump_tls_once(&mut self, p: &dyn Provider, now: Time) {
         if self.hs_failed || self.state != State::Active {
             return;
         }
@@ -892,7 +949,12 @@ impl Channel {
         let largest = self.ackm.largest_received(space);
         let opened = match self.unprotect(p, pkt, space, largest, now) {
             Ok(Some(o)) => o,
-            Ok(None) => return false,
+            Ok(None) => {
+                if !self.has_rx_keys(space) && self.deferred.len() < MAX_DEFERRED {
+                    self.deferred.push_back(pkt.bytes.to_vec());
+                }
+                return false;
+            }
             Err(e) => {
                 self.raise(e, now);
                 return false;
@@ -1556,6 +1618,48 @@ impl Channel {
     /// The next incoming stream.
     pub fn accept_stream(&mut self, now: Time) -> Option<u64> {
         self.streams.accept(now)
+    }
+
+    /// The streams, mutably (for the API's per-stream settings).
+    pub fn streams_mut(&mut self) -> &mut StreamMap {
+        &mut self.streams
+    }
+
+    /// Our max_idle_timeout request, in milliseconds.
+    #[must_use]
+    pub fn idle_timeout_request(&self) -> u64 {
+        self.local_tp.max_idle_timeout
+    }
+
+    /// The peer's max_idle_timeout request, once its parameters arrived.
+    #[must_use]
+    pub fn idle_timeout_peer_request(&self) -> Option<u64> {
+        self.peer_tp.as_ref().map(|t| t.max_idle_timeout)
+    }
+
+    /// The idle timeout in force (negotiated once the peer's parameters arrived), in
+    /// milliseconds; 0 for none.
+    #[must_use]
+    pub fn idle_timeout_actual(&self) -> u64 {
+        self.idle_timeout_ms
+    }
+
+    /// The next incoming stream of one direction.
+    pub fn accept_stream_of(&mut self, uni: bool, now: Time) -> Option<u64> {
+        self.streams.accept_of(uni, now)
+    }
+
+    /// Takes an incoming stream out of the accept queue (it became the default stream).
+    pub fn remove_from_accept_queue(&mut self, id: u64, now: Time) {
+        self.streams.remove_from_accept_queue(id, now);
+    }
+
+    /// Copies what [`Channel::stream_recv`] would read, leaving it.
+    ///
+    /// # Errors
+    /// The stream can't be read, or was reset.
+    pub fn stream_peek(&self, id: u64, buf: &mut [u8]) -> Result<(usize, bool)> {
+        self.streams.peek(id, buf)
     }
 
     // ---- sending ----

@@ -62,6 +62,11 @@ ffi_export! {
     {
         const F: &str = "SSL_do_handshake";
         // SAFETY: the caller's guarantee.
+        if unsafe { super::super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::super::quic::api::handshake(s) };
+        }
+        // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return -1 };
         if x.state().handshake_func.is_none() {
             err::raise(ERR_LIB_SSL, SSL_R_CONNECTION_TYPE_NOT_SET, F);
@@ -92,6 +97,11 @@ ffi_export! {
     where failure = -1, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::super::quic::api::connect(s) };
+        }
+        // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
         if x.state().handshake_func.is_none() {
             // SAFETY: as above.
@@ -111,6 +121,11 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_accept(s: *mut SSL) -> c_int
     where failure = -1, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::super::quic::api::accept(s) };
+        }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
         if x.state().handshake_func.is_none() {
@@ -135,6 +150,11 @@ pub(crate) unsafe fn read_internal(
     readbytes: &mut usize,
     function: &str,
 ) -> c_int {
+    // SAFETY: the caller's guarantee.
+    if unsafe { super::super::quic::of(s) }.is_some() {
+        // SAFETY: as above.
+        return unsafe { super::super::quic::api::read(s, buf, num, peek, readbytes) };
+    }
     // SAFETY: the caller's guarantee.
     let Some(x) = (unsafe { ssl(s) }) else {
         return -1;
@@ -312,6 +332,11 @@ pub(crate) unsafe fn write_internal(
     written: &mut usize,
     function: &str,
 ) -> c_int {
+    // SAFETY: the caller's guarantee.
+    if unsafe { super::super::quic::of(s) }.is_some() {
+        // SAFETY: as above.
+        return unsafe { super::super::quic::api::write(s, buf, num, 0, written) };
+    }
     // SAFETY: the caller's guarantee.
     let Some(x) = (unsafe { ssl(s) }) else {
         return 0;
@@ -498,6 +523,11 @@ ffi_export! {
             return SSL_ERROR_NONE;
         }
         // SAFETY: the caller's guarantee.
+        if unsafe { super::super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::super::quic::api::get_error(s, ret) }.unwrap_or(SSL_ERROR_SSL);
+        }
+        // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return SSL_ERROR_SSL };
         // SAFETY: no preconditions.
         let l = unsafe { crate::err::ERR_peek_error() };
@@ -576,6 +606,11 @@ ffi_export! {
     where failure = -1, library = ERR_LIB_SSL
     {
         const F: &str = "SSL_shutdown";
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::super::quic::api::shutdown(s, 0, ptr::null(), 0) };
+        }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return -1 };
         {

@@ -23,6 +23,10 @@ pub(crate) struct Method {
     pub(crate) client: bool,
     /// Whether it can act as a server (its `ssl_accept` is defined).
     pub(crate) server: bool,
+    /// Whether it is a QUIC method (its objects are QUIC objects, `super::quic`).
+    pub(crate) quic: bool,
+    /// Whether it is the thread-assisted QUIC client method.
+    pub(crate) thread: bool,
 }
 
 impl Method {
@@ -44,9 +48,9 @@ impl Method {
 
 macro_rules! methods {
     ($($stat:ident = $version:expr, $dtls:expr, $client:expr, $server:expr;)*) => {
-        $(static $stat: Method = Method { version: $version, dtls: $dtls, client: $client, server: $server };)*
+        $(static $stat: Method = Method { version: $version, dtls: $dtls, client: $client, server: $server, quic: false, thread: false };)*
         /// Every method.
-        static ALL: &[&Method] = &[$(&$stat,)*];
+        static ALL: &[&Method] = &[$(&$stat,)* &QUIC_CLIENT, &QUIC_CLIENT_THREAD, &QUIC_SERVER];
     };
 }
 
@@ -73,6 +77,32 @@ methods! {
     DTLS1_2_CLIENT = DTLS1_2_VERSION, true, true, false;
     DTLS1_2_SERVER = DTLS1_2_VERSION, true, false, true;
 }
+
+// The QUIC methods (`quic_method.c`): their objects run TLS 1.3 inside QUIC.
+static QUIC_CLIENT: Method = Method {
+    version: TLS_ANY_VERSION,
+    dtls: false,
+    client: true,
+    server: false,
+    quic: true,
+    thread: false,
+};
+static QUIC_CLIENT_THREAD: Method = Method {
+    version: TLS_ANY_VERSION,
+    dtls: false,
+    client: true,
+    server: false,
+    quic: true,
+    thread: true,
+};
+static QUIC_SERVER: Method = Method {
+    version: TLS_ANY_VERSION,
+    dtls: false,
+    client: false,
+    server: true,
+    quic: true,
+    thread: false,
+};
 
 /// The method behind a handle, if it is one of ours.
 pub(crate) fn method_of(m: *const SSL_METHOD) -> Option<&'static Method> {
@@ -352,5 +382,41 @@ mod tests {
         assert_eq!(TLS.idle_version(), rustyssl_abi::TLS1_3_VERSION);
         assert_eq!(DTLS_CLIENT.idle_version(), DTLS1_2_VERSION);
         assert_eq!(TLS1_1.idle_version(), TLS1_1_VERSION);
+    }
+}
+
+ffi_export! {
+    /// The QUIC client method (`SSL_new` makes QUIC connections).
+    ///
+    /// # Safety
+    /// No preconditions.
+    pub unsafe extern "C" fn rustyssl_private_OSSL_QUIC_client_method() -> *const SSL_METHOD
+    where failure = ptr::null(), library = ERR_LIB_SSL
+    {
+        QUIC_CLIENT.handle()
+    }
+}
+
+ffi_export! {
+    /// The thread-assisted QUIC client method: a thread keeps each connection's timers.
+    ///
+    /// # Safety
+    /// No preconditions.
+    pub unsafe extern "C" fn rustyssl_private_OSSL_QUIC_client_thread_method() -> *const SSL_METHOD
+    where failure = ptr::null(), library = ERR_LIB_SSL
+    {
+        QUIC_CLIENT_THREAD.handle()
+    }
+}
+
+ffi_export! {
+    /// The QUIC server method (for listeners: `SSL_new_listener`).
+    ///
+    /// # Safety
+    /// No preconditions.
+    pub unsafe extern "C" fn rustyssl_private_OSSL_QUIC_server_method() -> *const SSL_METHOD
+    where failure = ptr::null(), library = ERR_LIB_SSL
+    {
+        QUIC_SERVER.handle()
     }
 }

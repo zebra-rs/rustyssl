@@ -198,6 +198,17 @@ ffi_export! {
     {
         const F: &str = "SSL_write_ex2";
         // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            let mut got = 0usize;
+            // SAFETY: as above.
+            let r = unsafe { super::quic::api::write(s, buf, num, flags, &mut got) };
+            if !written.is_null() {
+                // SAFETY: the caller's slot.
+                unsafe { written.write(got) };
+            }
+            return r;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
         {
             let mut st = x.state();

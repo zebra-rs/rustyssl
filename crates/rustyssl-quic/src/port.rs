@@ -168,6 +168,22 @@ impl Port {
         self.routes_of.insert(id, cids);
     }
 
+    /// The settings of the channels made from now on.
+    pub fn channel_config_mut(&mut self) -> &mut ChannelConfig {
+        &mut self.cfg.channel
+    }
+
+    /// The accept queue's bound.
+    #[must_use]
+    pub fn max_pending(&self) -> usize {
+        self.cfg.max_pending
+    }
+
+    /// Sets the accept queue's bound.
+    pub fn set_max_pending(&mut self, n: usize) {
+        self.cfg.max_pending = n;
+    }
+
     /// A channel.
     pub fn channel(&mut self, id: ChannelId) -> Option<&mut Channel> {
         self.channels.get_mut(&id)

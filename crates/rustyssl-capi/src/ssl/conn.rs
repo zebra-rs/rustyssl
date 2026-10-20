@@ -221,6 +221,8 @@ impl Drop for SslState {
 
 /// A connection (`SSL`, shared by reference).
 pub(crate) struct Ssl {
+    /// What a QUIC object is (`super::quic`); first, so it goes before the state it uses.
+    pub(crate) quic: std::sync::OnceLock<super::quic::Quic>,
     references: AtomicI32,
     /// The verification parameters (owned), at a fixed address for `SSL_get0_param`.
     pub(crate) param: *mut X509_VERIFY_PARAM,
@@ -312,6 +314,21 @@ ffi_export! {
     /// `ctx` is NULL or a live context.
     pub unsafe extern "C" fn rustyssl_private_SSL_new(ctx: *mut SSL_CTX) -> *mut SSL
     where failure = ptr::null_mut(), library = ERR_LIB_SSL
+    {
+        // SAFETY: the caller's guarantee.
+        if !ctx.is_null() && let Some(r) = unsafe { super::quic::api::ssl_new(ctx) } {
+            return r;
+        }
+        // SAFETY: as above.
+        unsafe { new_ssl(ctx) }
+    }
+}
+
+/// `SSL_new`'s TLS object (also the base of every QUIC object), or NULL.
+///
+/// # Safety
+/// `ctx` is NULL or a live context.
+pub(crate) unsafe fn new_ssl(ctx: *mut SSL_CTX) -> *mut SSL {
     {
         const F: &str = "SSL_new";
         // SAFETY: the caller's guarantee.
@@ -451,6 +468,7 @@ ffi_export! {
         // SAFETY: as above.
         unsafe { ctx::rustyssl_private_SSL_CTX_up_ref(ctx) };
         let s = SSL::new_handle(Ssl {
+            quic: std::sync::OnceLock::new(),
             references: AtomicI32::new(1),
             param,
             // SAFETY: an all-zero `CRYPTO_EX_DATA` is the empty one `CRYPTO_new_ex_data` fills.
@@ -458,7 +476,9 @@ ffi_export! {
             state: Mutex::new(state),
         });
         // SAFETY: the new connection.
-        let Some(x) = (unsafe { ssl(s) }) else { return ptr::null_mut() };
+        let Some(x) = (unsafe { ssl(s) }) else {
+            return ptr::null_mut();
+        };
         // SAFETY: the new connection and its own application data.
         if unsafe { CRYPTO_new_ex_data(CRYPTO_EX_INDEX_SSL, s.cast(), x.ex_data()) } == 0 {
             // SAFETY: the new connection's only reference.
@@ -785,7 +805,12 @@ ffi_export! {
     where failure = ptr::null(), library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
-        unsafe { ssl(s) }.map_or(ptr::null(), |x| protocol_name(x.state().version).as_ptr())
+        unsafe { ssl(s) }.map_or(ptr::null(), |x| {
+            if x.quic.get().is_some() {
+                return c"QUICv1".as_ptr();
+            }
+            protocol_name(x.state().version).as_ptr()
+        })
     }
 }
 
@@ -811,20 +836,20 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
-        unsafe { ssl(s) }.map_or(0, |x| c_int::from(!x.state().method.dtls))
+        unsafe { ssl(s) }.map_or(0, |x| c_int::from(!x.state().method.dtls && x.quic.get().is_none()))
     }
 }
 
 ffi_export! {
-    /// Whether the connection is QUIC: never (QUIC isn't built yet, and no method makes one).
+    /// Whether the object is a QUIC one (a connection, stream, or listener).
     ///
     /// # Safety
     /// `s` is NULL or a live connection.
     pub unsafe extern "C" fn rustyssl_private_SSL_is_quic(s: *const SSL) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
-        let _ = s;
-        0
+        // SAFETY: the caller's guarantee.
+        c_int::from(unsafe { super::quic::of(s) }.is_some())
     }
 }
 
@@ -1493,6 +1518,10 @@ ffi_export! {
     where failure = ptr::null_mut(), library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::net_bio(s, false);
+        }
+        // SAFETY: the caller's guarantee.
         unsafe { ssl(s) }.map_or(ptr::null_mut(), |x| x.state().rbio)
     }
 }
@@ -1506,6 +1535,10 @@ ffi_export! {
     where failure = ptr::null_mut(), library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::net_bio(s, true);
+        }
+        // SAFETY: the caller's guarantee.
         unsafe { ssl(s) }.map_or(ptr::null_mut(), |x| x.state().wbio)
     }
 }
@@ -1518,6 +1551,11 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_set0_rbio(s: *mut SSL, rbio: *mut BIO)
     where failure = (), library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::quic::api::set0_net_bio(s, rbio, false) };
+        }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return };
         let old = core::mem::replace(&mut x.state().rbio, rbio);
@@ -1534,6 +1572,11 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_set0_wbio(s: *mut SSL, wbio: *mut BIO)
     where failure = (), library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::quic::api::set0_net_bio(s, wbio, true) };
+        }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return };
         let old = core::mem::replace(&mut x.state().wbio, wbio);
@@ -1554,11 +1597,11 @@ ffi_export! {
     where failure = (), library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
-        let Some(x) = (unsafe { ssl(s) }) else { return };
-        let (cur_r, cur_w) = {
-            let st = x.state();
-            (st.rbio, st.wbio)
-        };
+        if unsafe { ssl(s) }.is_none() {
+            return;
+        }
+        // SAFETY: as above.
+        let (cur_r, cur_w) = unsafe { (rustyssl_private_SSL_get_rbio(s), rustyssl_private_SSL_get_wbio(s)) };
         if rbio == cur_r && wbio == cur_w {
             return;
         }

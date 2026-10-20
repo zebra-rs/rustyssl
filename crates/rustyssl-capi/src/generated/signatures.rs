@@ -19995,6 +19995,12 @@ const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *const core::ffi::c_c
     crate::ssl::ciphers::rustyssl_private_OPENSSL_cipher_name;
 const _: unsafe extern "C" fn(u64, *const OPENSSL_INIT_SETTINGS) -> core::ffi::c_int =
     crate::ssl::rustyssl_private_OPENSSL_init_ssl;
+const _: unsafe extern "C" fn() -> *const SSL_METHOD =
+    crate::ssl::method::rustyssl_private_OSSL_QUIC_client_method;
+const _: unsafe extern "C" fn() -> *const SSL_METHOD =
+    crate::ssl::method::rustyssl_private_OSSL_QUIC_client_thread_method;
+const _: unsafe extern "C" fn() -> *const SSL_METHOD =
+    crate::ssl::method::rustyssl_private_OSSL_QUIC_server_method;
 const _: unsafe extern "C" fn() -> *const core::ffi::c_char =
     crate::ssl::apis::rustyssl_private_OSSL_default_cipher_list;
 const _: unsafe extern "C" fn() -> *const core::ffi::c_char =
