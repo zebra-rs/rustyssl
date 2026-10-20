@@ -336,6 +336,194 @@ static void test_validated(void)
     SSL_CTX_free(sctx);
 }
 
+static void pump(struct pair *p, int n)
+{
+    int i;
+
+    for (i = 0; i < n; i++) {
+        SSL_handle_events(p->client);
+        SSL_handle_events(p->listener);
+    }
+}
+
+static uint64_t poll_one(SSL *s, uint64_t events)
+{
+    SSL_POLL_ITEM it;
+    struct timeval tv = { 0, 0 };
+    size_t n = 0;
+
+    memset(&it, 0, sizeof(it));
+    it.desc = SSL_as_poll_descriptor(s);
+    it.events = events;
+    if (!SSL_poll(&it, 1, sizeof(it), &tv, 0, &n))
+        return ~(uint64_t)0;
+    return it.revents;
+}
+
+static void print_close(const char *who, SSL *s)
+{
+    SSL_CONN_CLOSE_INFO info;
+    int r = SSL_get_conn_close_info(s, &info, sizeof(info));
+
+    if (r != 1) {
+        printf("  %s close info: %d\n", who, r);
+        return;
+    }
+    printf("  %s close info: code %llu, frame type %llu, reason \"%.*s\", flags %u\n", who,
+           (unsigned long long)info.error_code, (unsigned long long)info.frame_type,
+           (int)info.reason_len, info.reason != NULL ? info.reason : "", info.flags);
+}
+
+/* Streams both ways, their states, SSL_poll, values, and the close. */
+static void test_streams(void)
+{
+    struct pair p;
+    SSL *cs = NULL, *ss = NULL, *cu = NULL, *su = NULL;
+    SSL_SHUTDOWN_EX_ARGS args;
+    unsigned char buf[64];
+    size_t n = 0, w = 0;
+    uint64_t v = 0, aec = 0;
+    int r, i;
+
+    printf("# streams, SSL_poll and the close\n");
+    check(setup(&p) && handshake(&p), "a connection");
+    p.server = SSL_accept_connection(p.listener, SSL_ACCEPT_CONNECTION_NO_BLOCK);
+    check(p.server != NULL, "accepted");
+    if (p.server == NULL) {
+        free_pair(&p);
+        return;
+    }
+    SSL_set_default_stream_mode(p.client, SSL_DEFAULT_STREAM_MODE_NONE);
+    SSL_set_incoming_stream_policy(p.client, SSL_INCOMING_STREAM_POLICY_ACCEPT, 0);
+    r = SSL_write_ex(p.client, "x", 1, &w);
+    printf("  write with no default stream: %d, %s\n", r, err_name(SSL_get_error(p.client, r)));
+    errors("client");
+    printf("  client poll W|OSB|OSU|EC|ISB|ISU: %#llx\n",
+           (unsigned long long)poll_one(p.client, SSL_POLL_EVENT_W | SSL_POLL_EVENT_OS
+                                                  | SSL_POLL_EVENT_EC | SSL_POLL_EVENT_IS));
+    check(SSL_get_value_uint(p.client, SSL_VALUE_CLASS_GENERIC,
+                             SSL_VALUE_QUIC_STREAM_BIDI_LOCAL_AVAIL, &v) == 1, "streams available");
+    printf("  bidi local avail %llu\n", (unsigned long long)v);
+    check(SSL_get_value_uint(p.client, SSL_VALUE_CLASS_FEATURE_NEGOTIATED,
+                             SSL_VALUE_QUIC_IDLE_TIMEOUT, &v) == 1, "negotiated idle timeout");
+    printf("  idle timeout %llu\n", (unsigned long long)v);
+    r = SSL_set_value_uint(p.client, SSL_VALUE_CLASS_FEATURE_REQUEST, SSL_VALUE_QUIC_IDLE_TIMEOUT, 5000);
+    printf("  idle timeout after the handshake: %d\n", r);
+    errors("client");
+
+    cs = SSL_new_stream(p.client, 0);
+    cu = SSL_new_stream(p.client, SSL_STREAM_FLAG_UNI);
+    check(cs != NULL && cu != NULL, "two client streams");
+    printf("  ids %llu %llu, types %d %d, local %d %d\n",
+           (unsigned long long)SSL_get_stream_id(cs), (unsigned long long)SSL_get_stream_id(cu),
+           SSL_get_stream_type(cs), SSL_get_stream_type(cu), SSL_is_stream_local(cs),
+           SSL_is_stream_local(cu));
+    printf("  uni read state %d, write state %d\n", SSL_get_stream_read_state(cu),
+           SSL_get_stream_write_state(cu));
+    check(SSL_write_ex(cs, "ping", 4, &w) == 1 && SSL_write_ex(cu, "one-way", 7, &w) == 1,
+          "writes on both");
+    check(SSL_stream_conclude(cu, 0) == 1, "the uni stream concluded");
+    printf("  uni write state after conclude %d\n", SSL_get_stream_write_state(cu));
+    for (i = 0; i < 50 && SSL_get_accept_stream_queue_len(p.server) < 2; i++)
+        pump(&p, 1);
+    printf("  server accept queue %zu, poll ISB|ISU %#llx\n", SSL_get_accept_stream_queue_len(p.server),
+           (unsigned long long)poll_one(p.server, SSL_POLL_EVENT_IS));
+    su = SSL_accept_stream(p.server, SSL_ACCEPT_STREAM_UNI);
+    ss = SSL_accept_stream(p.server, 0);
+    printf("  accepted uni %d, then any %d\n", su != NULL, ss != NULL);
+    /* Accepting a stream touched the default stream: the AUTO policy now rejects. */
+    errors("server accept");
+    if (ss == NULL) {
+        SSL_set_incoming_stream_policy(p.server, SSL_INCOMING_STREAM_POLICY_ACCEPT, 0);
+        ss = SSL_accept_stream(p.server, SSL_ACCEPT_STREAM_NO_BLOCK);
+    }
+    check(ss != NULL && su != NULL, "the server accepts both by direction");
+    if (ss == NULL || su == NULL)
+        goto out;
+    printf("  server ids %llu %llu, types %d %d\n", (unsigned long long)SSL_get_stream_id(ss),
+           (unsigned long long)SSL_get_stream_id(su), SSL_get_stream_type(ss), SSL_get_stream_type(su));
+    printf("  server uni poll R %#llx\n", (unsigned long long)poll_one(su, SSL_POLL_EVENT_R));
+    r = SSL_peek_ex(su, buf, sizeof(buf), &n);
+    printf("  peek: %d, %zu \"%.*s\"\n", r, n, (int)n, buf);
+    r = SSL_read_ex(su, buf, sizeof(buf), &n);
+    printf("  read: %d, %zu \"%.*s\"\n", r, n, (int)n, buf);
+    r = SSL_read_ex(su, buf, sizeof(buf), &n);
+    printf("  read at the end: %d, %s\n", r, err_name(SSL_get_error(su, r)));
+    printf("  uni read state %d, error code %d\n", SSL_get_stream_read_state(su),
+           SSL_get_stream_read_error_code(su, &aec));
+    r = SSL_write_ex(su, "no", 2, &w);
+    printf("  write on the server's receive-only stream: %d\n", r);
+    errors("server");
+    r = SSL_read_ex(ss, buf, sizeof(buf), &n);
+    printf("  bidi read: %d, %zu \"%.*s\"\n", r, n, (int)n, buf);
+    {
+        SSL_STREAM_RESET_ARGS ra;
+
+        ra.quic_error_code = 77;
+        check(SSL_stream_reset(ss, &ra, sizeof(ra)) == 1, "the server resets its send part");
+    }
+    printf("  server write state %d, error %d code %llu\n", SSL_get_stream_write_state(ss),
+           SSL_get_stream_write_error_code(ss, &aec), (unsigned long long)aec);
+    for (i = 0; i < 50 && SSL_get_stream_read_state(cs) == SSL_STREAM_STATE_OK; i++)
+        pump(&p, 1);
+    aec = 0;
+    printf("  client read state %d, error %d code %llu, poll ER %#llx\n", SSL_get_stream_read_state(cs),
+           SSL_get_stream_read_error_code(cs, &aec), (unsigned long long)aec,
+           (unsigned long long)poll_one(cs, SSL_POLL_EVENT_ER));
+    r = SSL_read_ex(cs, buf, sizeof(buf), &n);
+    printf("  read after the reset: %d, %s\n", r, err_name(SSL_get_error(cs, r)));
+    errors("client");
+
+    check(SSL_inject_net_dgram(p.client, (const unsigned char *)"junk", 4, NULL, NULL) == 1,
+          "a datagram injected");
+    SSL_handle_events(p.client);
+
+    memset(&args, 0, sizeof(args));
+    args.quic_error_code = 42;
+    args.quic_reason = "bye";
+    r = SSL_shutdown_ex(p.client, SSL_SHUTDOWN_FLAG_NO_STREAM_FLUSH, &args, sizeof(args));
+    printf("  shutdown: %d, get_shutdown %d\n", r, SSL_get_shutdown(p.client));
+    for (i = 0; i < 50; i++)
+        pump(&p, 1);
+    print_close("client", p.client);
+    print_close("server", p.server);
+    printf("  server poll EC %#llx, write: %d\n", (unsigned long long)poll_one(p.server, SSL_POLL_EVENT_EC),
+           SSL_write_ex(ss, "z", 1, &w));
+    errors("server");
+out:
+    ERR_clear_error();
+    SSL_free(cs);
+    SSL_free(cu);
+    SSL_free(ss);
+    SSL_free(su);
+    free_pair(&p);
+}
+
+/* SSL_poll on what it can't poll. */
+static void test_poll_errors(void)
+{
+    SSL_CTX *t = SSL_CTX_new(TLS_method());
+    SSL *s = SSL_new(t);
+    SSL_POLL_ITEM it[2];
+    size_t n = 99;
+    struct timeval tv = { 0, 0 };
+    int r;
+
+    printf("# SSL_poll errors\n");
+    memset(it, 0, sizeof(it));
+    it[0].desc = SSL_as_poll_descriptor(NULL);
+    it[1].desc = SSL_as_poll_descriptor(s);
+    it[1].events = SSL_POLL_EVENT_R;
+    r = SSL_poll(it, 2, sizeof(it[0]), &tv, 0, &n);
+    printf("  a TLS object: %d, count %zu, revents %#llx %#llx\n", r, n,
+           (unsigned long long)it[0].revents, (unsigned long long)it[1].revents);
+    errors("poll");
+    r = SSL_poll(NULL, 0, sizeof(it[0]), &tv, 0, &n);
+    printf("  no items: %d, count %zu\n", r, n);
+    SSL_free(s);
+    SSL_CTX_free(t);
+}
+
 static SSL *info_ssl;
 
 static void info_cb(const SSL *s, int where, int ret)
@@ -394,6 +582,8 @@ int main(void)
     test_connection();
     test_validated();
     test_from_listener();
+    test_streams();
+    test_poll_errors();
     X509_free(cert);
     EVP_PKEY_free(key);
     printf("1..%d\n", number);

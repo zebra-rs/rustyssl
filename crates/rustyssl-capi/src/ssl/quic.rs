@@ -15,6 +15,7 @@
 
 pub(crate) mod api;
 pub(crate) mod hs;
+pub(crate) mod poll;
 
 use core::ffi::{c_int, c_void};
 use core::ptr;
@@ -23,9 +24,8 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Instant;
 
 use rustyssl_abi::{
-    BIO, BIO_ADDR, BIO_CTRL_DGRAM_GET_EFFECTIVE_CAPS, BIO_DGRAM_CAP_HANDLES_DST_ADDR,
-    BIO_DGRAM_CAP_PROVIDES_SRC_ADDR, BIO_MSG, SSL, SSL_CTX, SSL_DEFAULT_STREAM_MODE_AUTO_BIDI,
-    SSL_ERROR_NONE, SSL_INCOMING_STREAM_POLICY_AUTO,
+    BIO, BIO_ADDR, BIO_CTRL_DGRAM_GET_EFFECTIVE_CAPS, BIO_DGRAM_CAP_HANDLES_DST_ADDR, BIO_MSG, SSL,
+    SSL_CTX, SSL_DEFAULT_STREAM_MODE_AUTO_BIDI, SSL_ERROR_NONE, SSL_INCOMING_STREAM_POLICY_AUTO,
 };
 use rustyssl_quic::channel::{Channel, PeerAddr};
 use rustyssl_quic::port::{ChannelId, Port, PortConfig, PortEvent};
@@ -89,6 +89,10 @@ pub(crate) struct StreamApi {
     /// An all-or-nothing write in progress: the buffer's address, length, and what's taken.
     pub(crate) aon: Option<(usize, usize, usize)>,
     pub(crate) ssl_options: u64,
+    /// The application read the end of the stream (`retired_fin`).
+    pub(crate) retired_fin: bool,
+    /// The application reset the send part (`requested_reset`).
+    pub(crate) requested_reset: bool,
 }
 
 impl StreamApi {
@@ -99,6 +103,8 @@ impl StreamApi {
             ssl_mode,
             aon: None,
             ssl_options: conn_options & api::permitted_stream(),
+            retired_fin: false,
+            requested_reset: false,
         }
     }
 }
@@ -191,6 +197,8 @@ pub(crate) struct EngineState {
     pub(crate) event_mode: BTreeMap<usize, u64>,
     /// The domain flags of the objects on it (`SSL_get_domain_flags`).
     pub(crate) domain_flags: u64,
+    /// Datagrams `SSL_inject_net_dgram` queued, for the next tick.
+    pub(crate) injected: VecDeque<(PeerAddr, Vec<u8>)>,
     /// The domain a listener was made from (a reference held), or NULL.
     pub(crate) domain: *mut SSL,
     /// The network BIOs (a reference held each).
@@ -262,6 +270,7 @@ impl Engine {
                 // SAFETY: the caller's live context.
                 domain_flags: unsafe { super::ctx::ctx(ctx) }.map_or(0, |c| c.state().domain_flags),
                 domain: ptr::null_mut(),
+                injected: VecDeque::new(),
             }),
         })
     }
@@ -350,6 +359,11 @@ impl EngineState {
     /// Reads what the network has into the port.
     fn net_read(&mut self) {
         let Some(p) = self.prov.clone() else { return };
+        while let Some((from, d)) = self.injected.pop_front() {
+            let now = self.now();
+            self.port.handle_datagram(&*p, now, &from, &d);
+            self.after_datagram();
+        }
         let (rbio, _) = self.bios();
         if rbio.is_null() {
             return;

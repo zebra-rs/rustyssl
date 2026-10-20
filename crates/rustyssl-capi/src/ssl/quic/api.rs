@@ -166,7 +166,7 @@ impl Qctx<'_> {
     }
 
     /// The stream the call is for: the stream object's, or the connection's default stream.
-    fn stream_id(&self, es: &mut EngineState) -> Option<u64> {
+    pub(super) fn stream_id(&self, es: &mut EngineState) -> Option<u64> {
         if self.is_stream {
             es.stream(self.q.key()).map(|r| r.api.id)
         } else {
@@ -174,7 +174,7 @@ impl Qctx<'_> {
         }
     }
 
-    fn stream_api<'e>(&self, es: &'e mut EngineState) -> Option<&'e mut StreamApi> {
+    pub(super) fn stream_api<'e>(&self, es: &'e mut EngineState) -> Option<&'e mut StreamApi> {
         if self.is_stream {
             es.stream(self.q.key()).map(|r| &mut r.api)
         } else {
@@ -996,7 +996,12 @@ fn read_actual(
     const F: &str = "quic_read_actual";
     match validate_for_read(es, c.conn, id) {
         ReadCheck::Ok => {}
-        ReadCheck::Eos => return c.normal(es, SSL_ERROR_ZERO_RETURN),
+        ReadCheck::Eos => {
+            if let Some(api) = c.stream_api(es) {
+                api.retired_fin = true;
+            }
+            return c.normal(es, SSL_ERROR_ZERO_RETURN);
+        }
         ReadCheck::Err(r) => return c.non_normal(es, r, F),
     }
     let now = es.now();
@@ -1013,6 +1018,9 @@ fn read_actual(
     };
     *n = got;
     if got == 0 && fin {
+        if let Some(api) = c.stream_api(es) {
+            api.retired_fin = true;
+        }
         return c.normal(es, SSL_ERROR_ZERO_RETURN);
     }
     1
@@ -1502,6 +1510,9 @@ pub(crate) unsafe fn stream_reset(
     let ok = es
         .channel_of(c.conn)
         .is_some_and(|ch| ch.stream_reset(id, code).is_ok());
+    if ok && let Some(api) = c.stream_api(&mut es) {
+        api.requested_reset = true;
+    }
     drop(es);
     // SAFETY: no lock is held.
     unsafe { super::tick(&engine) };
@@ -1539,7 +1550,15 @@ fn classify(es: &mut EngineState, conn: usize, id: u64, write: bool) -> (c_int, 
         if let Some(code) = p.peer_stop_sending {
             return (SSL_STREAM_STATE_RESET_REMOTE, code);
         }
-        if p.buf.is_finished() {
+        // OpenSSL's test is the stream's `have_final_size`, which only the receive part sets
+        // (the peer's final size known).
+        let final_known = st.recv.as_ref().is_some_and(|r| {
+            matches!(
+                r.state,
+                RecvState::SizeKnown | RecvState::DataRecvd | RecvState::DataRead
+            )
+        });
+        if final_known {
             return (SSL_STREAM_STATE_FINISHED, u64::MAX);
         }
         (SSL_STREAM_STATE_OK, u64::MAX)
@@ -2643,4 +2662,13 @@ pub(crate) fn default_domain_flags(m: &crate::ssl::method::Method) -> u64 {
     } else {
         u64::from(SSL_DOMAIN_FLAG_MULTI_THREAD | SSL_DOMAIN_FLAG_LEGACY_BLOCKING)
     }
+}
+
+/// `expect_quic_csl`.
+///
+/// # Safety
+/// `s` is NULL or a live `SSL`.
+pub(super) unsafe fn expect_csl<'a>(s: *const SSL) -> Option<Qctx<'a>> {
+    // SAFETY: the caller's guarantee.
+    unsafe { expect(s, C | S | L) }
 }
