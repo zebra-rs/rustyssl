@@ -1035,6 +1035,8 @@ impl TransportParams {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::arithmetic_side_effects, reason = "test code")]
+
     use super::*;
 
     fn varint_bytes(v: u64) -> Vec<u8> {

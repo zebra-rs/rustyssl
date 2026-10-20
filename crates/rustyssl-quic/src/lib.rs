@@ -14,10 +14,10 @@
 // pub mod cc;
 // pub mod channel;
 // pub mod cid;
-// pub mod crypto;
+pub mod crypto;
 pub mod error;
 // pub mod fc;
-// pub mod packet;
+pub mod packet;
 // pub mod port;
 // pub mod stream;
 pub mod time;
@@ -29,7 +29,9 @@ pub mod wire;
 pub use error::{Error, Result};
 pub use time::Time;
 
-// /// A provider for this crate's tests and the fuzz targets: `rustyssl-tls`'s test provider plus
-// /// header protection through `rustyssl-crypto` directly (the non-default `test-provider`
-// /// feature). Never use it outside tests.
-// testprov
+/// A provider for this crate's tests and the fuzz targets: `rustyssl-tls`'s test provider plus
+/// header protection through `rustyssl-crypto` directly (the non-default `test-provider`
+/// feature). Never use it outside tests.
+#[cfg(any(test, feature = "test-provider"))]
+#[doc(hidden)]
+pub mod testprov;
