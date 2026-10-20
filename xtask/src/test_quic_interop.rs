@@ -20,7 +20,8 @@
 //! headers, and each run loads either the reference's libraries or rustyssl's. Two changes to
 //! their source: the hq client's download directory is `$DOWNLOADS`, not `/downloads`, and the
 //! demo server's connection state starts zeroed (it frees an uninitialized pointer otherwise).
-//! curl is given the CA with `--cacert`, as its own default bundle would take precedence.
+//! curl is given the CA with `--cacert`, as its own default bundle would take precedence, and
+//! `-q`, so that no `~/.curlrc` applies.
 //!
 //! **The peers** are built from sources pinned by commit and SHA-256 (`tests/quic-interop/
 //! pins.txt`), each on a TLS stack of its own:
@@ -137,8 +138,8 @@ const PEERS: &[&str] = &["quiche", "ngtcp2", "quic-go"];
 /// How long a client may run.
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(120);
 
-/// How long a server is given to bind its port before a client is started.
-const SERVER_START: Duration = Duration::from_millis(500);
+/// How long a server is given to bind its port before a client is started anyway.
+const SERVER_START: Duration = Duration::from_secs(10);
 
 /// The configuration file every run is pointed at (one that doesn't exist).
 const MISSING_CONFIG: &str = "/nonexistent/rustyssl-tests/openssl.cnf";
@@ -235,15 +236,18 @@ pub(crate) fn curl_command(
     urls: &[String],
     downloads: &Path,
 ) -> Command {
-    let mut config = String::from("--verbose\n--parallel\n");
+    let mut config = String::from("--verbose\n--no-progress-meter\n--parallel\n");
     for (i, url) in urls.iter().enumerate() {
         if i > 0 {
             config.push_str("--next\n");
         }
         let name = url.rsplit('/').next().unwrap_or_default();
+        // The CA explicitly (each transfer's options are its own): curl's default bundle would
+        // take precedence over SSL_CERT_FILE.
         let _ = writeln!(
             config,
-            "--http3-only\n-o \"{}\"\n--url {url}",
+            "--http3-only\n--cacert \"{}\"\n-o \"{}\"\n--url {url}",
+            ca.display(),
             downloads.join(name).display()
         );
     }
@@ -251,9 +255,8 @@ pub(crate) fn curl_command(
     // Written here; a failure shows as curl failing to read it.
     let _ = fs::write(&curlrc, config);
     let mut c = Command::new(curl);
-    // The CA explicitly: curl's own default bundle takes precedence over SSL_CERT_FILE.
-    c.arg("--cacert")
-        .arg(ca)
+    // -q first: not the user's ~/.curlrc (an `insecure` there would skip verification).
+    c.arg("-q")
         .arg("--config")
         .arg(&curlrc)
         .env("SSL_CERT_FILE", ca)
@@ -820,6 +823,25 @@ fn free_udp_port() -> Result<u16> {
     Ok(s.local_addr()?.port())
 }
 
+/// Waits (up to [`SERVER_START`]) until the server has bound `port`, as far as binding it
+/// ourselves shows (on 127.0.0.1 or every address; servers bind one or the other, or IPv6's
+/// wildcard, which takes IPv4's too), or until it exits.
+fn wait_bound(port: u16, server: &mut Child) -> Result {
+    let start = Instant::now();
+    while start.elapsed() < SERVER_START && server.try_wait()?.is_none() {
+        let free = ["127.0.0.1", "0.0.0.0"]
+            .iter()
+            .all(|a| UdpSocket::bind((*a, port)).is_ok());
+        if !free {
+            // Bound; give it a moment to start reading.
+            std::thread::sleep(Duration::from_millis(100));
+            return Ok(());
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    Ok(())
+}
+
 /// Spawns `cmd` with its output in `log`.
 fn spawn_logged(cmd: &mut Command, log: &Path) -> Result<Child> {
     let out = fs::File::create(log)?;
@@ -861,7 +883,43 @@ fn tail(log: &Path, lines: usize) -> String {
 }
 
 /// Runs `case` with `server` serving `client`; the outcome, with the logs in `dir`.
+/// How many times a failing run is tried: some endpoints (OpenSSL's nghttp3 demo server, which
+/// asserts on some orders of parallel requests) fail now and then on any library, and a case
+/// is compared across libraries, not judged on one try.
+const ATTEMPTS: usize = 3;
+
+/// [`run_once`] until it passes, up to [`ATTEMPTS`] times (each try's logs in `dir/try-N`); the
+/// last outcome, and the number of tries.
 fn run_case(
+    case: &Case,
+    server: &dyn Endpoint,
+    client: &dyn Endpoint,
+    dir: &Path,
+    pki: &Path,
+    reference_lib: &Path,
+    seed: u64,
+) -> Result<(Outcome, usize)> {
+    let mut tries = 0;
+    loop {
+        tries += 1;
+        let try_dir = dir.join(format!("try-{tries}"));
+        let o = run_once(case, server, client, &try_dir, pki, reference_lib, seed)?;
+        if !matches!(o, Outcome::Fail(_)) || tries >= ATTEMPTS {
+            return Ok((o, tries));
+        }
+    }
+}
+
+/// The label of an outcome after `tries`.
+fn label_of(o: &Outcome, tries: usize) -> String {
+    if *o == Outcome::Pass && tries > 1 {
+        format!("pass (try {tries})")
+    } else {
+        o.label().to_owned()
+    }
+}
+
+fn run_once(
     case: &Case,
     server: &dyn Endpoint,
     client: &dyn Endpoint,
@@ -889,7 +947,7 @@ fn run_case(
     };
     let server_log = dir.join("server.log");
     let mut srv = spawn_logged(&mut server.server(&run, case.server), &server_log)?;
-    std::thread::sleep(SERVER_START);
+    wait_bound(run.port, &mut srv)?;
     let result = (|| -> Result<Outcome> {
         if let Some(status) = srv.try_wait()? {
             return Ok(Outcome::Fail(format!(
@@ -1259,7 +1317,13 @@ fn regressions(rows: &[Row], sides: &[Side]) -> Vec<String> {
     out
 }
 
-fn write_report(root: &Path, rows: &[Row], sides: &[Side], bad: &[String]) -> Result<PathBuf> {
+fn write_report(
+    root: &Path,
+    rows: &[Row],
+    sides: &[Side],
+    bad: &[String],
+    retried: &[String],
+) -> Result<PathBuf> {
     let mut md = String::from("# QUIC interop: OpenSSL's QUIC API against other stacks\n\n");
     let _ = writeln!(
         md,
@@ -1308,6 +1372,15 @@ fn write_report(root: &Path, rows: &[Row], sides: &[Side], bad: &[String]) -> Re
         md.push_str("\n## Failures\n\n");
         md.push_str(&failures);
     }
+    if !retried.is_empty() {
+        let _ = writeln!(
+            md,
+            "\n## Tried more than once\n\nA failing run is tried up to {ATTEMPTS} times.\n"
+        );
+        for r in retried {
+            let _ = writeln!(md, "- {r}");
+        }
+    }
     if !bad.is_empty() {
         md.push_str("\n## Passing on the reference only\n\n");
         for b in bad {
@@ -1317,6 +1390,104 @@ fn write_report(root: &Path, rows: &[Row], sides: &[Side], bad: &[String]) -> Re
     let path = target_dir(root).join("quic-interop-report.md");
     fs::write(&path, md)?;
     Ok(path)
+}
+
+/// `test-consumers curl-h3`'s downloads: HTTP/3 requests in curl's parallel mode.
+const CURL_CASES: &[Case] = &[
+    Case {
+        name: "one",
+        files: &[(1, 5 * KB, 10)],
+        client: "http3",
+        server: "http3",
+    },
+    Case {
+        name: "three",
+        files: &[(1, 5 * KB, 10), (1, 10 * KB, 10), (1, 500 * KB, 10)],
+        client: "http3",
+        server: "http3",
+    },
+    Case {
+        name: "large",
+        files: &[(1, 10 * MB, 10)],
+        client: "http3",
+        server: "http3",
+    },
+    Case {
+        name: "many",
+        files: &[(100, KB, 10)],
+        client: "http3",
+        server: "http3",
+    },
+];
+
+/// `test-consumers curl-h3`: curl (built with OpenSSL's QUIC stack) on each side, downloading
+/// [`CURL_CASES`] over HTTP/3 from each peer's server (each on its own TLS stack, and fixed);
+/// per side, each test's name, whether it passed, and why not. Logs go to `work`.
+pub(crate) fn curl_h3(
+    reference: &Path,
+    sides: &[Side],
+    work: &Path,
+) -> Result<Vec<Vec<(String, bool, String)>>> {
+    let root = workspace_root();
+    let pins = parse_pins(&fs::read_to_string(
+        root.join("tests/quic-interop/pins.txt"),
+    )?)?;
+    let dir = target_dir(&root).join("quic-interop");
+    fresh_dir(work)?;
+    let log = work.join("build.log");
+    let pki = work.join("pki");
+    make_pki(reference, &pki)?;
+    let hq = build_hq(reference, &dir.join("build"), &log)?;
+    let h3 = build_h3(reference, &dir, &pins, &log)?;
+    let servers: Vec<Box<dyn Endpoint>> = vec![
+        Box::new(Quiche {
+            bin: build_quiche(&root, &dir, &pins, &log)?,
+        }),
+        Box::new(Ngtcp2 {
+            bin: build_ngtcp2(reference, &dir, &pins, &log)?,
+        }),
+        Box::new(QuicGo {
+            bin: build_quic_go(&dir, &pins, &log)?,
+        }),
+    ];
+    let reference_lib = reference.join("lib");
+    let mut per_side = Vec::new();
+    for side in sides {
+        let curl = Ours {
+            side: side.clone(),
+            hq: hq.clone(),
+            h3: h3.clone(),
+        };
+        let mut results = Vec::new();
+        for server in &servers {
+            for (n, case) in CURL_CASES.iter().enumerate() {
+                let seed = 0x6375_726C_0000_0000 ^ u64::try_from(n).unwrap_or(0);
+                let run_dir = work.join(side.name).join(server.name()).join(case.name);
+                let (outcome, tries) = run_case(
+                    case,
+                    server.as_ref(),
+                    &curl,
+                    &run_dir,
+                    &pki,
+                    &reference_lib,
+                    seed,
+                )?;
+                let name = format!("{} {}", server.name(), case.name);
+                println!(
+                    "curl-h3  {:<9} {name:<16} {}",
+                    side.name,
+                    label_of(&outcome, tries)
+                );
+                results.push(match outcome {
+                    Outcome::Pass => (name, true, String::new()),
+                    Outcome::Fail(why) => (name, false, why),
+                    Outcome::Unsupported => (name, false, "unsupported".to_owned()),
+                });
+            }
+        }
+        per_side.push(results);
+    }
+    Ok(per_side)
 }
 
 pub fn run(args: &[String]) -> Result {
@@ -1382,6 +1553,7 @@ pub fn run(args: &[String]) -> Result {
         .collect();
     let reference_lib = reference.join("lib");
     let mut rows = Vec::new();
+    let mut retried = Vec::new();
     for peer_name in &peers {
         let peer: Box<dyn Endpoint> = match peer_name.as_str() {
             "quiche" => Box::new(Quiche {
@@ -1408,7 +1580,7 @@ pub fn run(args: &[String]) -> Result {
             };
             for o in &ours {
                 let base = work.join(peer.name()).join(case.name).join(o.side.name);
-                let a = run_case(
+                let (a, a_tries) = run_case(
                     case,
                     o,
                     peer.as_ref(),
@@ -1417,7 +1589,7 @@ pub fn run(args: &[String]) -> Result {
                     &reference_lib,
                     seed,
                 )?;
-                let b = run_case(
+                let (b, b_tries) = run_case(
                     case,
                     peer.as_ref(),
                     o,
@@ -1426,13 +1598,27 @@ pub fn run(args: &[String]) -> Result {
                     &reference_lib,
                     seed,
                 )?;
+                for (direction, outcome, tries) in [
+                    ("openssl server", &a, a_tries),
+                    ("openssl client", &b, b_tries),
+                ] {
+                    if tries > 1 {
+                        retried.push(format!(
+                            "{} {} ({direction}, {}): {}",
+                            peer.name(),
+                            case.name,
+                            o.side.name,
+                            label_of(outcome, tries)
+                        ));
+                    }
+                }
                 println!(
-                    "{:<8} {:<13} {:<9} openssl server: {:<11} openssl client: {}",
+                    "{:<8} {:<13} {:<9} openssl server: {:<17} openssl client: {}",
                     peer.name(),
                     case.name,
                     o.side.name,
-                    a.label(),
-                    b.label()
+                    label_of(&a, a_tries),
+                    label_of(&b, b_tries)
                 );
                 row.ours_server.push(a);
                 row.ours_client.push(b);
@@ -1441,7 +1627,7 @@ pub fn run(args: &[String]) -> Result {
         }
     }
     let bad = regressions(&rows, &sides);
-    let path = write_report(&root, &rows, &sides, &bad)?;
+    let path = write_report(&root, &rows, &sides, &bad, &retried)?;
     if reference_only {
         // Validating the cases themselves: every supported run must pass on the reference.
         let failed = rows

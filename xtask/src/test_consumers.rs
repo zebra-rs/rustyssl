@@ -38,6 +38,12 @@
 //! resumption, early data, client certificates, ciphers; the client against the server over
 //! loopback) runs in a virtualenv with pytest and cryptography. Needs cmake, libev (Debian
 //! `libev-dev`, Homebrew `libev`) and Python 3 with `venv`; skipped without them.
+//!
+//! **curl-h3**: curl 8.18.0 built with `--with-openssl-quic` and nghttp3 (OpenSSL's own QUIC
+//! stack, the API of ADR 0006's 10.2) downloading over HTTP/3, in its parallel mode, from three
+//! other stacks' servers on loopback (quiche, ngtcp2 on the reference, quic-go): one file, three,
+//! a 10 MB one, a hundred. Built and run by `test-quic-interop`'s driver from its pins
+//! (`tests/quic-interop/pins.txt`); needs what that command needs.
 
 use std::fmt::Write as _;
 use std::fs;
@@ -50,7 +56,7 @@ use crate::test_providers::{Pin, Results, Side, cmake, fetch, parse_pins, pool, 
 use crate::util::{Result, fresh_dir, run_logged, target_dir, workspace_root};
 
 /// The consumers the command knows, as named on its command line.
-const CONSUMERS: &[&str] = &["rust", "ruby", "pyca", "node", "ngtcp2"];
+const CONSUMERS: &[&str] = &["rust", "ruby", "pyca", "node", "ngtcp2", "curl-h3"];
 
 /// How long one test may run.
 const TEST_TIMEOUT: Duration = Duration::from_secs(300);
@@ -566,7 +572,26 @@ fn run_ngtcp2(ctx: &Ctx<'_>, pins: &[Pin]) -> Result<Vec<Results>> {
     keep(ctx, "ngtcp2", all)
 }
 
-/// Each test's outcome in TAP: `ok N name` passes (a `# skip` isn't a result), `not ok N
+/// curl-h3: curl over HTTP/3 with OpenSSL's QUIC stack, against other stacks' servers (built
+/// and run by `test-quic-interop`'s driver, from its pins).
+fn run_curl_h3(ctx: &Ctx<'_>) -> Result<Vec<Results>> {
+    let work = ctx.work.join("curl-h3");
+    let all = crate::test_quic_interop::curl_h3(ctx.reference, ctx.sides, &work)?
+        .into_iter()
+        .map(|side| {
+            side.into_iter()
+                .map(|(name, passed, why)| Outcome {
+                    name,
+                    passed,
+                    output: (!passed).then_some(why),
+                })
+                .collect()
+        })
+        .collect();
+    keep(ctx, "curl-h3", all)
+}
+
+/// Each test's outcome in TAP:`ok N name` passes (a `# skip` isn't a result), `not ok N
 /// name` fails.
 fn tap_results(out: &str) -> Vec<(String, bool)> {
     out.lines()
@@ -765,6 +790,7 @@ pub fn run(args: &[String]) -> Result {
             "pyca" => run_pyca(&ctx, &pins)?,
             "node" => run_node(&ctx, &pins)?,
             "ngtcp2" => run_ngtcp2(&ctx, &pins)?,
+            "curl-h3" => run_curl_h3(&ctx)?,
             _ => unreachable!(),
         };
         let report = Report {
