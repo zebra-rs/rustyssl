@@ -203,6 +203,18 @@ pub enum Protection {
         /// Encrypt-then-MAC (RFC 7366).
         etm: bool,
     },
+    /// TLS 1.0–1.2's MAC-then-encrypt through a stitched CBC-and-HMAC cipher (an engine's,
+    /// `EVP_CIPH_FLAG_AEAD_CIPHER` in CBC mode), which MACs, pads, and checks itself.
+    Stitched12 {
+        /// The keyed stitched cipher.
+        stitched: Box<dyn crate::crypto::Stitched>,
+        /// The cipher's block length.
+        block_len: usize,
+        /// The MAC's length (for the overhead).
+        mac_len: usize,
+        /// Whether each record carries its IV (TLS 1.1 and later).
+        explicit_iv: bool,
+    },
 }
 
 impl core::fmt::Debug for Protection {
@@ -213,6 +225,7 @@ impl core::fmt::Debug for Protection {
             Self::Tls13Integrity { .. } => "Protection::Tls13Integrity",
             Self::Aead12 { .. } => "Protection::Aead12",
             Self::Cbc12 { .. } => "Protection::Cbc12",
+            Self::Stitched12 { .. } => "Protection::Stitched12",
         })
     }
 }
@@ -289,6 +302,23 @@ impl Protection {
         etm: bool,
         encrypt: bool,
     ) -> Result<Self> {
+        let explicit_iv =
+            version >= tls1_1() || version == u16::try_from(abi::DTLS1_BAD_VER).unwrap_or(0x0100);
+        // `ssl_cipher_get_evp`: TLS (not DTLS), 1.0 or later, MAC-then-encrypt, AES-128/256
+        // with SHA-1 or SHA-256 may use a stitched cipher in place of the two.
+        let stitchable = !etm
+            && version >> 8 == 3
+            && version >= tls1_0()
+            && matches!(alg, CipherAlg::Aes128Cbc | CipherAlg::Aes256Cbc)
+            && matches!(mac_hash, HashAlg::Sha1 | HashAlg::Sha256);
+        if stitchable && let Some(stitched) = p.stitched(alg, mac_hash, key, mac_key, iv, encrypt) {
+            return Ok(Self::Stitched12 {
+                stitched,
+                block_len: alg.block_len(),
+                mac_len: mac_hash.len(),
+                explicit_iv,
+            });
+        }
         let cipher = if alg == CipherAlg::Null {
             None
         } else {
@@ -305,8 +335,7 @@ impl Protection {
                 vec![0; alg.block_len()]
             },
             // DTLS (counted down, `DTLS1_BAD_VER` 0x0100 included) always sends the IV.
-            explicit_iv: version >= tls1_1()
-                || version == u16::try_from(abi::DTLS1_BAD_VER).unwrap_or(0x0100),
+            explicit_iv,
             etm,
         })
     }
@@ -946,6 +975,43 @@ impl RecordReader {
                 record.data = ct;
                 Ok(())
             }
+            Protection::Stitched12 {
+                stitched,
+                block_len,
+                explicit_iv,
+                ..
+            } => {
+                let bs = *block_len;
+                // Publicly invalid: no whole blocks.
+                if record.data.is_empty() || !record.data.len().is_multiple_of(bs) {
+                    return Err(bad_mac());
+                }
+                let seq = fixed.unwrap_or(self.seq);
+                take_seq(fixed, &mut self.seq)?;
+                let header =
+                    mac_header(seq, record.content_type, record.version, record.data.len())?;
+                // The cipher checks the padding and the MAC (a failure is bad_record_mac).
+                let mac_len =
+                    rustyssl_crypto::dit::with(|| stitched.open(&header, &mut record.data))
+                        .map_err(|_| bad_mac())?;
+                if *explicit_iv {
+                    if record.data.len() < bs {
+                        return Err(bad_mac());
+                    }
+                    record.data.drain(..bs);
+                }
+                // `tls1_cbc_remove_padding_and_mac` for a stitched cipher: the padding and MAC
+                // are checked already, so only their lengths come off (checked here, where
+                // OpenSSL trusts the cipher).
+                let pad = usize::from(record.data.last().copied().unwrap_or(0));
+                let n = record
+                    .data
+                    .len()
+                    .checked_sub(pad.saturating_add(1).saturating_add(mac_len))
+                    .ok_or_else(bad_mac)?;
+                record.data.truncate(n);
+                Ok(())
+            }
         }
     }
 
@@ -1262,6 +1328,9 @@ impl RecordWriter {
                 cipher: Some(_),
                 explicit_iv: false,
                 ..
+            } | Protection::Stitched12 {
+                explicit_iv: false,
+                ..
             }
         );
         if self.empty_fragments && tls10_cbc && ty == application_data() && !data.is_empty() {
@@ -1380,6 +1449,28 @@ impl RecordWriter {
                     }
                 }
             }
+            Protection::Stitched12 {
+                stitched,
+                block_len,
+                explicit_iv,
+                ..
+            } => {
+                // `tls1_enc`'s stitched path: a random explicit IV block (TLS 1.1 and later),
+                // then the payload; the header carries their length, and the cipher MACs,
+                // pads, and encrypts.
+                let seq = take_seq(fixed, &mut self.seq)?;
+                let mut body =
+                    Vec::with_capacity(data.len().saturating_add(block_len.saturating_mul(3)));
+                if *explicit_iv {
+                    let mut e = vec![0u8; *block_len];
+                    p.random(&mut e, false)?;
+                    body.extend_from_slice(&e);
+                }
+                body.extend_from_slice(data);
+                let header = mac_header(seq, ty, self.version, body.len())?;
+                stitched.seal(&header, &mut body)?;
+                (ty, self.version, body)
+            }
         };
         match fixed {
             Some(seq) => out.extend_from_slice(&dtls::header(outer_ty, version, seq, body.len())?),
@@ -1460,6 +1551,15 @@ impl RecordWriter {
                 let bs = if cipher.is_some() { *block_len } else { 0 };
                 let eiv = if *explicit_iv { bs } else { 0 };
                 eiv.saturating_add(bs).saturating_add(mac_hash.len())
+            }
+            Protection::Stitched12 {
+                block_len,
+                mac_len,
+                explicit_iv,
+                ..
+            } => {
+                let eiv = if *explicit_iv { *block_len } else { 0 };
+                eiv.saturating_add(*block_len).saturating_add(*mac_len)
             }
         };
         header.saturating_add(extra)

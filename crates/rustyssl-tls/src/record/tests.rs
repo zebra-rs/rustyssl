@@ -899,3 +899,74 @@ fn errors_name_the_record_layer_function_openssl_raises_them_from() {
     let e = r.read(&p, &bad).unwrap_err();
     assert_eq!((e.func, e.cause), (Some("tls_get_more_records"), None));
 }
+
+/// A stitched cipher that encrypts nothing, as OpenSSL's ossltest engine's: sealing writes a
+/// known MAC and real padding; opening accepts anything, so the record layer's own length
+/// checks are what stand.
+struct FakeStitched {
+    payload: Option<usize>,
+}
+
+impl crate::crypto::Stitched for FakeStitched {
+    fn seal(&mut self, header: &[u8; 13], body: &mut Vec<u8>) -> Result<()> {
+        let len = usize::from(u16::from_be_bytes([header[11], header[12]]));
+        assert_eq!(len, body.len());
+        let total = (len + 20 + 16) & !15;
+        let pad = u8::try_from(total - len - 20 - 1).unwrap();
+        body.extend_from_slice(&[0xaa; 20]);
+        body.resize(total, pad);
+        self.payload = Some(len);
+        Ok(())
+    }
+
+    fn open(&mut self, _header: &[u8; 13], _body: &mut [u8]) -> Result<usize> {
+        Ok(20)
+    }
+}
+
+fn stitched(version: u16) -> impl Fn(bool) -> Protection {
+    move |_| Protection::Stitched12 {
+        stitched: Box::new(FakeStitched { payload: None }),
+        block_len: 16,
+        mac_len: 20,
+        explicit_iv: version >= 0x0302,
+    }
+}
+
+#[test]
+fn a_stitched_cipher_carries_records_in_every_version() {
+    let p = TestProvider::new(b"s");
+    for version in [0x0301u16, 0x0302, 0x0303] {
+        let make = stitched(version);
+        let (mut w, mut r) = pair12(&p, &make, version);
+        for len in [0usize, 1, 15, 16, 17, 1000, 16384] {
+            round_trip(&p, &mut w, &mut r, &vec![0x5a; len]);
+        }
+    }
+}
+
+#[test]
+fn a_stitched_records_lengths_are_checked_where_openssl_trusts_the_cipher() {
+    // Padding that claims more than the record holds: OpenSSL subtracts it unchecked (the
+    // cipher verified it); here the subtraction is checked, and the record is a bad MAC.
+    let p = TestProvider::new(b"s");
+    let mut r = RecordReader::new(true);
+    r.set_protection(Mode::Tls12(0x0303), stitched(0x0303)(false));
+    let mut rec = vec![23, 3, 3, 0, 32];
+    rec.extend_from_slice(&[0xff; 32]);
+    let e = r.read(&p, &rec).unwrap_err();
+    assert_eq!(
+        reason(e),
+        (
+            al(abi::SSL_AD_BAD_RECORD_MAC),
+            abi::SSL_R_DECRYPTION_FAILED_OR_BAD_RECORD_MAC
+        )
+    );
+    // A body that isn't whole blocks is publicly invalid.
+    let mut r = RecordReader::new(true);
+    r.set_protection(Mode::Tls12(0x0303), stitched(0x0303)(false));
+    let mut rec = vec![23, 3, 3, 0, 17];
+    rec.extend_from_slice(&[0; 17]);
+    let e = r.read(&p, &rec).unwrap_err();
+    assert_eq!(reason(e).0, al(abi::SSL_AD_BAD_RECORD_MAC));
+}
