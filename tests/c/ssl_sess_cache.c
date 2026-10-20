@@ -587,6 +587,69 @@ static void test_copy(void)
     errors();
 }
 
+static int accept_all(int ok, X509_STORE_CTX *ctx)
+{
+    (void)ok;
+    (void)ctx;
+    return 1;
+}
+
+/* What the server reports of the client's certificate. */
+static void server_peer(SSL *s, const char *when)
+{
+    X509 *peer = SSL_get1_peer_certificate(s);
+    STACK_OF(X509) *chain = SSL_get_peer_cert_chain(s);
+    char buf[64];
+
+    printf("  %s: reused %d, verify result %ld, peer %s, chain %d\n", when,
+        SSL_session_reused(s), SSL_get_verify_result(s),
+        peer != NULL ? cn(peer, buf, sizeof(buf)) : "none",
+        chain != NULL ? sk_X509_num(chain) : -1);
+    X509_free(peer);
+}
+
+/* A client certificate, verified on the full handshake, is still the server's once resumed. */
+static void test_client_cert(int max, int ticket)
+{
+    SSL_CTX *sctx = server_ctx(), *cctx = client_ctx(max);
+    X509 *ca = cert(CA_PEM), *x = cert(SERVER_PEM);
+    EVP_PKEY *k = key(SERVER_KEY_PEM);
+    SSL_SESSION *first;
+    SSL *c, *s;
+
+    printf("# a client certificate kept by a resumed session (%s, %s)\n",
+        max == TLS1_3_VERSION ? "TLS 1.3" : "TLS 1.2", ticket ? "ticket" : "session ID");
+    if (!ticket)
+        SSL_CTX_set_options(sctx, SSL_OP_NO_TICKET);
+    X509_STORE_add_cert(SSL_CTX_get_cert_store(sctx), ca);
+    SSL_CTX_set_verify(sctx, SSL_VERIFY_PEER, accept_all);
+    check(SSL_CTX_use_certificate(cctx, x) == 1 && SSL_CTX_use_PrivateKey(cctx, k) == 1,
+        "the client's certificate");
+    connect_pair(cctx, sctx, NULL, &c, &s);
+    check(run(c, s) == 0, "the full handshake");
+    drain(c, s);
+    server_peer(s, "full");
+    first = SSL_get1_session(c);
+    close_pair(c, s);
+    connect_pair(cctx, sctx, first, &c, &s);
+    check(run(c, s) == 0, "the resumed handshake");
+    drain(c, s);
+    server_peer(s, "resumed");
+    close_pair(c, s);
+    SSL_SESSION_free(first);
+    X509_free(ca);
+    X509_free(x);
+    EVP_PKEY_free(k);
+    quiet_remove = 1;
+    SSL_CTX_free(sctx);
+    SSL_CTX_free(cctx);
+    quiet_remove = 0;
+    SSL_SESSION_free(client_last);
+    client_last = NULL;
+    server_last = NULL;
+    errors();
+}
+
 int main(void)
 {
     setvbuf(stdout, NULL, _IOLBF, 0);
@@ -596,6 +659,9 @@ int main(void)
     test_tls13();
     test_external();
     test_copy();
+    test_client_cert(TLS1_2_VERSION, 0);
+    test_client_cert(TLS1_2_VERSION, 1);
+    test_client_cert(TLS1_3_VERSION, 1);
     printf("1..%d\n", number);
     return failures == 0 ? 0 : 1;
 }

@@ -753,8 +753,10 @@ ffi_export! {
 /// The peer's certificate (the connection keeps it), or NULL.
 fn peer_leaf(x: &Ssl) -> *mut X509 {
     let st = x.state();
-    // A resumed handshake sends no certificate: the peer is the session's (`s->session->peer`).
-    if st.hit != 0 && st.drv.peer.from == 0 && !st.sess.session.is_null() {
+    // A resumed handshake sends no certificate: the peer is the session's (`s->session->peer`),
+    // even though the core restores the session's chain (which is then not a received one, and
+    // not verified again).
+    if st.hit != 0 && !st.sess.session.is_null() {
         // SAFETY: the connection's session, which it holds a reference to.
         return unsafe {
             crate::ssl::session::rustyssl_private_SSL_SESSION_get0_peer(st.sess.session)
@@ -814,6 +816,12 @@ ffi_export! {
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return ptr::null_mut() };
         let st = x.state();
+        // A resumed handshake's chain is the session's (`s->session->peer_chain`): a cached
+        // session's, or none from a ticket.
+        if st.hit != 0 && !st.sess.session.is_null() {
+            // SAFETY: the connection's session, which it holds a reference to.
+            return unsafe { crate::ssl::session::with(st.sess.session, ptr::null_mut(), |d| d.peer_chain) };
+        }
         if st.drv.peer.from == 0 {
             return ptr::null_mut();
         }

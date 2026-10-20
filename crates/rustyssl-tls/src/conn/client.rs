@@ -519,8 +519,11 @@ pub(crate) fn read_transition(c: &mut Connection, mt: u8) -> Result<()> {
 }
 
 /// A TLS client's records from now on carry its version (the ClientHello's highest until the
-/// ServerHello chooses one), TLS 1.3's as TLS 1.2.
+/// ServerHello chooses one), TLS 1.3's as TLS 1.2. DTLS's records keep theirs.
 fn client_records_at_version(c: &mut Connection) {
+    if c.cfg.dtls {
+        return;
+    }
     let v = c.neg.version;
     c.rw.version = if v >= crate::consts::version::TLS1_3 {
         crate::consts::version::TLS1_2
