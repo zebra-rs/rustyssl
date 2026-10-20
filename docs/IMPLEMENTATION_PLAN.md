@@ -5808,6 +5808,13 @@ OpenSSL 3.6.5 ABI, with every 3.5 export unchanged (`abi-check compat35`).
 
 ## Phase 10: QUIC
 
+Progress (2026-10-20): the design is [ADR 0006](adr/0006-quic.md). It defines a QUIC mode on
+`rustyssl_tls::Connection` (CRYPTO bytes per level, secrets as events, transport parameters as
+a request) that serves both 10.3 and the transport; `rustyssl-quic` as a sans-IO port and
+channel; and capi's QUIC objects under one mutex per engine. Work is split into parallel forks
+with disjoint files: A (the seam and 10.3), B (the transport), then C (10.2's API) and D
+(interop and curl HTTP/3).
+
 - [ ] **10.1 Sans-IO QUIC transport** (`rustyssl-quic`):
   - packet protection and header protection
   - frames, streams, flow control
