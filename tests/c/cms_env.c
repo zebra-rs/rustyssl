@@ -883,6 +883,25 @@ int main(void)
     check(decrypts(c2, ec_key, ec, 0), "AuthEnvelopedData, round trip");
     CMS_ContentInfo_free(c2);
     CMS_ContentInfo_free(cms);
+    /* Streamed: the tag, known only once the content is through, goes into the MAC. */
+    {
+        STACK_OF(X509) *one = sk_X509_new_null();
+
+        sk_X509_push(one, ec);
+        cms = CMS_encrypt(one, NULL, EVP_aes_128_gcm(), CMS_STREAM | CMS_BINARY);
+        sk_X509_free(one);
+    }
+    in = mem(msg);
+    out = BIO_new(BIO_s_mem());
+    r = PEM_write_bio_CMS_stream(out, cms, in, CMS_STREAM | CMS_BINARY);
+    errors();
+    check(r == 1, "PEM_write_bio_CMS_stream of AuthEnvelopedData");
+    BIO_free(in);
+    CMS_ContentInfo_free(cms);
+    cms = PEM_read_bio_CMS(out, NULL, NULL, NULL);
+    BIO_free(out);
+    check(cms != NULL && decrypts(cms, ec_key, ec, 0), "streamed AuthEnvelopedData, round trip");
+    CMS_ContentInfo_free(cms);
     cms = CMS_AuthEnvelopedData_create(EVP_aes_128_cbc());
     check(CMS_add1_recipient_cert(cms, rsa, 0) != NULL, "AuthEnvelopedData with CBC takes a recipient");
     in = mem(msg);
