@@ -1366,7 +1366,7 @@ pub(crate) fn ext_parse_early_data(
     if x.context == cx::TLS1_3_NEW_SESSION_TICKET {
         let max = mx::early_data::parse_ticket(body)?;
         c.neg.session.max_early_data = max;
-        if c.cfg.quic && max != u32::MAX {
+        if c.cfg.quic.is_some() && max != u32::MAX {
             c.neg.session.max_early_data = 1;
             return Err(Error::alert(
                 abi::SSL_AD_ILLEGAL_PARAMETER,

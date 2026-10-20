@@ -6,7 +6,7 @@ use core::ffi::c_int;
 
 use rustyssl_abi as abi;
 
-use crate::conn::{Connection, Event};
+use crate::conn::{Connection, Event, QuicLevel};
 use crate::crypto::{HashAlg, Provider, Secret};
 use crate::error::{Error, InFunc, Result};
 use crate::keysched::{self, KeyBlock, PrfHash, Schedule13, keylog};
@@ -130,6 +130,23 @@ fn check_boundary(c: &Connection) -> Result<()> {
 /// `SSL_R_BAD_RECORD_TYPE`), as RFC 8446, section 5 requires.
 fn new_read_layer(c: &mut Connection) {
     c.rr.first_handshake = super::finished::is_first_handshake(c);
+}
+
+/// QUIC mode's key change (`quic_new_record_layer`): the secret goes to the caller instead of
+/// the record layer; a read level changes only on a message boundary.
+fn quic_secret(
+    c: &mut Connection,
+    read: bool,
+    level: QuicLevel,
+    cp: &'static Cipher,
+    hash: HashAlg,
+    secret: &Secret,
+) -> Result<()> {
+    if read {
+        check_boundary(c)?;
+    }
+    c.quic_secret(read, level, cp, hash, secret);
+    Ok(())
 }
 
 /// Installs TLS 1.3 protection in one direction.
@@ -298,6 +315,9 @@ fn change_cipher_state13_inner(
         c.neg.early_cipher = Some(cp);
         log_secret(c, keylog::EARLY_EXPORTER_SECRET, eem.bytes());
         log_secret(c, keylog::CLIENT_EARLY_TRAFFIC_SECRET, secret.bytes());
+        if c.cfg.quic.is_some() {
+            return quic_secret(c, read, QuicLevel::Early, cp, hash, &secret);
+        }
         if !read {
             // A client's early alerts go out in the clear (`set_plain_alerts`).
             c.rw.plain_alerts = !c.cfg.server;
@@ -368,6 +388,14 @@ fn change_cipher_state13_inner(
         (false, true) => c.hs.sh.keys.client_app_secret = secret.clone(),
         (false, false) => c.hs.sh.keys.server_app_secret = secret.clone(),
     }
+    if c.cfg.quic.is_some() {
+        let level = if handshake {
+            QuicLevel::Handshake
+        } else {
+            QuicLevel::Application
+        };
+        return quic_secret(c, read, level, cp, hash, &secret);
+    }
     if !read {
         c.rw.plain_alerts = false;
     }
@@ -419,15 +447,18 @@ fn update_key_inner(c: &mut Connection, p: &dyn Provider, sending: bool) -> Resu
         &c.hs.sh.keys.client_app_secret
     };
     let next = keysched::next_traffic_secret(p, hash, old.bytes())?;
-    let prot = protection13(p, cp, hash, next.bytes())?;
     if server_secret {
         c.hs.sh.keys.server_app_secret = next.clone();
     } else {
         c.hs.sh.keys.client_app_secret = next.clone();
     }
-    if sending {
+    if c.cfg.quic.is_some() {
+        quic_secret(c, !sending, QuicLevel::Application, cp, hash, &next)?;
+    } else if sending {
+        let prot = protection13(p, cp, hash, next.bytes())?;
         c.rw.set_protection(Mode::Tls13, prot);
     } else {
+        let prot = protection13(p, cp, hash, next.bytes())?;
         check_boundary(c)?;
         c.rr.set_protection(Mode::Tls13, prot);
         new_read_layer(c);

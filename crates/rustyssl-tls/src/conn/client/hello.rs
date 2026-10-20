@@ -403,7 +403,9 @@ pub(super) fn process_server_hello(
     if c.is_tls13() {
         digest_cached_records(c, p, true)?;
         keys::store_handshake_traffic_hash(c)?;
-        if c.cfg.quic || (c.hs.sh.early_data_state == EarlyDataState::None && !middlebox(c)) {
+        if c.cfg.quic.is_some()
+            || (c.hs.sh.early_data_state == EarlyDataState::None && !middlebox(c))
+        {
             keys::change_cipher_state13(
                 c,
                 p,

@@ -314,7 +314,9 @@ fn custom_add(
             continue;
         }
         let mut body = Vec::new();
-        if m.has_add {
+        if is_quic_params(c, m.typ) {
+            body = c.quic_params_to_send();
+        } else if m.has_add {
             let r = Request::CustomExt {
                 index: i,
                 typ: m.typ,
@@ -550,6 +552,12 @@ pub fn parse_all(
     Ok(Step::Done)
 }
 
+/// Whether custom extension `typ` is QUIC mode's transport parameters, which the core sends
+/// from its configuration and reports as [`Request::QuicTransportParams`].
+fn is_quic_params(c: &Connection, typ: u16) -> bool {
+    c.cfg.quic.is_some() && typ == t::QUIC_TRANSPORT_PARAMETERS
+}
+
 /// `custom_ext_parse`.
 pub(crate) fn custom_parse(
     c: &mut Connection,
@@ -587,6 +595,20 @@ pub(crate) fn custom_parse(
         && let Some(f) = c.hs.sh.ext.custom.get_mut(i)
     {
         *f |= FLAG_RECEIVED;
+    }
+    if is_quic_params(c, typ) {
+        let r = Request::QuicTransportParams {
+            params: body.to_vec(),
+        };
+        return match ask_once(c, r, chainidx) {
+            None => Ok(Step::Wait),
+            Some(Answer::Continue) => Ok(Step::Done),
+            Some(Answer::Fail { alert, .. }) => {
+                let al = alert.map_or(abi::SSL_AD_INTERNAL_ERROR, c_int::from);
+                Err(Error::alert(al, abi::SSL_R_BAD_EXTENSION))
+            }
+            Some(_) => Err(Error::internal()),
+        };
     }
     if !m.has_parse {
         return Ok(Step::Done);
