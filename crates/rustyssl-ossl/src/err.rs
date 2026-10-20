@@ -108,3 +108,15 @@ pub fn snapshot() -> Vec<Entry> {
         });
     }
 }
+
+/// `ERR_print_errors_fp(stdout)`, as the bytes it would write (the caller writes them, in
+/// order with its own output).
+pub fn errors_text() -> Vec<u8> {
+    match Bio::new_mem() {
+        Some(m) => {
+            print_errors(&m);
+            m.read_to_end()
+        }
+        None => Vec::new(),
+    }
+}

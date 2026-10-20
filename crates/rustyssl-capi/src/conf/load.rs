@@ -175,7 +175,7 @@ fn reason(e: &Error) -> c_int {
     match e {
         Error::MissingCloseSquareBracket => CONF_R_MISSING_CLOSE_SQUARE_BRACKET,
         Error::MissingEqualSign(_) => CONF_R_MISSING_EQUAL_SIGN,
-        Error::InvalidPragma => CONF_R_INVALID_PRAGMA,
+        Error::InvalidPragma | Error::InvalidPragmaValue => CONF_R_INVALID_PRAGMA,
         Error::NoCloseBrace => CONF_R_NO_CLOSE_BRACE,
         Error::VariableHasNoValue => CONF_R_VARIABLE_HAS_NO_VALUE,
         Error::VariableExpansionTooLong => CONF_R_VARIABLE_EXPANSION_TOO_LONG,
@@ -344,6 +344,13 @@ unsafe fn read_all(
                         data.extend_from_slice(here);
                         err::raise_with_bytes(ERR_LIB_CONF, reason(&e), "def_load_bio", &data);
                     }
+                    // Upstream raises what value expansion finds in `str_copy`.
+                    Error::NoCloseBrace
+                    | Error::VariableHasNoValue
+                    | Error::VariableExpansionTooLong => {
+                        err::raise(ERR_LIB_CONF, reason(&e), "str_copy");
+                    }
+                    Error::InvalidPragmaValue => err::raise(ERR_LIB_CONF, reason(&e), "parsebool"),
                     _ => err::raise(ERR_LIB_CONF, reason(&e), "def_load_bio"),
                 }
                 return Err(Failure::Raised);

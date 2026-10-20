@@ -1,0 +1,5 @@
+inc_top = in the includer
+.include basic.cnf
+
+[ included ]
+from = includer

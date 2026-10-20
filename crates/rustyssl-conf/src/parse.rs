@@ -19,6 +19,9 @@ pub enum Error {
     MissingEqualSign(Vec<u8>),
     /// A malformed pragma (`CONF_R_INVALID_PRAGMA`).
     InvalidPragma,
+    /// A boolean pragma's value that is neither on/true nor off/false (`CONF_R_INVALID_PRAGMA`,
+    /// which OpenSSL raises in `parsebool`).
+    InvalidPragmaValue,
     /// `${` or `$(` without its closing brace (`CONF_R_NO_CLOSE_BRACE`).
     NoCloseBrace,
     /// A reference to a variable that isn't set (`CONF_R_VARIABLE_HAS_NO_VALUE`).
@@ -367,7 +370,7 @@ fn parse_bool(v: &[u8]) -> Result<bool, Error> {
     } else if v.eq_ignore_ascii_case(b"off") || v.eq_ignore_ascii_case(b"false") {
         Ok(false)
     } else {
-        Err(Error::InvalidPragma)
+        Err(Error::InvalidPragmaValue)
     }
 }
 
@@ -581,6 +584,10 @@ mod tests {
         assert_eq!(value(b".pragma :on"), Err(Error::InvalidPragma));
         assert_eq!(value(b".pragma dollarid:"), Err(Error::InvalidPragma));
         assert_eq!(value(b".pragmatic = 1"), Err(Error::InvalidPragma));
+        assert_eq!(
+            value(b".pragma dollarid:maybe"),
+            Err(Error::InvalidPragmaValue)
+        );
         assert_eq!(
             value(b".include a.cnf"),
             Ok(Line::Include(b"a.cnf".to_vec()))

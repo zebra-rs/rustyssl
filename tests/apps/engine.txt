@@ -1,0 +1,53 @@
+# `openssl engine` (cargo xtask test-apps runs each line with upstream's tool on the reference,
+# then with ours on rustyssl and on the reference). Engines found through ENGINESDIR (padlock,
+# an unknown id) name a directory that differs by library, so they are loaded by path instead.
+engine -help
+engine -h
+engine
+engine -c
+engine -t
+engine -tt
+engine -t -t
+engine -v
+engine -vv
+engine -vvv
+engine -vvvv
+engine -vvvv -v
+engine -c -t -vvvv
+engine rdrand
+engine rdrand -c -tt -vvvv
+engine dynamic
+engine dynamic -c -t -vv
+engine dynamic rdrand -c
+engine -c dynamic rdrand
+engine rdrand -c dynamic
+engine dynamic -t -post ID:foo
+engine rdrand -t -post NOSUCH -post NOSUCH:1
+engine dynamic -pre ID:foo
+engine dynamic -pre ID:foo -pre LOAD
+engine dynamic -pre NO_VCHECK:1 -pre LIST_ADD:0 -t
+engine dynamic -pre DIR_LOAD:x
+engine dynamic -pre DIR_ADD:/nonexistent -pre DIR_LOAD:2 -pre ID:foo -pre LOAD
+engine dynamic -pre NOSUCH
+engine dynamic -pre LOAD
+engine dynamic -pre :x
+engine dynamic -pre SO_PATH:{src}/../lib/engines-3/padlock.so -pre LOAD -t -c -vvv
+engine dynamic -pre SO_PATH:{src}/../lib/engines-3/loader_attic.so -pre LOAD -c -vvvv
+engine dynamic -pre SO_PATH:{src}/../lib/engines-3/padlock.so -pre ID:padlock -pre LOAD -tt -post NOSUCH
+# A command name of 254 bytes is passed on; 255 is too long.
+engine dynamic -pre AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA:x -pre LOAD
+engine dynamic -pre BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB:x -pre LOAD
+engine dynamic -pre BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+# Option errors.
+engine -x
+engine dynamic -x
+engine -pre
+engine -post
+engine -t dynamic -c
+engine -t dynamic -v -c
+engine -help -x
+engine -x -help
+engine dynamic -help
+engine -- dynamic
+engine -c -- -t
+engine -t=1

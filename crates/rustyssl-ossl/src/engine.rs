@@ -285,3 +285,158 @@ pub fn destroy_loader() {
     // SAFETY: NULL or the loader setup_loader registered.
     unsafe { ffi::OSSL_STORE_LOADER_free(l) };
 }
+
+/// The ids of every engine in the list (`ENGINE_get_first` ... `ENGINE_get_next`).
+pub fn ids() -> Vec<String> {
+    let mut out = Vec::new();
+    // SAFETY: no arguments; the result is a structural reference (or NULL).
+    let mut e = unsafe { ffi::ENGINE_get_first() };
+    while !e.is_null() {
+        // SAFETY: e is live; its id is owned by it and copied at once.
+        out.push(string_at(unsafe { ffi::ENGINE_get_id(e) }).unwrap_or_default());
+        // SAFETY: get_next releases e's reference and returns the next one (or NULL).
+        e = unsafe { ffi::ENGINE_get_next(e) };
+    }
+    out
+}
+
+/// The schemes of the store loaders `e` provides (the `OSSL_STORE_do_all_loaders` walk).
+struct LoaderWalk {
+    engine: *const ENGINE,
+    schemes: Vec<String>,
+}
+
+unsafe extern "C" fn visit_loader(loader: *const OSSL_STORE_LOADER, arg: *mut core::ffi::c_void) {
+    // SAFETY: arg is the LoaderWalk that store_schemes passed, live for the whole walk.
+    let walk = unsafe { &mut *arg.cast::<LoaderWalk>() };
+    // SAFETY: the loader is live for the callback.
+    if unsafe { ffi::OSSL_STORE_LOADER_get0_engine(loader) } == walk.engine {
+        // SAFETY: as above; the scheme is owned by the loader and copied at once.
+        let scheme = string_at(unsafe { ffi::OSSL_STORE_LOADER_get0_scheme(loader) });
+        walk.schemes
+            .push(scheme.unwrap_or_else(|| "(null)".to_owned()));
+    }
+}
+
+/// `OBJ_nid2sn` of each of the `n` NIDs at `nids`.
+///
+/// # Safety
+/// `nids` points to `n` ints (or `n <= 0`).
+unsafe fn short_names(nids: *const c_int, n: c_int) -> Vec<String> {
+    let Ok(n) = usize::try_from(n) else {
+        return Vec::new();
+    };
+    if nids.is_null() || n == 0 {
+        return Vec::new();
+    }
+    // SAFETY: the caller's contract.
+    let nids = unsafe { core::slice::from_raw_parts(nids, n) };
+    nids.iter()
+        // SAFETY: OBJ_nid2sn takes any NID; the name is static.
+        .map(|&nid| string_at(unsafe { ffi::OBJ_nid2sn(nid) }).unwrap_or_else(|| "(null)".into()))
+        .collect()
+}
+
+impl Engine {
+    /// `ENGINE_get_name`.
+    pub fn name(&self) -> String {
+        // SAFETY: the engine is live; the name is owned by it.
+        string_at(unsafe { ffi::ENGINE_get_name(self.as_ptr()) })
+            .unwrap_or_else(|| "(null)".to_owned())
+    }
+
+    /// `ENGINE_ctrl(e, cmd, i, NULL, NULL)`: the commands that take and return numbers.
+    pub fn ctrl_num(&self, cmd: c_int, i: core::ffi::c_long) -> c_int {
+        // SAFETY: the engine is live; these commands take no pointer.
+        unsafe { ffi::ENGINE_ctrl(self.as_ptr(), cmd, i, core::ptr::null_mut(), None) }
+    }
+
+    /// `ENGINE_ctrl(e, cmd, i, buf, NULL)` into a buffer of `len + 1` bytes (the
+    /// `ENGINE_CTRL_GET_*_FROM_CMD` commands): what it returns, and the string.
+    pub fn ctrl_text(&self, cmd: c_int, i: core::ffi::c_long, len: usize) -> (c_int, String) {
+        let mut buf = vec![0u8; len.saturating_add(1)];
+        // SAFETY: the engine is live; buf holds len + 1 bytes, as these commands need for
+        // the length the matching *_LEN_* command gave.
+        let r = unsafe { ffi::ENGINE_ctrl(self.as_ptr(), cmd, i, buf.as_mut_ptr().cast(), None) };
+        let end = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
+        buf.truncate(end);
+        (r, String::from_utf8_lossy(&buf).into_owned())
+    }
+
+    /// `ENGINE_ctrl_cmd_string(e, cmd, arg, 0)`: what it returns.
+    pub fn ctrl_cmd_string_ret(&self, cmd: &[u8], arg: Option<&[u8]>) -> c_int {
+        let Ok(c) = std::ffi::CString::new(cmd) else {
+            return 0;
+        };
+        let a = match arg.map(std::ffi::CString::new) {
+            Some(Ok(a)) => Some(a),
+            Some(Err(_)) => return 0,
+            None => None,
+        };
+        // SAFETY: the engine is live; the strings are valid or NULL.
+        unsafe {
+            ffi::ENGINE_ctrl_cmd_string(
+                self.as_ptr(),
+                c.as_ptr(),
+                a.as_ref().map_or(core::ptr::null(), |a| a.as_ptr()),
+                0,
+            )
+        }
+    }
+
+    /// What `openssl engine -c` lists: the methods the engine has (RSA, EC, DSA, DH, RAND),
+    /// its ciphers', digests', and key methods' short names, and its store loaders.
+    pub fn capabilities(&self) -> Vec<String> {
+        let e = self.as_ptr();
+        let mut out = Vec::new();
+        // The engine is live; each getter returns its method or NULL.
+        let methods = [
+            // SAFETY: as above.
+            ("RSA", !unsafe { ffi::ENGINE_get_RSA(e) }.is_null()),
+            // SAFETY: as above.
+            ("EC", !unsafe { ffi::ENGINE_get_EC(e) }.is_null()),
+            // SAFETY: as above.
+            ("DSA", !unsafe { ffi::ENGINE_get_DSA(e) }.is_null()),
+            // SAFETY: as above.
+            ("DH", !unsafe { ffi::ENGINE_get_DH(e) }.is_null()),
+            // SAFETY: as above.
+            ("RAND", !unsafe { ffi::ENGINE_get_RAND(e) }.is_null()),
+        ];
+        out.extend(methods.iter().filter(|m| m.1).map(|m| m.0.to_owned()));
+        // SAFETY: the engine is live.
+        if let Some(f) = unsafe { ffi::ENGINE_get_ciphers(e) } {
+            let mut nids: *const c_int = core::ptr::null();
+            // SAFETY: the engine's own callback, asked for its NID list (NULL cipher).
+            let n = unsafe { f(e, core::ptr::null_mut(), &mut nids, 0) };
+            // SAFETY: the callback returned n NIDs at nids.
+            out.extend(unsafe { short_names(nids, n) });
+        }
+        // SAFETY: the engine is live.
+        if let Some(f) = unsafe { ffi::ENGINE_get_digests(e) } {
+            let mut nids: *const c_int = core::ptr::null();
+            // SAFETY: as above.
+            let n = unsafe { f(e, core::ptr::null_mut(), &mut nids, 0) };
+            // SAFETY: as above.
+            out.extend(unsafe { short_names(nids, n) });
+        }
+        // SAFETY: the engine is live.
+        if let Some(f) = unsafe { ffi::ENGINE_get_pkey_meths(e) } {
+            let mut nids: *const c_int = core::ptr::null();
+            // SAFETY: as above.
+            let n = unsafe { f(e, core::ptr::null_mut(), &mut nids, 0) };
+            // SAFETY: as above.
+            out.extend(unsafe { short_names(nids, n) });
+        }
+        let mut walk = LoaderWalk {
+            engine: e,
+            schemes: Vec::new(),
+        };
+        // SAFETY: visit_loader gets &mut walk back, which outlives the call, and doesn't keep
+        // it.
+        unsafe {
+            ffi::OSSL_STORE_do_all_loaders(Some(visit_loader), (&raw mut walk).cast());
+        }
+        out.extend(walk.schemes.into_iter().map(|s| format!("STORE({s})")));
+        out
+    }
+}
