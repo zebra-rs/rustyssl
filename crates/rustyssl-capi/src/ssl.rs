@@ -32,6 +32,7 @@ pub(crate) mod npn;
 mod ocsp_req;
 pub(crate) mod ocsp_resp;
 pub(crate) mod psk;
+pub(crate) mod quic_tls;
 pub(crate) mod requests;
 pub(crate) mod sess_asn1;
 pub(crate) mod sess_cache;

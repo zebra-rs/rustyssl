@@ -42,6 +42,7 @@ use rustyssl_tls::record::PaddingHook;
 
 use self::config::CtxSnapshot;
 use super::conn::{Ssl, SslState};
+use super::quic_tls::{self, Pumped};
 use super::tls_provider::EvpProvider;
 use crate::bio::{BIO_ctrl, BIO_read, BIO_test_flags, BIO_write};
 use crate::err;
@@ -192,6 +193,8 @@ pub(crate) struct Driver {
     /// The last ClientHello's cipher suites seen, and whether `CipherLists::peer` is yet to be
     /// made from them (once the hello is processed and a TLS 1.2 resumption is known).
     pub(crate) peer_ciphers_raw: (Vec<u8>, bool),
+    /// QUIC mode: what waits for the stack's callbacks (`super::quic_tls`).
+    pub(crate) quic: super::quic_tls::Queue,
 }
 
 /// An owned `EVP_PKEY` (the peer's raw public key), freed with the connection.
@@ -1181,6 +1184,7 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
     // and the exit before the failure, so a later step sees its own error).
     let mut failed_at_entry = None;
     let dtls = x.state().method.dtls;
+    let quic = super::quic_tls::is_on(x);
     if dtls {
         // `dtls1_query_mtu`, before the handshake writes (a write in a DTLS handshake fails
         // without an MTU).
@@ -1193,6 +1197,11 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
             Flush::Done => {}
             Flush::Retry => break Stop::Retry,
             Flush::Error => break Stop::Syscall,
+        }
+        // QUIC: what a partial `crypto_send` left goes first (`quic_retry_write_records`).
+        // SAFETY: as above.
+        if quic && matches!(unsafe { quic_tls::pump(s, x) }, Pumped::Retry) {
+            break Stop::Retry;
         }
         let taken = {
             let mut st = x.state();
@@ -1317,6 +1326,12 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                 // The alert goes out if the BIO takes it.
                 // SAFETY: the caller's guarantee.
                 let _ = unsafe { flush(x) };
+                if quic {
+                    // What was made before the failure, then the alert, to the stack.
+                    quic_tls::queue(x, None);
+                    // SAFETY: as above.
+                    let _ = unsafe { quic_tls::pump(s, x) };
+                }
                 break Stop::Failed;
             }
         };
@@ -1369,8 +1384,35 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                     None => break Stop::Retry,
                 }
             }
+            Event::QuicSecret(q) => {
+                quic_tls::queue(x, Some(q));
+                // SAFETY: as above.
+                if matches!(unsafe { quic_tls::pump(s, x) }, Pumped::Retry) {
+                    break Stop::Retry;
+                }
+            }
+            Event::Output if quic => {
+                quic_tls::queue(x, None);
+                // SAFETY: as above.
+                if matches!(unsafe { quic_tls::pump(s, x) }, Pumped::Retry) {
+                    break Stop::Retry;
+                }
+            }
             Event::Output => {}
             Event::NeedInput if entered => {}
+            Event::NeedInput if quic => {
+                quic_tls::queue(x, None);
+                // SAFETY: as above.
+                match unsafe { quic_tls::pump(s, x) } {
+                    Pumped::Done => {}
+                    Pumped::Retry => break Stop::Retry,
+                    Pumped::Failed => continue,
+                }
+                // SAFETY: as above.
+                if matches!(unsafe { quic_tls::read(s, x) }, quic_tls::Read::Retry) {
+                    break Stop::Retry;
+                }
+            }
             Event::NeedInput => {
                 // What was written goes out before waiting for the peer (`statem_flush`).
                 // SAFETY: as above.
@@ -1471,6 +1513,13 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                 }
             }
             Event::HandshakeDone => {
+                if quic {
+                    quic_tls::queue(x, None);
+                    // SAFETY: as above.
+                    if matches!(unsafe { quic_tls::pump(s, x) }, Pumped::Retry) {
+                        break Stop::Retry;
+                    }
+                }
                 // SAFETY: as above.
                 match unsafe { flush_for(x, reading) } {
                     Flush::Done => {}
@@ -1526,6 +1575,13 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
             }
             Event::AppData => break Stop::AppData,
             Event::Idle => {
+                if quic {
+                    quic_tls::queue(x, None);
+                    // SAFETY: as above.
+                    if matches!(unsafe { quic_tls::pump(s, x) }, Pumped::Retry) {
+                        break Stop::Retry;
+                    }
+                }
                 // SAFETY: as above.
                 match unsafe { flush_for(x, reading) } {
                     Flush::Done => break Stop::Idle,

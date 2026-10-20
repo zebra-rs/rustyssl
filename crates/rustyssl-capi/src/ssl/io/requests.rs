@@ -381,6 +381,10 @@ pub(crate) unsafe fn handle(
             // SAFETY: as above.
             Some(unsafe { super::super::srp::client_secret(s, x, snap) })
         }
+        Request::QuicTransportParams { params } => {
+            // SAFETY: as above.
+            Some(unsafe { super::super::quic_tls::got_params(s, x, &params) })
+        }
         // The configuration never asks for these yet (their callbacks aren't wired): answering
         // wrongly could accept what the application would refuse.
         _ => {

@@ -182,6 +182,8 @@ pub(crate) struct SslState {
     pub(crate) d1: super::dtls::D1,
     /// The session (`session`) and the one a server's lookup found (`super::sess_cache`).
     pub(crate) sess: super::sess_cache::Slot,
+    /// The third-party QUIC stack's callbacks (`super::quic_tls`).
+    pub(crate) quic: super::quic_tls::QuicTls,
 }
 
 // SAFETY: the raw pointers are owned references to OpenSSL objects (or the application's
@@ -438,6 +440,7 @@ ffi_export! {
                 drv: super::io::Driver::default(),
                 d1: super::dtls::D1::default(),
                 sess: super::sess_cache::Slot::default(),
+                quic: super::quic_tls::QuicTls::default(),
             };
             st.reset();
             st

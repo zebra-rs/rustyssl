@@ -21495,6 +21495,15 @@ const _: unsafe extern "C" fn(*mut SSL, SSL_psk_use_session_cb_func) =
     crate::ssl::accessors::rustyssl_private_SSL_set_psk_use_session_callback;
 const _: unsafe extern "C" fn(*mut SSL, core::ffi::c_int) -> core::ffi::c_int =
     crate::ssl::conn::rustyssl_private_SSL_set_purpose;
+const _: unsafe extern "C" fn(
+    *mut SSL,
+    *const OSSL_DISPATCH,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::ssl::quic_tls::rustyssl_private_SSL_set_quic_tls_cbs;
+const _: unsafe extern "C" fn(*mut SSL, core::ffi::c_int) -> core::ffi::c_int =
+    crate::ssl::quic_tls::rustyssl_private_SSL_set_quic_tls_early_data_enabled;
+const _: unsafe extern "C" fn(*mut SSL, *const core::ffi::c_uchar, usize) -> core::ffi::c_int =
+    crate::ssl::quic_tls::rustyssl_private_SSL_set_quic_tls_transport_params;
 const _: unsafe extern "C" fn(*mut SSL, core::ffi::c_int) =
     crate::ssl::accessors::rustyssl_private_SSL_set_quiet_shutdown;
 const _: unsafe extern "C" fn(*mut SSL, core::ffi::c_int) =
