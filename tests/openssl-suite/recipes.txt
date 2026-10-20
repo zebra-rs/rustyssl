@@ -4,3 +4,13 @@
 # `internal <recipe> [#n ...] <reason>`: subtests (all, without numbers) that read OpenSSL's
 # private structures, which can't pass on another layout. Subtests that run a program needing
 # the libraries' internal functions are found from the programs and need no line here.
+
+# Programs that read libssl's private structures (as tests/openssl-suite/ssl.txt lists them): each
+# recipe runs its program as one subtest, so the program's other tests can't count either here;
+# test-openssl-suite --ssl runs them one by one.
+internal test_sslbuffers #1 sslbuffertest's test_func reads the private SSL_CONNECTION's record buffers (and crashes on another layout)
+internal test_dtls_mtu #1 dtls_mtu_test's run_mtu_tests reads the private SSL_CONNECTION's DTLS state
+skip test_tls13secrets tls13secretstest compiles its own copy of ssl/tls13_enc.c over libssl's private SSL_CONNECTION
+
+# QUIC (Phase 10): programs that need the QUIC API, which rustyssl doesn't implement yet.
+skip test_ssl_ctx ssl_ctx_test runs as one subtest and its QUIC iterations need OSSL_QUIC_client_method (Phase 10); its others pass under test-openssl-suite --ssl

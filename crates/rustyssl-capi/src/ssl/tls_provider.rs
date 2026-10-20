@@ -1288,6 +1288,7 @@ fn cipher_name(alg: CipherAlg) -> Option<&'static CStr> {
         CipherAlg::Aria256Cbc => c"ARIA-256-CBC",
         CipherAlg::DesEde3Cbc => c"DES-EDE3-CBC",
         CipherAlg::SeedCbc => c"SEED-CBC",
+        CipherAlg::IdeaCbc => c"IDEA-CBC",
         CipherAlg::Sm4Cbc => c"SM4-CBC",
         CipherAlg::Null => return None,
     })

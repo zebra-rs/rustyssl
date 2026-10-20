@@ -166,6 +166,8 @@ pub enum CipherAlg {
     DesEde3Cbc,
     /// SEED-CBC.
     SeedCbc,
+    /// IDEA-CBC (the legacy provider's).
+    IdeaCbc,
     /// SM4-CBC.
     Sm4Cbc,
     /// No encryption (the NULL suites).
@@ -181,6 +183,7 @@ impl CipherAlg {
             | Self::Camellia128Cbc
             | Self::Aria128Cbc
             | Self::SeedCbc
+            | Self::IdeaCbc
             | Self::Sm4Cbc => 16,
             Self::Aes256Cbc | Self::Camellia256Cbc | Self::Aria256Cbc => 32,
             Self::DesEde3Cbc => 24,
@@ -192,7 +195,7 @@ impl CipherAlg {
     #[must_use]
     pub const fn block_len(self) -> usize {
         match self {
-            Self::DesEde3Cbc => 8,
+            Self::DesEde3Cbc | Self::IdeaCbc => 8,
             Self::Null => 0,
             _ => 16,
         }

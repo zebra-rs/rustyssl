@@ -55,6 +55,7 @@ tls11 | -cipher DEFAULT@SECLEVEL=0 | {ca} -tls1_1 -cipher DEFAULT@SECLEVEL=0
 tls10 | -cipher DEFAULT@SECLEVEL=0 | {ca} -tls1 -cipher DEFAULT@SECLEVEL=0
 tls10-resume | -cipher DEFAULT@SECLEVEL=0 | {ca} -tls1 -cipher DEFAULT@SECLEVEL=0 +resume
 tls11-cbc-no-etm | -cipher DEFAULT@SECLEVEL=0 | {ca} -tls1_1 -cipher ECDHE-RSA-AES128-SHA@SECLEVEL=0 -no_etm
+tls11-idea | -provider legacy -provider default -cipher IDEA-CBC-SHA@SECLEVEL=0 | {ca} -tls1_1 -provider legacy -provider default -cipher IDEA-CBC-SHA@SECLEVEL=0
 tls11-default-seclevel | | {ca} -tls1_1
 tls10-default-seclevel | -cipher DEFAULT@SECLEVEL=0 | {ca} -tls1
 tls13-trace | -num_tickets 0 | {ca} +trace
