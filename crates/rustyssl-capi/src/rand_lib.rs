@@ -939,10 +939,10 @@ fn method() -> *const RAND_METHOD {
     }
     // SAFETY: no preconditions; a functional reference, or NULL.
     let e = unsafe { ENGINE_get_default_RAND() };
-    // SAFETY: NULL or the live engine.
     let from_engine = if e.is_null() {
         ptr::null()
     } else {
+        // SAFETY: the live engine.
         unsafe { ENGINE_get_RAND(e) }
     };
     let (meth, engine) = if from_engine.is_null() {
