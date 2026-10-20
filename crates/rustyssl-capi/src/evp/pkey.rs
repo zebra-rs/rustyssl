@@ -935,6 +935,9 @@ fn export_legacy(k: &Pkey, km: &keymgmt::Ref, selection: c_int) -> Option<Arc<Ke
         unsafe { m.freedata(keydata) };
         return None;
     }
+    // The provider's copy of a private key goes to the secure heap.
+    // SAFETY: the key data just filled, which this function owns.
+    let keydata = unsafe { m.move_to_secure(keydata) };
     let new = KeyData::adopt(km.clone(), keydata)?;
     // Read before the key's lock: the method's function takes it.
     // SAFETY: as above.

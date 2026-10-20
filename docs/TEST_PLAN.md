@@ -288,7 +288,7 @@ rustyssl itself**. You can only regenerate golden files with
   where `DEVIATIONS.md` documents it. A dedicated hostname-verification corpus covers
   wildcards, IDNA, IP SANs, and the CN-fallback flags.
 
-### L8: Consumer drop-in suites (`cargo xtask test-consumers <name>`)
+### L8: Consumer drop-in suites (`cargo xtask test-consumers [consumer...]`)
 
 Each consumer is built against the **official headers**. Its own test suite then runs twice,
 once with the reference libraries and once with ours (in containers with the system
@@ -325,6 +325,48 @@ only the libraries change between the two runs:
 
 pkcs11 and tpm2 need their distribution's tools (AGENTS.md lists them) and skip without them,
 so they run in the Linux containers; oqs runs anywhere cmake does.
+
+The consumers run under `cargo xtask test-consumers [rust|ruby|pyca|node]`, the same way:
+pinned to release commits with their tarballs' SHA-256 in `tests/consumers/pins.txt`, built
+once against the reference, each test's result compared between the reference's run and
+rustyssl's (a test that fails on both isn't counted; one that fails or is missing on rustyssl
+alone is). Results go to `target/consumers-report.md`.
+
+- **rust:** rust-openssl's `openssl` crate (openssl-v0.10.81), its tests one per process.
+- **ruby:** the openssl gem v4.0.2, built with `extconf.rb`, each `test/openssl/test_*.rb` under
+  test-unit (`core_assertions` from test-unit-ruby-core v1.0.16, pinned beside it).
+- **pyca:** cryptography 50.0.2 in a virtualenv (build requirements pinned by hash, test
+  requirements at its CI's versions), its `tests` with the vectors from the same tree.
+- **node:** Node.js v24.22.0 (LTS) built with `--shared-openssl`, `test/parallel/test-crypto*`
+  and `test-tls*` through `tools/test.py`.
+
+Results on macOS (aarch64), 2026-10-19:
+
+| Consumer | Reference | rustyssl |
+|---|---:|---:|
+| rust-openssl | 433 of 459 | 433 of 459 |
+| ruby/openssl | 594 of 598 | 594 of 598 |
+| pyca/cryptography | 4482 of 4482 (199 skipped) | 4482 of 4482 (199 skipped) |
+| Node.js (crypto, TLS) | 376 of 376 | 376 of 376 |
+
+Node.js's `test-crypto-secure-heap` passes since rustyssl keeps private keys in the secure
+heap when it's set up, as OpenSSL does (docs/adr/0005-secure-heap.md): with `--secure-heap` it
+expects `CRYPTO_secure_used()` to grow while a Diffie-Hellman key exists. It failed before,
+when secrets lived only in Rust-owned memory. `tests/c/secure_heap_keys.c` checks, on both
+libraries, which operations put memory in the heap (secure `BIGNUM`s, every private key made,
+copied, imported, or decoded) and which don't (ciphers, MACs, KDFs, the random generator,
+public keys); `tests/c/secure_heap_full.c`, that keys filling a small heap leave room for a new
+thread's random generator.
+
+Fixed on the way:
+- libssl flushes its write BIO at the state machine's flush points (a buffering write BIO
+  stalled the handshake);
+- the servername callback falls back to the context the connection was made with;
+- a client's temporary key is its ClientHello's first key share;
+- a TLS 1.3 server whose client closed before its NewSessionTickets still completes;
+- a server's `SSL_get_tlsext_status_type` is what its ClientHello asked for;
+- a resumed server's peer certificate and chain are its session's: a session-ID cache hit
+  has both, a ticket the certificate alone (Node.js's `test-tls-client-cert-resumption`).
 
 ### L9: Security testing
 

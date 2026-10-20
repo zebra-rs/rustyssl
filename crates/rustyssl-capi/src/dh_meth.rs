@@ -350,6 +350,7 @@ ffi_callback! {
             // SAFETY: the caller's key and its method's function.
             let pub_key = unsafe { mod_exp(dh, f, g, &priv_key, p) }?;
             st.priv_key = Some(priv_key);
+            st.secure_private();
             st.pub_key = Some(pub_key);
             Some(())
         })();

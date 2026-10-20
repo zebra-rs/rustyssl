@@ -79,14 +79,14 @@ const CLIENT_TIMEOUT: Duration = Duration::from_secs(120);
 const OQS_SCRIPTS: &[&str] = &["certgen", "certverify", "cmssign", "ca", "pkcs12gen"];
 
 /// A pinned source tree.
-struct Pin {
-    name: String,
-    repository: String,
-    commit: String,
-    sum: String,
+pub(crate) struct Pin {
+    pub(crate) name: String,
+    pub(crate) repository: String,
+    pub(crate) commit: String,
+    pub(crate) sum: String,
 }
 
-fn parse_pins(text: &str) -> Result<Vec<Pin>> {
+pub(crate) fn parse_pins(text: &str) -> Result<Vec<Pin>> {
     let mut pins = Vec::new();
     for line in text.lines().map(str::trim) {
         if line.is_empty() || line.starts_with('#') {
@@ -108,7 +108,7 @@ fn parse_pins(text: &str) -> Result<Vec<Pin>> {
 
 /// Fetches a pinned tarball (if it isn't there with its sum) and unpacks it, once per pin;
 /// returns the tree.
-fn fetch(dir: &Path, pin: &Pin) -> Result<PathBuf> {
+pub(crate) fn fetch(dir: &Path, pin: &Pin) -> Result<PathBuf> {
     let downloads = dir.join("downloads");
     fs::create_dir_all(&downloads)?;
     let tarball = downloads.join(format!("{}-{}.tar.gz", pin.name, pin.commit));
@@ -190,22 +190,22 @@ fn cmake(source: &Path, build: &Path, options: &[String], install: bool, log: &P
 
 /// One library a run uses.
 #[derive(Clone)]
-struct Side {
-    name: &'static str,
-    lib: PathBuf,
+pub(crate) struct Side {
+    pub(crate) name: &'static str,
+    pub(crate) lib: PathBuf,
 }
 
 impl Side {
     /// `cmd` with this side's libraries first on the loader path (both variables: oqs-provider's
     /// scripts copy `LD_LIBRARY_PATH` into `DYLD_LIBRARY_PATH`, which macOS drops for `/bin/bash`).
-    fn env<'a>(&self, cmd: &'a mut Command) -> &'a mut Command {
+    pub(crate) fn env<'a>(&self, cmd: &'a mut Command) -> &'a mut Command {
         cmd.env(LOADER_PATH, &self.lib)
             .env("LD_LIBRARY_PATH", &self.lib)
     }
 }
 
 /// Waits for `child` up to `timeout`, killing it after; its output and whether it exited 0.
-fn wait(mut child: Child, timeout: Duration) -> Result<(bool, String)> {
+pub(crate) fn wait(mut child: Child, timeout: Duration) -> Result<(bool, String)> {
     let mut out = child.stdout.take().ok_or("no stdout")?;
     let reader = std::thread::spawn(move || {
         let mut s = Vec::new();
@@ -229,7 +229,7 @@ fn wait(mut child: Child, timeout: Duration) -> Result<(bool, String)> {
 }
 
 /// Runs `work` over `items` on `jobs` threads, keeping their order.
-fn pool<T: Send + Sync + 'static, R: Send + 'static>(
+pub(crate) fn pool<T: Send + Sync + 'static, R: Send + 'static>(
     items: Vec<T>,
     jobs: usize,
     work: impl Fn(&T) -> R + Send + Sync + 'static,
@@ -274,7 +274,7 @@ fn pool<T: Send + Sync + 'static, R: Send + 'static>(
 }
 
 /// A result per check (`program`, `script alg`, `tls sig group`): passed or not, per side.
-type Results = BTreeMap<String, bool>;
+pub(crate) type Results = BTreeMap<String, bool>;
 
 /// oqs-provider's built tree and what its runs need.
 struct Oqs {

@@ -28,11 +28,11 @@ use std::ffi::CString;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use rustyssl_abi::{
-    BIO, BIO_CTRL_EOF, BIO_FLAGS_READ, BIO_FLAGS_RWS, BIO_FLAGS_SHOULD_RETRY, ERR_LIB_SSL,
-    ERR_R_INTERNAL_ERROR, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED, SSL, SSL_AD_CLOSE_NOTIFY,
+    BIO, BIO_CTRL_EOF, BIO_CTRL_FLUSH, BIO_FLAGS_READ, BIO_FLAGS_RWS, BIO_FLAGS_SHOULD_RETRY,
+    ERR_LIB_SSL, ERR_R_INTERNAL_ERROR, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED, SSL, SSL_AD_CLOSE_NOTIFY,
     SSL_AD_REASON_OFFSET, SSL_CB_ACCEPT_EXIT, SSL_CB_CONNECT_EXIT, SSL_MODE_AUTO_RETRY,
     SSL_NOTHING, SSL_OP_IGNORE_UNEXPECTED_EOF, SSL_R_UNEXPECTED_EOF_WHILE_READING, SSL_READING,
-    SSL_RECEIVED_SHUTDOWN, SSL_WRITING, stack_st_X509,
+    SSL_RECEIVED_SHUTDOWN, SSL_WRITING, TLS_ST_SW_SESSION_TICKET, stack_st_X509,
 };
 use rustyssl_tls::conn::common::security::SecOther;
 use rustyssl_tls::conn::common::{EarlyDataState, SecurityHook};
@@ -133,6 +133,9 @@ pub(crate) struct Driver {
     pub(crate) out: Vec<u8>,
     /// What's left to write of the record at the front of `out` (0: a record starts there).
     pub(crate) out_record_left: usize,
+    /// The core reached a flush point (`statem_flush`): once `out` is written, the write BIO
+    /// is flushed.
+    pub(crate) flush_wanted: bool,
     /// DTLS: the lengths of the datagrams in `out`, in order.
     pub(crate) out_dgrams: std::collections::VecDeque<usize>,
     /// A write waiting to be retried (`wpend_tot`, `wpend_buf`): what it accepted, and its
@@ -615,6 +618,7 @@ pub(crate) fn push_output(d: &mut Driver, c: &mut Connection) {
         let out = c.take_output();
         d.out.extend_from_slice(&out);
     }
+    d.flush_wanted |= c.take_flush();
 }
 
 /// [`push_output`] for the connection's core, if it's in place.
@@ -705,7 +709,13 @@ pub(crate) unsafe fn flush(x: &Ssl) -> Flush {
             let mut st = x.state();
             if st.drv.out.is_empty() {
                 st.drv.out_record_left = 0;
-                return Flush::Done;
+                if !st.drv.flush_wanted {
+                    return Flush::Done;
+                }
+                let wbio = st.wbio;
+                drop(st);
+                // SAFETY: the caller's guarantee.
+                return unsafe { flush_bio(x, wbio) };
             }
             if st.drv.out_record_left == 0 {
                 st.drv.out_record_left = if st.method.dtls {
@@ -740,6 +750,9 @@ pub(crate) unsafe fn flush(x: &Ssl) -> Flush {
             // error (a zero return isn't, as it may come from a custom BIO).
             if r < 0 {
                 let errno = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
+                if closed_after_tickets(x, errno) {
+                    return Flush::Done;
+                }
                 err::raise_with_text(
                     rustyssl_abi::ERR_LIB_SYS,
                     errno,
@@ -755,6 +768,54 @@ pub(crate) unsafe fn flush(x: &Ssl) -> Flush {
         let out = &mut st.drv.out;
         out.drain(..done.min(out.len()));
     }
+}
+
+/// `statem_flush`: `BIO_flush` on the write BIO, with no lock held; one that asks to be retried
+/// leaves the flush wanted, to run again before the core goes on.
+///
+/// # Safety
+/// As for [`flush`].
+unsafe fn flush_bio(x: &Ssl, wbio: *mut BIO) -> Flush {
+    if wbio.is_null() {
+        return Flush::Error;
+    }
+    // SAFETY: the connection's BIO; no lock is held.
+    if unsafe { BIO_ctrl(wbio, BIO_CTRL_FLUSH, 0, ptr::null_mut()) } > 0 {
+        x.state().drv.flush_wanted = false;
+        return Flush::Done;
+    }
+    // SAFETY: as above.
+    if unsafe { BIO_test_flags(wbio, BIO_FLAGS_SHOULD_RETRY) } != 0 {
+        x.state().rwstate = SSL_WRITING;
+        return Flush::Retry;
+    }
+    x.state().drv.flush_wanted = false;
+    let errno = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
+    if closed_after_tickets(x, errno) {
+        return Flush::Done;
+    }
+    Flush::Error
+}
+
+/// `ossl_statem_server_post_work`'s TLS 1.3 `TLS_ST_SW_SESSION_TICKET` case: a server whose
+/// NewSessionTickets can't be sent because the client closed the connection (`EPIPE`,
+/// `ECONNRESET`: a client may close as soon as its handshake is done) goes on as if they had
+/// been, so that it still reads what the client sent. The unsent tickets are dropped, and no
+/// error is queued (OpenSSL's tickets wait in its write buffer, whose flush fails without one).
+fn closed_after_tickets(x: &Ssl, errno: c_int) -> bool {
+    if errno != libc::EPIPE && errno != libc::ECONNRESET {
+        return false;
+    }
+    let mut st = x.state();
+    let tls13 = st.drv.tls.as_deref().is_some_and(Connection::is_tls13);
+    if !(st.server && tls13 && st.hand_state == TLS_ST_SW_SESSION_TICKET) {
+        return false;
+    }
+    st.drv.out.clear();
+    st.drv.out_record_left = 0;
+    st.drv.flush_wanted = false;
+    st.rwstate = SSL_NOTHING;
+    true
 }
 
 /// The length of the TLS record at the front of `out` (header included), or all of `out` when

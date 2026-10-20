@@ -1465,7 +1465,12 @@ ffi_export! {
             if ret != 0 {
                 // `evp_keymgmt_util_gen`.
                 // SAFETY: the key manager's generation context; the callback takes the context.
-                let kd = unsafe { km.get().generate(genctx, Some(to_pkey_gencb), ctx.cast()) };
+                let mut kd = unsafe { km.get().generate(genctx, Some(to_pkey_gencb), ctx.cast()) };
+                if operation == EVP_PKEY_OP_KEYGEN {
+                    // A private key goes to the secure heap, as OpenSSL's key managers put theirs.
+                    // SAFETY: the key data just made, which this call owns.
+                    kd = unsafe { km.get().move_to_secure(kd) };
+                }
                 let ok = match (KeyData::adopt(km.clone(), kd), k) {
                     (Some(kd), Some(k)) => pkey::assign(k, kd),
                     _ => false,
@@ -1758,6 +1763,9 @@ ffi_export! {
         let kd = m.newdata();
         // SAFETY: the key manager's new data; the caller's array.
         let ok = !kd.is_null() && unsafe { m.import(kd, selection, params) } != 0;
+        // A private key goes to the secure heap (KEYPAIR selects a public key alone too).
+        // SAFETY: the key data just imported, which this call owns.
+        let kd = if ok { unsafe { m.move_to_secure(kd) } } else { kd };
         let ok = if ok {
             // SAFETY: the caller's key, or the new one.
             match (KeyData::adopt(km.clone(), kd), unsafe { pkey::pkey(target) }) {

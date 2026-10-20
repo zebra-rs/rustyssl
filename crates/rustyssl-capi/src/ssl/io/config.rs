@@ -931,6 +931,17 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
     }
 }
 
+/// The servername callback of the context the connection was made with (`s->session_ctx`),
+/// which `final_server_name` falls back to when the current context has none (after an
+/// `SSL_set_SSL_CTX`).
+pub(crate) fn session_servername(st: &SslState) -> (AnyCb, *mut c_void) {
+    // SAFETY: the connection's session context, which it keeps alive.
+    unsafe { super::super::ctx::ctx(st.session_ctx) }.map_or((None, ptr::null_mut()), |c| {
+        let cs = c.state();
+        (cs.servername_cb, cs.servername_arg)
+    })
+}
+
 /// Which of the connection's and its context's callbacks are set, for the core (again after
 /// the servername callback, which may switch the context).
 pub(crate) fn callbacks(st: &SslState, snap: &CtxSnapshot) -> Callbacks {
@@ -938,7 +949,7 @@ pub(crate) fn callbacks(st: &SslState, snap: &CtxSnapshot) -> Callbacks {
         info: st.info_callback.is_some() || snap.info_callback.is_some(),
         msg: st.msg_callback.is_some(),
         keylog: snap.keylog_callback.is_some(),
-        servername: snap.servername_cb.is_some(),
+        servername: snap.servername_cb.is_some() || session_servername(st).0.is_some(),
         client_hello: snap.client_hello_cb.is_some(),
         cert: st.cert.cert_cb.is_some(),
         client_cert: snap.client_cert_cb.is_some() || !snap.client_cert_engine.is_null(),

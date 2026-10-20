@@ -268,6 +268,7 @@ pub(crate) unsafe fn key_fromdata(
     }
     if priv_key.is_some() {
         st.priv_key = priv_key;
+        st.secure_private();
     }
     true
 }
@@ -502,6 +503,7 @@ pub(crate) unsafe fn dup(h: *const DH, selection: c_int) -> *mut DH {
     }
     if selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY != 0 {
         st.priv_key = src.priv_key.clone();
+        st.secure_private();
     }
     let out = Dh::new_handle_in(k.libctx.get());
     // SAFETY: just made, or NULL.

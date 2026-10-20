@@ -5785,9 +5785,15 @@ OpenSSL 3.6.5 ABI, with every 3.5 export unchanged (`abi-check compat35`).
   they pass on the reference, apart from QUIC and the tests that read OpenSSL's private
   structures; BoGo, tlsfuzzer, Wycheproof, the interop matrix and the differential probe agree.
 - **Not met yet:** M6's "at least 98% of eligible upstream tests" needs the rest of the
-  upstream tree (`cargo xtask test-openssl-suite` runs a subset), and its consumer suites
-  (Ruby, pyca/cryptography, rust-openssl, Node.js) need `cargo xtask test-consumers`, which
-  doesn't exist yet.
+  upstream tree (`cargo xtask test-openssl-suite` runs a subset).
+- **M6's consumer suites (`cargo xtask test-consumers`, macOS, 2026-10-19):** rust-openssl
+  (433 of 459), ruby/openssl (594 of 598) and pyca/cryptography (4482 of 4482) pass exactly as
+  on the reference, and Node.js's crypto and TLS tests pass 376 of 376, as on the reference.
+  `test-crypto-secure-heap` needed private keys in the secure heap, which rustyssl now keeps
+  there when it's set up, as OpenSSL does (the user's decision, 2026-10-19; ADR 0005: a scoped
+  global allocator, finished keys copied into the heap, secure `BIGNUM`s, and a reserve so keys
+  fill at most half of it). The suites found six libssl differences, all
+  fixed with tests (TEST_PLAN.md, L8).
 
 ## Phase 10: QUIC
 

@@ -1667,6 +1667,23 @@ ffi_export! {
     }
 }
 
+/// Whether `prov` is one of rustyssl's own predefined providers, whose functions are Rust (an
+/// application's or a module's are C).
+///
+/// # Safety
+/// `prov` is NULL or a live provider.
+pub(crate) unsafe fn is_predefined(prov: *const OSSL_PROVIDER) -> bool {
+    // SAFETY: the caller's guarantee.
+    unsafe { OSSL_PROVIDER::get(prov) }.is_some_and(|p| {
+        builtin::PREDEFINED
+            .iter()
+            .any(|&(_, init, _)| match (init, p.init) {
+                (Some(a), Some(b)) => core::ptr::fn_addr_eq(a, b),
+                _ => false,
+            })
+    })
+}
+
 /// The library context a provider was loaded into, as given (NULL for the default).
 ///
 /// # Safety

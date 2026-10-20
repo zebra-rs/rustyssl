@@ -192,7 +192,7 @@ generator. Don't paste the number.
 Working now: `cargo build`, `test`, `clippy`, `fmt`, `deny`, `vet`, and `fuzz`, and the
 xtask commands `vendor`, `codegen`, `dist`, `ref-openssl`, `abi-check`, `test-c`,
 `test-apps`, `test-interop`, `test-differential`, `test-openssl-suite` (`evp_test`, `bntest`, `ectest`, `rsa_test`; libssl's programs with `--ssl`),
-`test-wycheproof`, `test-bogo`, `test-tlsfuzzer`, `test-timing`, `test-providers`, `coverage`, and `usage-scan`.
+`test-wycheproof`, `test-bogo`, `test-tlsfuzzer`, `test-timing`, `test-providers`, `test-consumers` (`rust`, `ruby`, `pyca`, `node`), `coverage`, and `usage-scan`.
 The other `cargo xtask` commands arrive later and fail with a message until then. Update this
 section when they change. CI (`.github/workflows/ci.yml`) runs the gates on every push.
 
@@ -220,6 +220,13 @@ Tools each command needs:
   (`libtss2-tcti-tabrmd0` on Debian), `tpm2-tools`, `swtpm`, and a D-Bus daemon, as
   tpm2-openssl's CI does; without them it skips too. `swtpm` needs seccomp, so in Docker on an
   arm64 host run it in an arm64 container, not an emulated amd64 one.
+- **`test-consumers`:** what `dist` and `ref-openssl` need, plus `curl` and `tar` (each
+  consumer is fetched at a pinned commit, `tests/consumers/pins.txt`). `rust` needs cargo;
+  `ruby` needs Ruby with its bundled test-unit; `pyca` needs Python 3 with `venv` (3.13 or 3.12
+  preferred, for wheels), a Rust toolchain, and network access to PyPI for the requirements it
+  installs into its own virtualenv; `node` needs what Node.js's build needs (Python 3, a C++
+  compiler, `make`), several GB of disk, and a long build (it's built once and kept). A
+  consumer whose tools are missing skips with a message.
 - **`test-wycheproof`:** what `dist` and `ref-openssl` need, plus `curl` (the vectors are
   fetched at a pinned commit).
 - **`test-bogo`:** what `dist` and `ref-openssl` need, plus `curl`, `tar`, and Go (at least
@@ -277,7 +284,7 @@ cargo xtask test-bogo [pattern...]           # BoringSSL's runner with tests/bog
 cargo xtask test-tlsfuzzer [--timing] [script...]  # tlsfuzzer (tests/tlsfuzzer/scripts.txt) against s_server, both libraries -> target/tlsfuzzer-report.md
 cargo xtask test-providers [oqs|pkcs11|tpm2...]  # third-party providers (tests/providers/pins.txt) and their suites, both libraries
 cargo xtask test-timing [target...]          # dudect constant-time checks and Marvin's RSA split (tests/timing/dudect.c), both libraries
-cargo xtask test-consumers <name>            # curl/nginx/openssh/python/... test suites with our libraries
+cargo xtask test-consumers [--jobs N] [consumer...]  # rust-openssl, ruby/openssl, pyca/cryptography, Node.js suites (tests/consumers/pins.txt), both libraries -> target/consumers-report.md
 cargo +nightly miri test -p rustyssl-capi    # the unsafe FFI layer under Miri (and its doctests)
 cargo +nightly fuzz run <target>             # fuzzing (fuzz/ is its own workspace; `cargo +nightly fuzz list`)
 ```

@@ -18,6 +18,7 @@ mod targets;
 mod test_apps;
 mod test_bogo;
 mod test_c;
+mod test_consumers;
 mod test_differential;
 mod test_interop;
 mod test_openssl_suite;
@@ -51,7 +52,7 @@ const COMMANDS: &[(&str, &str)] = &[
     ("test-providers", "third-party providers (oqs-provider) and their suites on both libraries"),
     ("test-wycheproof", "run Wycheproof's test vectors on the reference and rustyssl"),
     ("test-timing", "dudect's constant-time checks (and Marvin's RSA split) on both libraries"),
-    ("test-consumers", "run consumer test suites (curl, nginx, openssh, ...) on our libraries"),
+    ("test-consumers", "consumers' own test suites (rust-openssl, ...) built against the reference, on both libraries"),
     ("regen-golden", "regenerate golden files from the reference OpenSSL"),
     ("bench", "benchmark against the reference OpenSSL"),
 ];
@@ -74,6 +75,7 @@ fn main() -> ExitCode {
         Some("test-bogo") => report("test-bogo", test_bogo::run(&rest)),
         Some("test-interop") => report("test-interop", test_interop::run(&rest)),
         Some("test-c") => report("test-c", test_c::run(&rest)),
+        Some("test-consumers") => report("test-consumers", test_consumers::run(&rest)),
         Some("test-differential") => report("test-differential", test_differential::run(&rest)),
         Some("test-openssl-suite") => report("test-openssl-suite", test_openssl_suite::run(&rest)),
         Some("test-tlsfuzzer") => report("test-tlsfuzzer", test_tlsfuzzer::run(&rest)),

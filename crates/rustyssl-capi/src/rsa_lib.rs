@@ -334,7 +334,8 @@ fn get0(k: &Rsa, f: Field) -> *const BIGNUM {
         return ptr::null();
     };
     if slot.0.is_null() {
-        let b = new_bignum(v, false);
+        // The private numbers are secure ones, as OpenSSL's are.
+        let b = new_bignum(v, f.secret());
         if f.secret() {
             // SAFETY: just made.
             unsafe { BN_set_flags(b, BN_FLG_CONSTTIME) };

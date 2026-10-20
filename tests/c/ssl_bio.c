@@ -10,9 +10,13 @@
  * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4).
  */
 #define _POSIX_C_SOURCE 200809L
+#include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 #include <openssl/bio.h>
 #include <openssl/err.h>
@@ -506,8 +510,88 @@ static void test_split_line(void)
     }
 }
 
+/*
+ * Both ends write through a buffering BIO (BIO_f_buffer over the pair): the handshake goes on
+ * only because the library flushes the write BIO after each flight (statem_flush), as it
+ * does; nothing reaches the pair before a flush.
+ */
+static void test_buffered_wbio(void)
+{
+    SSL_CTX *cctx = client_ctx(), *sctx = server_ctx();
+    SSL *c = SSL_new(cctx), *s = SSL_new(sctx);
+    BIO *a = NULL, *b = NULL, *ca, *sb;
+    int r;
+
+    printf("# a buffering write BIO on both ends\n");
+    BIO_new_bio_pair(&a, 0, &b, 0);
+    ca = BIO_push(BIO_new(BIO_f_buffer()), a);
+    sb = BIO_push(BIO_new(BIO_f_buffer()), b);
+    BIO_up_ref(a);
+    BIO_up_ref(b);
+    SSL_set_bio(c, a, ca);
+    SSL_set_bio(s, b, sb);
+    SSL_set_connect_state(c);
+    SSL_set_accept_state(s);
+    r = run(c, s, 0);
+    printf("  handshake %s, %s\n", r == 0 ? "done" : "failed", SSL_get_version(c));
+    check(r == 0, "the handshake through buffering write BIOs");
+    errors();
+    SSL_free(c);
+    SSL_free(s);
+    SSL_CTX_free(cctx);
+    SSL_CTX_free(sctx);
+}
+
+/*
+ * A TLS 1.3 client that closes its socket as soon as its handshake is done, before reading the
+ * server's NewSessionTickets: the server's ticket write fails (EPIPE or ECONNRESET), which
+ * OpenSSL ignores, so SSL_accept still succeeds.
+ */
+static void test_closed_before_tickets(void)
+{
+    SSL_CTX *cctx = client_ctx(), *sctx = server_ctx();
+    SSL *c = SSL_new(cctx), *s = SSL_new(sctx);
+    int fds[2], round, cr = 0, sr = 0;
+
+    printf("# a TLS 1.3 client closes before the server's tickets\n");
+    signal(SIGPIPE, SIG_IGN);
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) != 0) {
+        printf("Bail out! socketpair\n");
+        exit(1);
+    }
+    fcntl(fds[0], F_SETFL, O_NONBLOCK);
+    fcntl(fds[1], F_SETFL, O_NONBLOCK);
+    SSL_set_fd(c, fds[0]);
+    SSL_set_fd(s, fds[1]);
+    SSL_set_connect_state(c);
+    SSL_set_accept_state(s);
+    /* The client's flight, the server's, then the client's Finished: the client is done. */
+    for (round = 0; round < 16 && cr != 1; round++) {
+        cr = SSL_do_handshake(c);
+        if (cr != 1)
+            SSL_do_handshake(s);
+    }
+    printf("  client: %d, %s\n", cr, SSL_get_version(c));
+    SSL_free(c);
+    close(fds[0]);
+    for (round = 0; round < 16 && sr != 1; round++) {
+        sr = SSL_do_handshake(s);
+        if (sr != 1 && SSL_get_error(s, sr) != SSL_ERROR_WANT_READ)
+            break;
+    }
+    printf("  server: %d, SSL_get_error %d\n", sr, sr == 1 ? 0 : SSL_get_error(s, sr));
+    check(sr == 1, "the server's handshake succeeds without sending its tickets");
+    errors();
+    SSL_free(s);
+    close(fds[1]);
+    SSL_CTX_free(cctx);
+    SSL_CTX_free(sctx);
+}
+
 int main(void)
 {
+    test_buffered_wbio();
+    test_closed_before_tickets();
     test_pair();
     test_set_ssl();
     test_constructors();

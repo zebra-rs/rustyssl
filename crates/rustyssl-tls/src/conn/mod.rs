@@ -241,6 +241,9 @@ pub struct Connection {
     skipped: u64,
     /// Network output not yet taken.
     output: Vec<u8>,
+    /// The state machine reached a flush point (`statem_flush`) since the caller last asked
+    /// ([`Connection::take_flush`]).
+    flush_point: bool,
     /// Handshake octets read from records and not yet taken as messages
     /// (`s->rlayer.handshake_fragment` and the message buffer).
     pub(crate) hs_in: Vec<u8>,
@@ -405,6 +408,7 @@ impl Connection {
             },
             input: Vec::new(),
             output: Vec::new(),
+            flush_point: false,
             hs_in: Vec::new(),
             cur_msg: None,
             events: VecDeque::new(),
@@ -639,6 +643,13 @@ impl Connection {
         core::mem::take(&mut self.output)
     }
 
+    /// Whether the state machine reached a flush point (`statem_flush`) since the last call:
+    /// once the output is written, the caller flushes it (`BIO_flush` on the write BIO), as
+    /// OpenSSL does after a flight (a buffering BIO sends nothing until then).
+    pub fn take_flush(&mut self) -> bool {
+        core::mem::take(&mut self.flush_point)
+    }
+
     /// The ClientHello's legacy_version (`s->client_version`): what a server received, or what a
     /// client sent (TLS 1.2's number for TLS 1.3); 0 before either.
     #[must_use]
@@ -841,6 +852,7 @@ impl Connection {
 
     /// Whether output is waiting to be taken: a flush point (`statem_flush`) waits for it.
     pub(crate) fn flushed(&mut self) -> bool {
+        self.flush_point = true;
         if self.cfg.dtls {
             self.dtls_close_datagram();
         }

@@ -983,7 +983,21 @@ fn from_core(st: &SslState, c: &Session, group: Option<u16>, timeout: c_long) ->
         d.peer_rpk = spki_key(st, k);
     }
     let p = &st.drv.peer;
-    if p.from > 0 {
+    if p.from > 0 && st.hit != 0 {
+        // A resumed handshake whose chain the core restored from the ticket it took: the
+        // session keeps the peer's certificate but not its chain, as OpenSSL's ticket (an
+        // `i2d_SSL_SESSION`) has the one and not the other.
+        // SAFETY: the connection's stack, or NULL (-1).
+        if unsafe { OPENSSL_sk_num(p.chain.cast()) } > 0 {
+            // SAFETY: an index in range.
+            let leaf: *mut rustyssl_abi::X509 =
+                unsafe { OPENSSL_sk_value(p.chain.cast(), 0) }.cast();
+            // SAFETY: the connection's certificate.
+            if !leaf.is_null() && unsafe { X509_up_ref(leaf) } != 0 {
+                d.peer = leaf;
+            }
+        }
+    } else if p.from > 0 {
         if p.accepted {
             // SAFETY: the connection's stack, or NULL.
             let n = unsafe { OPENSSL_sk_num(p.chain.cast()) };

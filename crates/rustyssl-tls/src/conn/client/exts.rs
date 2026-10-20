@@ -460,16 +460,19 @@ fn add_key_share(c: &mut Connection, p: &dyn Provider, group: u16, i: usize) -> 
         st.ks.truncate(i);
         st.ks.push((group, share));
     }
-    if i == 0 {
-        state(c)?.pkey = true;
-        c.hs.sh.group_id = group;
-    }
-    let st = state(c)?;
-    Ok(st
+    let public = state(c)?
         .ks
         .get(i)
         .map(|k| k.1.public().to_vec())
-        .unwrap_or_default())
+        .unwrap_or_default();
+    if i == 0 {
+        state(c)?.pkey = true;
+        c.hs.sh.group_id = group;
+        // The first share is the client's temporary key (`s->s3.tmp.pkey`, `SSL_get_tmp_key`)
+        // until a TLS 1.3 ServerHello picks one; a TLS 1.2 handshake keeps it.
+        c.hs.sh.own_tmp = Some((group, public.clone()));
+    }
+    Ok(public)
 }
 
 /// `tls_construct_ctos_key_share`: shares for the groups marked for them (or, without marks,

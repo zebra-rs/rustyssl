@@ -37,6 +37,18 @@ pub(crate) struct DsaState {
     pub(crate) priv_key: Option<BigNum>,
 }
 
+impl DsaState {
+    /// Moves the private key to the secure heap, where OpenSSL keeps it (`BN_secure_new`),
+    /// when the heap is set up.
+    pub(crate) fn secure_private(&mut self) {
+        if crate::secure::initialized()
+            && let Some(p) = self.priv_key.take()
+        {
+            self.priv_key = Some(crate::secure::scope(|| p.clone()));
+        }
+    }
+}
+
 /// One of a DSA key's numbers.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Field {
@@ -303,6 +315,7 @@ impl Dsa {
 
     /// Replaces the state (its numbers stored in the application's handles too).
     pub(crate) fn replace(&self, mut new: DsaState) {
+        new.secure_private();
         let mut st = self.lock();
         self.legacy().numbers.write(&mut new);
         *st = new;
@@ -345,7 +358,8 @@ impl Dsa {
         };
         let slot = lg.numbers.slot(f);
         if slot.0.is_null() {
-            *slot = Ptr(new_bignum(v, false));
+            // The private key is a secure number, as OpenSSL's is.
+            *slot = Ptr(new_bignum(v, f == Field::Priv));
         }
         slot.0
     }
