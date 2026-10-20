@@ -46,9 +46,12 @@ pub(crate) unsafe fn handle(
         // SAFETY: the caller's guarantee.
         Request::Verify { chain, rpk } => unsafe { verify(s, x, snap, &chain, rpk) },
         Request::Servername => {
-            let (cb, arg) = snap.map_or((None, ptr::null_mut()), |c| {
-                (c.servername_cb, c.servername_arg)
-            });
+            // The current context's callback, else the one the connection was made with
+            // (`final_server_name`).
+            let (cb, arg) = match snap.map(|c| (c.servername_cb, c.servername_arg)) {
+                Some((Some(cb), arg)) => (Some(cb), arg),
+                _ => super::config::session_servername(&x.state()),
+            };
             let Some(cb) = cb else {
                 return Some(Answer::Tlsext {
                     ret: rustyssl_abi::SSL_TLSEXT_ERR_NOACK,

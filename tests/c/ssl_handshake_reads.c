@@ -262,6 +262,51 @@ static void test_sni_switch(int first_alpn, int second_alpn)
     SSL_CTX_free(second);
 }
 
+static int calls_first, calls_other;
+
+static int count_first_cb(SSL *s, int *al, void *arg)
+{
+    (void)s;
+    (void)al;
+    (void)arg;
+    calls_first++;
+    return SSL_TLSEXT_ERR_OK;
+}
+
+static int count_other_cb(SSL *s, int *al, void *arg)
+{
+    (void)s;
+    (void)al;
+    (void)arg;
+    calls_other++;
+    return SSL_TLSEXT_ERR_OK;
+}
+
+/*
+ * A connection switched (SSL_set_SSL_CTX) before its handshake to a context without a
+ * servername callback still runs the one of the context it was made with
+ * (final_server_name's session context); a context with its own runs that one.
+ */
+static void test_servername_fallback(int other_has_cb)
+{
+    SSL_CTX *cctx = client_ctx(), *sctx = server_ctx(), *other = server_ctx();
+    SSL *c, *s;
+
+    printf("# servername after a switch to a context %s a callback\n",
+           other_has_cb ? "with" : "without");
+    calls_first = calls_other = 0;
+    SSL_CTX_set_tlsext_servername_callback(sctx, count_first_cb);
+    if (other_has_cb)
+        SSL_CTX_set_tlsext_servername_callback(other, count_other_cb);
+    pair(cctx, sctx, &c, &s);
+    SSL_set_SSL_CTX(s, other);
+    SSL_set_tlsext_host_name(c, "fallback");
+    check(handshake(c, s), "the handshake");
+    printf("  the first context's callback %d, the other's %d\n", calls_first, calls_other);
+    done(c, s, cctx, sctx);
+    SSL_CTX_free(other);
+}
+
 static int hello_cb(SSL *s, int *al, void *arg)
 {
     (void)al;
@@ -640,6 +685,8 @@ int main(void)
     test_sni_switch(1, 1);
     test_sni_switch(0, 1);
     test_sni_switch(1, 0);
+    test_servername_fallback(0);
+    test_servername_fallback(1);
     test_hello_cb();
     test_status(TLS1_3_VERSION);
     test_status(TLS1_2_VERSION);
