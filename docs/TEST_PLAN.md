@@ -340,18 +340,32 @@ alone is). Results go to `target/consumers-report.md`.
 - **node:** Node.js v24.22.0 (LTS) built with `--shared-openssl`, `test/parallel/test-crypto*`
   and `test-tls*` through `tools/test.py`.
 
-Results on macOS (aarch64), 2026-10-19 (Node.js: see the plan's Phase 9 exit status):
+Results on macOS (aarch64), 2026-10-19:
 
 | Consumer | Reference | rustyssl |
 |---|---:|---:|
 | rust-openssl | 433 of 459 | 433 of 459 |
 | ruby/openssl | 594 of 598 | 594 of 598 |
 | pyca/cryptography | 4482 of 4482 (199 skipped) | 4482 of 4482 (199 skipped) |
+| Node.js (crypto, TLS) | 376 of 376 | 375 of 376 |
 
-Fixed on the way: libssl flushes its write BIO at the state machine's flush points (a
-buffering write BIO stalled the handshake); the servername callback falls back to the context
-the connection was made with; a client's temporary key is its ClientHello's first key share;
-a TLS 1.3 server whose client closed before its NewSessionTickets still completes.
+Node.js's one rustyssl-only failure is `test-crypto-secure-heap`: with `--secure-heap` it
+expects `CRYPTO_secure_used()` to grow while a Diffie-Hellman key exists, because OpenSSL
+keeps private keys (`BN_secure_new`, `BN_CTX_secure_new`) in the secure arena. rustyssl's
+arena (`CRYPTO_secure_malloc_init` and friends) is real, but secrets live in Rust-owned
+memory and `BN_FLG_SECURE` is only a flag, so nothing is allocated there. Reporting arena use
+without putting the keys there would claim work not done (rule 10), so this waits for secret
+storage to go through the arena (BIGNUM digits in capi, key material in `rustyssl-crypto`).
+
+Fixed on the way:
+- libssl flushes its write BIO at the state machine's flush points (a buffering write BIO
+  stalled the handshake);
+- the servername callback falls back to the context the connection was made with;
+- a client's temporary key is its ClientHello's first key share;
+- a TLS 1.3 server whose client closed before its NewSessionTickets still completes;
+- a server's `SSL_get_tlsext_status_type` is what its ClientHello asked for;
+- a resumed server's peer certificate and chain are its session's: a session-ID cache hit
+  has both, a ticket the certificate alone (Node.js's `test-tls-client-cert-resumption`).
 
 ### L9: Security testing
 
