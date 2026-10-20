@@ -99,3 +99,17 @@ impl Md {
         Self::from_ptr(unsafe { ffi::EVP_get_digestbyname(n.as_ptr()) }.cast_mut())
     }
 }
+
+impl Md {
+    /// `EVP_sha1()` (static; `EVP_MD_free` ignores it).
+    pub fn sha1() -> Option<Self> {
+        // SAFETY: no arguments; a static digest.
+        Self::from_ptr(unsafe { ffi::EVP_sha1() }.cast_mut())
+    }
+
+    /// `EVP_MD_get0_name`.
+    pub fn name(&self) -> String {
+        // SAFETY: the digest is live; the name is owned by it.
+        crate::util::string_at(unsafe { ffi::EVP_MD_get0_name(self.as_ptr()) }).unwrap_or_default()
+    }
+}

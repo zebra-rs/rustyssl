@@ -117,3 +117,11 @@ impl PkeyCtxRef<'_> {
         unsafe { ffi::EVP_PKEY_CTX_ctrl_str(self.0, k.as_ptr(), v.as_ptr()) }
     }
 }
+
+impl Pkey {
+    /// `PEM_write_bio_PUBKEY`: what it returns.
+    pub fn write_pubkey_pem(&self, out: &crate::Bio) -> core::ffi::c_int {
+        // SAFETY: both are live.
+        unsafe { ffi::PEM_write_bio_PUBKEY(out.as_ptr(), self.as_ptr()) }
+    }
+}

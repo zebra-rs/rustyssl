@@ -1,0 +1,34 @@
+# `openssl spkac` (cargo xtask test-apps: upstream's tool on the reference, then ours on rustyssl
+# and on the reference). RSA PKCS#1 v1.5 signatures are deterministic, so -key's output is
+# compared byte for byte.
+spkac -help
+spkac -key {src}/test/testrsa.pem
+spkac -key {src}/test/testrsa.pem -challenge hello
+spkac -key {src}/test/testrsa2048.pem -digest sha256 -challenge x
+spkac -key {src}/test/testrsa.pem -digest nosuchdigest
+spkac -key {src}/test/testrsa.pem -digest sha1 -out {dir}/spkac.out
+spkac -key {src}/certs/nonexistent.pem
+spkac -key {src}/test/certs/key-pass-12345.pem -passin pass:12345
+spkac -key {src}/test/certs/key-pass-12345.pem -passin pass:wrong
+spkac -key {src}/test/certs/key-pass-12345.pem -passin nonsense
+spkac -key {src}/test/testrsa.pem -keyform PEM
+spkac -key {src}/test/testrsa.pem -keyform xyz
+spkac -key - < {src}/test/testrsa.pem
+spkac -key {src}/test/tested25519.pem
+spkac -in {tests}/pki/spkac.cnf
+spkac -in {tests}/pki/spkac.cnf -verify
+spkac -in {tests}/pki/spkac.cnf -noout -verify
+spkac -in {tests}/pki/spkac.cnf -noout -pubkey
+spkac -in {tests}/pki/spkac.cnf -spksect other -spkac ALT -verify -pubkey
+spkac -in {tests}/pki/spkac.cnf -spksect other -spkac BAD
+spkac -in {tests}/pki/spkac.cnf -spkac NOPE
+spkac -in {tests}/pki/spkac.cnf -spksect nosect
+spkac -in {tests}/pki/spkac.cnf -out {dir}/spkac.txt -noout
+spkac -in {dir}/nonexistent.cnf
+spkac < {tests}/pki/spkac.cnf
+spkac -in - -verify < {tests}/pki/spkac.cnf
+spkac -in {tests}/pki/spkac.cnf -provider default -propquery provider=default
+spkac -in {tests}/pki/spkac.cnf -provider-path {dir} -provider default
+spkac -in {tests}/pki/spkac.cnf extra
+spkac -nosuchoption
+spkac -in

@@ -12,8 +12,8 @@ pub mod version;
 // pub mod cmp;
 // pub mod cms;
 // pub mod configutl;
-// pub mod crl;
-// pub mod crl2pkcs7;
+pub mod crl;
+pub mod crl2pkcs7;
 // pub mod dgst;
 // pub mod dhparam;
 // pub mod dsa;
@@ -53,7 +53,7 @@ pub mod version;
 // pub mod skeyutl;
 // pub mod smime;
 // pub mod speed;
-// pub mod spkac;
+pub mod spkac;
 // pub mod srp;
 // pub mod storeutl;
 // pub mod ts;
@@ -71,8 +71,8 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "cmp" => cmp::main,
         // "cms" => cms::main,
         // "configutl" => configutl::main,
-        // "crl" => crl::main,
-        // "crl2pkcs7" => crl2pkcs7::main,
+        "crl" => crl::main,
+        "crl2pkcs7" => crl2pkcs7::main,
         // "dgst" => dgst::main,
         // "dhparam" => dhparam::main,
         // "dsa" => dsa::main,
@@ -112,7 +112,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "skeyutl" => skeyutl::main,
         // "smime" => smime::main,
         // "speed" => speed::main,
-        // "spkac" => spkac::main,
+        "spkac" => spkac::main,
         // "srp" => srp::main,
         // "storeutl" => storeutl::main,
         // "ts" => ts::main,

@@ -277,3 +277,50 @@ impl Lookup {
         self.ctrl_ex(X509_L_ADD_STORE, uri, 0, libctx, propq)
     }
 }
+
+crate::handle!(
+    /// An owned `X509_STORE_CTX`.
+    StoreCtx, X509_STORE_CTX, X509_STORE_CTX_free
+);
+
+impl StoreCtx {
+    /// `X509_STORE_CTX_new()`.
+    pub fn new() -> Option<Self> {
+        // SAFETY: no arguments.
+        Self::from_ptr(unsafe { ffi::X509_STORE_CTX_new() })
+    }
+
+    /// `X509_STORE_CTX_init(ctx, store, cert, untrusted)`; the context uses the objects
+    /// while it lives, so the caller keeps them alive until it is dropped or re-initialized.
+    pub fn init(
+        &self,
+        store: &Store,
+        cert: Option<&crate::x509::Cert>,
+        untrusted: Option<&crate::x509::CertStack>,
+    ) -> bool {
+        // SAFETY: all are live or NULL.
+        unsafe {
+            ffi::X509_STORE_CTX_init(
+                self.as_ptr(),
+                store.as_ptr(),
+                cert.map_or(core::ptr::null_mut(), crate::x509::Cert::as_ptr),
+                untrusted.map_or(core::ptr::null_mut(), crate::x509::CertStack::as_ptr),
+            ) == 1
+        }
+    }
+
+    /// `X509_STORE_CTX_get_obj_by_subject(ctx, X509_LU_X509, name)`.
+    pub fn get_cert_by_subject(
+        &self,
+        name: crate::x509::NameRef<'_>,
+    ) -> Option<crate::x509::Object> {
+        // SAFETY: the context is live (initialized with its store); the name is live.
+        crate::x509::Object::from_ptr(unsafe {
+            ffi::X509_STORE_CTX_get_obj_by_subject(
+                self.as_ptr(),
+                crate::abi::X509_LU_X509,
+                name.as_ptr(),
+            )
+        })
+    }
+}
