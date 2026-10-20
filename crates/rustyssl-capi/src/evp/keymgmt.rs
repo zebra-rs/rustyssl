@@ -26,7 +26,8 @@ use rustyssl_abi::{
     OSSL_FUNC_KEYMGMT_IMPORT_TYPES, OSSL_FUNC_KEYMGMT_IMPORT_TYPES_EX, OSSL_FUNC_KEYMGMT_LOAD,
     OSSL_FUNC_KEYMGMT_MATCH, OSSL_FUNC_KEYMGMT_NEW, OSSL_FUNC_KEYMGMT_QUERY_OPERATION_NAME,
     OSSL_FUNC_KEYMGMT_SET_PARAMS, OSSL_FUNC_KEYMGMT_SETTABLE_PARAMS, OSSL_FUNC_KEYMGMT_VALIDATE,
-    OSSL_LIB_CTX, OSSL_OP_KEYMGMT, OSSL_PARAM, OSSL_PROVIDER,
+    OSSL_KEYMGMT_SELECT_ALL, OSSL_KEYMGMT_SELECT_PRIVATE_KEY, OSSL_LIB_CTX, OSSL_OP_KEYMGMT,
+    OSSL_PARAM, OSSL_PROVIDER,
 };
 
 use super::fetch::{self, Kind};
@@ -481,11 +482,47 @@ impl Keymgmt {
     /// # Safety
     /// `reference` points to `reference_sz` octets of the provider's reference.
     pub(crate) unsafe fn load(&self, reference: *const c_void, reference_sz: usize) -> *mut c_void {
-        match self.funcs.load {
-            // SAFETY: the provider's function with the caller's reference.
-            Some(load) => unsafe { load(reference, reference_sz) },
-            None => ptr::null_mut(),
+        let Some(load) = self.funcs.load else {
+            return ptr::null_mut();
+        };
+        // SAFETY: the provider's function with the caller's reference.
+        let keydata = unsafe { load(reference, reference_sz) };
+        // A decoder made the key: OpenSSL's decoders put a private one in the secure heap.
+        // SAFETY: the key data just loaded.
+        unsafe { self.move_to_secure(keydata) }
+    }
+
+    /// `keydata`, moved to the secure heap if it holds a private key, the heap is set up, and
+    /// this is one of rustyssl's own key managers: a copy made in a secure scope replaces it.
+    /// OpenSSL's key managers allocate private keys there; copying the finished key (rather
+    /// than making it in a scope) keeps the one-time state a first use sets up, and anything
+    /// else that isn't the key's, out of the arena.
+    ///
+    /// # Safety
+    /// `keydata` is NULL or key data of this key manager that the caller owns.
+    pub(crate) unsafe fn move_to_secure(&self, keydata: *mut c_void) -> *mut c_void {
+        let Some(dup) = self.funcs.dup else {
+            return keydata;
+        };
+        if !crate::secure::initialized() || keydata.is_null() {
+            return keydata;
         }
+        // SAFETY: the key manager's provider, live while it is.
+        if !unsafe { crate::provider::is_predefined(self.prov.0) } {
+            return keydata;
+        }
+        // SAFETY: the caller's key data.
+        if unsafe { self.has(keydata, OSSL_KEYMGMT_SELECT_PRIVATE_KEY) } != 1 {
+            return keydata;
+        }
+        // SAFETY: the provider's function with the caller's key data.
+        let copy = crate::secure::scope(|| unsafe { dup(keydata, OSSL_KEYMGMT_SELECT_ALL) });
+        if copy.is_null() {
+            return keydata;
+        }
+        // SAFETY: the caller's key data, replaced by its copy.
+        unsafe { self.freedata(keydata) };
+        copy
     }
 
     /// `evp_keymgmt_newdata`: new key data, or NULL.
@@ -795,11 +832,26 @@ impl Keymgmt {
     /// # Safety
     /// `keydata` is key data of this key manager.
     pub(crate) unsafe fn dup(&self, keydata: *mut c_void, selection: c_int) -> *mut c_void {
-        match self.funcs.dup {
-            // SAFETY: the caller's guarantee.
-            Some(f) => unsafe { f(keydata, selection) },
-            None => ptr::null_mut(),
+        let Some(f) = self.funcs.dup else {
+            return ptr::null_mut();
+        };
+        // A copy of a private key goes to the secure heap.
+        let mut secret =
+            crate::secure::initialized() && selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY != 0;
+        if secret {
+            // SAFETY: the key manager's provider, live while it is.
+            secret = unsafe { crate::provider::is_predefined(self.prov.0) };
         }
+        if secret {
+            // SAFETY: the caller's key data.
+            secret = unsafe { self.has(keydata, OSSL_KEYMGMT_SELECT_PRIVATE_KEY) } == 1;
+        }
+        if secret {
+            // SAFETY: the provider's function with the caller's key data.
+            return crate::secure::scope(|| unsafe { f(keydata, selection) });
+        }
+        // SAFETY: as above.
+        unsafe { f(keydata, selection) }
     }
 }
 
