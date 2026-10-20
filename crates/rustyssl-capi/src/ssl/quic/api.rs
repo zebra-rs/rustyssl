@@ -632,8 +632,9 @@ pub(crate) unsafe fn accept_stream(s: *mut SSL, flags: u64) -> *mut SSL {
         return ptr::null_mut();
     };
     let engine = Arc::clone(c.engine());
-    let _ = flags
-        & u64::from(SSL_ACCEPT_STREAM_NO_BLOCK | SSL_ACCEPT_STREAM_UNI | SSL_ACCEPT_STREAM_BIDI);
+    let _ = flags & u64::from(SSL_ACCEPT_STREAM_NO_BLOCK);
+    let uni = flags & u64::from(SSL_ACCEPT_STREAM_UNI) != 0;
+    let bidi = flags & u64::from(SSL_ACCEPT_STREAM_BIDI) != 0;
     let id = {
         let mut es = engine.lock();
         if effective_policy(&mut es, c.conn) == SSL_INCOMING_STREAM_POLICY_REJECT {
@@ -645,7 +646,13 @@ pub(crate) unsafe fn accept_stream(s: *mut SSL, flags: u64) -> *mut SSL {
             return ptr::null_mut();
         }
         let now = es.now();
-        let Some(id) = es.channel_of(c.conn).and_then(|ch| ch.accept_stream(now)) else {
+        // One direction only when one is asked for alone.
+        let id = es.channel_of(c.conn).and_then(|ch| match (uni, bidi) {
+            (true, false) => ch.accept_stream_of(true, now),
+            (false, true) => ch.accept_stream_of(false, now),
+            _ => ch.accept_stream(now),
+        });
+        let Some(id) = id else {
             return ptr::null_mut();
         };
         if let Some(r) = es.conn(c.conn) {

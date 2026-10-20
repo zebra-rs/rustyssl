@@ -81,9 +81,9 @@ quic_multistream_test {src}/test/certs/servercert.pem {src}/test/certs/serverkey
 # port, packetiser or record layer (ossl_quic_conn_get_channel, ossl_quic_listener_get_port,
 # ossl_qtx_*).
 internal quicapitest test_quic_write_read test_fin_only_blocking test_version test_ssl_trace test_bio_ssl test_back_pressure test_multiple_dgrams test_non_io_retry test_quic_psk test_client_auth test_alpn test_noisy_dgram test_bw_limit test_get_shutdown test_tparam test_session_cb test_early_ticks test_new_token test_quic_amplification_limit test_reject_stream_gc test_quic_resize_txe test_pending_limit
-# quic_multistream_test: its scripts run against the internal test server, with internal threads
-# (ossl_crypto_thread_native_*).
-internal quic_multistream_test test_script
+# quic_multistream_test: its scripts (test_dyn_frame_types's too) run against the internal test
+# server, with internal threads (ossl_crypto_thread_native_*) and packet writers (WPACKET_*).
+internal quic_multistream_test test_script test_dyn_frame_types
 # DTLS (Phase 8): 80-test_dtls.t, 80-test_dtlsv1listen.t, 80-test_dtls_mtu.t, 70-test_bad_dtls.t
 dtlstest {src}/apps/server.pem {src}/apps/server.pem
 dtlsv1listentest
