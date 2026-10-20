@@ -1,0 +1,72 @@
+# `openssl genpkey`. Generated keys are random: `| check` re-parses each run's output with
+# upstream's tool on the reference (hex dumps collapsed). Parameters for named groups and
+# curves are deterministic and compared byte for byte.
+genpkey -help
+genpkey -algorithm RSA -help
+genpkey -algorithm EC -help
+genpkey -algorithm nosuch -help
+genpkey
+genpkey -algorithm nosuch
+genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:1024 | pkey -noout -text
+genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:1024 -quiet | pkey -noout -check
+genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:1024 -pkeyopt rsa_keygen_primes:3 -verbose | pkey -noout -text
+genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:1024 -pkeyopt rsa_keygen_pubexp:3 | pkey -noout -text_pub
+genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:1024 -text | pkey -noout -text
+genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:1024 -outform DER | pkey -inform DER -noout -text_pub
+genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:1024 -out {dir}/genpkey-rsa.pem -outpubkey {dir}/genpkey-rsapub.pem | pkey -pubin -in {dir}/genpkey-rsapub.pem -noout -text
+genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:1024 -outform DER -out {dir}/genpkey-rsa.der -outpubkey {dir}/genpkey-rsapub.der | pkey -pubin -inform DER -in {dir}/genpkey-rsapub.der -noout -text
+genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:1024 -aes128 -pass pass:secret | pkey -passin pass:secret -noout -check
+genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:1024 -aes-128-gcm -pass pass:secret
+genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:1024 -nosuchcipher
+genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:1024 -pass nosuch:x
+genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:-5
+genpkey -algorithm RSA -pkeyopt nosuchopt:1
+genpkey -algorithm RSA -pkeyopt nocolon
+genpkey -algorithm RSA-PSS -pkeyopt rsa_keygen_bits:1024 | pkey -noout -text_pub
+genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 | pkey -noout -text
+genpkey -algorithm EC -pkeyopt group:secp384r1 -pkeyopt point-format:compressed | pkey -noout -check
+genpkey -algorithm EC -pkeyopt ec_paramgen_curve:nosuch
+genpkey -algorithm EC
+genpkey -genparam -algorithm EC -pkeyopt ec_paramgen_curve:P-256
+genpkey -genparam -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -text
+genpkey -genparam -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -pkeyopt ec_param_enc:explicit
+genpkey -genparam -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -outform DER
+genpkey -genparam -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out {dir}/genpkey-ecp.pem | pkeyparam -in {dir}/genpkey-ecp.pem -text
+genpkey -paramfile {dir}/genpkey-ecp.pem | pkey -noout -text
+genpkey -paramfile {dir}/genpkey-ecp.pem -genparam
+genpkey -genparam -paramfile {dir}/genpkey-ecp.pem
+genpkey -paramfile {dir}/genpkey-ecp.pem -algorithm EC
+genpkey -algorithm EC -paramfile {dir}/genpkey-ecp.pem
+genpkey -paramfile /nonexistent/params.pem
+genpkey -paramfile {txt}
+genpkey -genparam -algorithm DH -pkeyopt group:ffdhe2048
+genpkey -genparam -algorithm DH -pkeyopt group:ffdhe2048 -text
+genpkey -algorithm DH -pkeyopt group:ffdhe2048 | pkey -noout -check
+genpkey -genparam -algorithm DHX -pkeyopt dh_rfc5114:2
+genpkey -genparam -algorithm DSA -pkeyopt dsa_paramgen_bits:1024 | pkeyparam -noout -check
+genpkey -genparam -algorithm DH -pkeyopt dh_paramgen_prime_len:512 | pkeyparam -text -noout
+genpkey -genparam -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -aes128
+genpkey -genparam -algorithm X25519
+genpkey -algorithm X25519 | pkey -noout -text_pub
+genpkey -algorithm ED25519 -text | pkey -noout -check
+genpkey -algorithm ED448 -outform DER | pkey -inform DER -noout -text_pub
+genpkey -algorithm X448 -outpubkey {dir}/genpkey-x448pub.pem | pkey -pubin -in {dir}/genpkey-x448pub.pem -noout -text_pub
+genpkey -algorithm ML-KEM-512 | pkey -noout -check
+genpkey -algorithm ML-DSA-44 -pkeyopt hexseed:000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+genpkey -algorithm ML-DSA-44 -pkeyopt hexseed:000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f -text
+genpkey -algorithm SM2 | pkey -noout -text_pub
+genpkey -algorithm HMAC -pkeyopt key:secret
+genpkey -algorithm X25519 -out /nonexistent/dir/key.pem
+genpkey -algorithm X25519 -out {dir}/genpkey-k.pem -outpubkey /nonexistent/dir/pub.pem
+genpkey -algorithm X25519 -outform XYZ
+genpkey -algorithm X25519 -config /nonexistent/openssl.cnf
+genpkey -algorithm X25519 -config {txt}
+genpkey -algorithm X25519 -engine /nonexistent/eng.so | pkey -noout -check
+genpkey -algorithm X25519 -provider default | pkey -noout -check
+genpkey -algorithm X25519 -provider /nonexistent/prov.so
+genpkey -algorithm X25519 -propquery provider=nosuch
+genpkey -algorithm X25519 -rand {bin} -writerand {dir}/genpkey.rnd | pkey -noout -check
+genpkey -algorithm X25519 -rand /nonexistent/rand.bin | pkey -noout -check
+genpkey -algorithm X25519 extra
+genpkey -algorithm
+genpkey -nosuchoption

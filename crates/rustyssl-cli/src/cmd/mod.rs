@@ -25,7 +25,7 @@ pub mod version;
 // pub mod errstr;
 // pub mod fipsinstall;
 // pub mod gendsa;
-// pub mod genpkey;
+pub mod genpkey;
 // pub mod genrsa;
 // pub mod info;
 // pub mod kdf;
@@ -84,7 +84,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "errstr" => errstr::main,
         // "fipsinstall" => fipsinstall::main,
         // "gendsa" => gendsa::main,
-        // "genpkey" => genpkey::main,
+        "genpkey" => genpkey::main,
         // "genrsa" => genrsa::main,
         // "info" => info::main,
         // "kdf" => kdf::main,
