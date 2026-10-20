@@ -20,6 +20,12 @@
 //! --with-openssl-dir`), each `test/openssl/test_*.rb` file run by Ruby's bundled test-unit
 //! with `core_assertions` from the pinned test-unit-ruby-core; each test's mark in the verbose
 //! output is its result. Needs `ruby` (skipped without it).
+//!
+//! **pyca** (pyca/cryptography): built against the reference (`OPENSSL_DIR`) into a virtualenv
+//! under `target/consumers/build/` with the build requirements its CI pins by hash and the test
+//! requirements at its CI's versions; its `tests` run by pytest over every core, each test's
+//! `-rA` line its result. Needs Python 3 with `venv` (3.13 or 3.12 preferred, for wheels) and
+//! network access to PyPI for those requirements (skipped without Python).
 
 use std::fmt::Write as _;
 use std::fs;
@@ -32,7 +38,7 @@ use crate::test_providers::{Pin, Results, Side, fetch, parse_pins, pool, wait};
 use crate::util::{Result, fresh_dir, run_logged, target_dir, workspace_root};
 
 /// The consumers the command knows, as named on its command line.
-const CONSUMERS: &[&str] = &["rust", "ruby"];
+const CONSUMERS: &[&str] = &["rust", "ruby", "pyca"];
 
 /// How long one test may run.
 const TEST_TIMEOUT: Duration = Duration::from_secs(300);
@@ -272,6 +278,110 @@ fn run_ruby(ctx: &Ctx<'_>, pins: &[Pin]) -> Result<Vec<Results>> {
     keep(ctx, "ruby", all)
 }
 
+/// pyca/cryptography: the package built against the reference in a virtualenv of its own
+/// (the build requirements its CI pins with hashes, the test requirements at its CI's
+/// versions), its `tests` run by pytest with `cryptography_vectors` from the same tree.
+fn run_pyca(ctx: &Ctx<'_>, pins: &[Pin]) -> Result<Vec<Results>> {
+    let Some(python) = ["python3.13", "python3.12", "python3"]
+        .into_iter()
+        .find(|p| Command::new(p).arg("--version").output().is_ok())
+    else {
+        println!("pyca: skipped (no python3 on PATH)");
+        return Ok(Vec::new());
+    };
+    let pin = ctx.pin(pins, "cryptography")?;
+    let tree = fetch(&ctx.dir, pin)?;
+    let venv = ctx.dir.join("build/cryptography-venv");
+    let stamp = venv.join(format!("built-{}", pin.commit));
+    let py = venv.join("bin/python");
+    if !stamp.exists() {
+        let log = ctx.work.join("pyca-build.log");
+        println!("Building pyca/cryptography (log: {})...", log.display());
+        fresh_dir(&venv)?;
+        run_logged(Command::new(python).args(["-m", "venv"]).arg(&venv), &log)?;
+        let pip = || {
+            let mut cmd = Command::new(&py);
+            cmd.args(["-m", "pip", "install", "-q"]);
+            cmd
+        };
+        run_logged(
+            pip()
+                .arg("--require-hashes")
+                .arg("-r")
+                .arg(tree.join(".github/requirements/build-requirements.txt")),
+            &log,
+        )?;
+        run_logged(
+            pip()
+                .arg("-c")
+                .arg(tree.join("ci-constraints-requirements.txt"))
+                .args([
+                    "pytest",
+                    "pytest-benchmark",
+                    "pytest-xdist",
+                    "pretend",
+                    "certifi",
+                ]),
+            &log,
+        )?;
+        // maturin's backend runs `maturin` from PATH.
+        let path = std::env::join_paths(std::iter::once(venv.join("bin")).chain(
+            std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()),
+        ))?;
+        run_logged(
+            pip()
+                .arg("--no-build-isolation")
+                .arg(&tree)
+                .env("PATH", path)
+                .env("OPENSSL_DIR", ctx.reference),
+            &log,
+        )?;
+        fs::write(&stamp, "")?;
+    }
+    let jobs = ctx.jobs.to_string();
+    let make = move |_: &str| {
+        let mut cmd = Command::new(&py);
+        cmd.args([
+            "-m",
+            "pytest",
+            "tests",
+            "-n",
+            &jobs,
+            "-q",
+            "-rA",
+            "-p",
+            "no:cacheprovider",
+        ])
+        .arg("--benchmark-disable")
+        .current_dir(&tree)
+        .env("PYTHONPATH", "vectors");
+        cmd
+    };
+    // One run per side (pytest-xdist spreads it over the cores).
+    let all = run_tests(ctx, &["tests".to_owned()], make, |_, _, out| {
+        pytest_results(out)
+    })?;
+    keep(ctx, "pyca", all)
+}
+
+/// Each test's outcome in pytest's `-rA` summary: `PASSED <id>`, `FAILED <id> - ...`,
+/// `ERROR <id> - ...`, `XFAIL`/`XPASS <id>` (skips are listed by place, not by test, and so
+/// aren't results; a test skipped on one side only is missing there).
+fn pytest_results(out: &str) -> Vec<(String, bool)> {
+    out.lines()
+        .filter_map(|l| {
+            let (kind, rest) = l.split_once(' ')?;
+            let id = rest.split(" - ").next()?.trim();
+            let passed = match kind {
+                "PASSED" | "XFAIL" => true,
+                "FAILED" | "ERROR" | "XPASS" => false,
+                _ => return None,
+            };
+            id.contains("::").then(|| (id.to_owned(), passed))
+        })
+        .collect()
+}
+
 /// Each test's outcome in test-unit's verbose output: `Class::Name:` lines name the case,
 /// `  test_name:<tabs><mark>: (time)` its tests, `.` a pass (failures, errors, omissions and
 /// pendings are not).
@@ -433,6 +543,7 @@ pub fn run(args: &[String]) -> Result {
         let per_side = match *c {
             "rust" => run_rust(&ctx, &pins)?,
             "ruby" => run_ruby(&ctx, &pins)?,
+            "pyca" => run_pyca(&ctx, &pins)?,
             _ => unreachable!(),
         };
         let report = Report {
@@ -465,6 +576,21 @@ pub fn run(args: &[String]) -> Result {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_pytest_results() {
+        let out = "....\n=== short test summary info ===\nPASSED tests/a.py::test_x[p1]\n\
+                   FAILED tests/b.py::TestB::test_y - assert 1 == 2\nERROR tests/c.py::test_z\n\
+                   SKIPPED [3] tests/d.py:12: no wycheproof\n4 passed, 1 failed in 1s\n";
+        assert_eq!(
+            pytest_results(out),
+            [
+                ("tests/a.py::test_x[p1]".to_owned(), true),
+                ("tests/b.py::TestB::test_y".to_owned(), false),
+                ("tests/c.py::test_z".to_owned(), false),
+            ]
+        );
+    }
 
     #[test]
     fn reads_test_unit_results() {
