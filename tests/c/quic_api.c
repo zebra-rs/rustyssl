@@ -499,6 +499,77 @@ out:
     free_pair(&p);
 }
 
+/*
+ * A large response, as an HTTP/0.9 server sends it: written in chunks (retrying when the send
+ * buffer is full), concluded, and the stream object freed at once. Everything must arrive.
+ */
+static void test_large_transfer(void)
+{
+    struct pair p;
+    SSL *cs = NULL, *ss = NULL;
+    static unsigned char out[3 << 20], in[8192];
+    size_t total = sizeof(out), sent = 0, got = 0, n = 0, w = 0;
+    unsigned long sum_out = 0, sum_in = 0;
+    int r, i, fin = 0;
+
+    printf("# a large transfer, the stream freed after its conclusion\n");
+    for (n = 0; n < total; n++) {
+        out[n] = (unsigned char)(n * 7 + (n >> 11));
+        sum_out = sum_out * 31 + out[n];
+    }
+    check(setup(&p) && handshake(&p), "a connection");
+    p.server = SSL_accept_connection(p.listener, SSL_ACCEPT_CONNECTION_NO_BLOCK);
+    cs = SSL_new_stream(p.client, 0);
+    check(cs != NULL && SSL_write_ex(cs, "GET /big\r\n", 10, &w) == 1, "a request");
+    SSL_stream_conclude(cs, 0);
+    for (i = 0; i < 100 && ss == NULL; i++) {
+        pump(&p, 1);
+        ss = SSL_accept_stream(p.server, SSL_ACCEPT_STREAM_NO_BLOCK);
+    }
+    check(ss != NULL, "the server accepts it");
+    if (ss == NULL)
+        goto out;
+    /* The server writes all of it, the client reading as it goes. */
+    for (i = 0; i < 2000000 && (sent < total || !fin); i++) {
+        if (sent < total) {
+            size_t chunk = total - sent > 65536 ? 65536 : total - sent;
+
+            r = SSL_write_ex(ss, out + sent, chunk, &w);
+            if (r == 1)
+                sent += w;
+            else if (SSL_get_error(ss, r) != SSL_ERROR_WANT_WRITE)
+                break;
+            if (sent == total) {
+                SSL_stream_conclude(ss, 0);
+                SSL_free(ss);
+                ss = NULL;
+            }
+        }
+        r = SSL_read_ex(cs, in, sizeof(in), &n);
+        if (r == 1) {
+            size_t k;
+
+            for (k = 0; k < n; k++)
+                sum_in = sum_in * 31 + in[k];
+            got += n;
+        } else if (SSL_get_error(cs, r) == SSL_ERROR_ZERO_RETURN) {
+            fin = 1;
+        } else if (SSL_get_error(cs, r) != SSL_ERROR_WANT_READ) {
+            break;
+        }
+        SSL_handle_events(p.listener);
+    }
+    check(sent == total, "the server wrote all of it");
+    check(got == total && fin, "the client read all of it and the end");
+    check(sum_in == sum_out, "unchanged");
+    printf("  sent %zu, received %zu, end %d\n", sent, got, fin);
+out:
+    ERR_clear_error();
+    SSL_free(ss);
+    SSL_free(cs);
+    free_pair(&p);
+}
+
 /* SSL_poll on what it can't poll. */
 static void test_poll_errors(void)
 {
@@ -583,6 +654,7 @@ int main(void)
     test_validated();
     test_from_listener();
     test_streams();
+    test_large_transfer();
     test_poll_errors();
     X509_free(cert);
     EVP_PKEY_free(key);

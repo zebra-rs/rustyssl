@@ -438,13 +438,10 @@ impl EngineState {
                 }
             }
             (Kind::Stream, Some(Rec::Stream(r))) => {
-                // An unfinished send part is reset, and the receive part stopped
-                // (`ossl_quic_free`).
+                // An unfinished send part is reset, a receive part still receiving stopped;
+                // a concluded stream's data still goes out (`ossl_quic_free`).
                 if let Some(ch) = self.channel_of(r.conn) {
-                    let id = r.api.id;
-                    let _ = ch.stream_reset(id, 0);
-                    let _ = ch.stream_stop_sending(id, 0);
-                    ch.stream_release(id);
+                    ch.stream_release(r.api.id);
                 }
                 if let Some(c) = self.conn(r.conn) {
                     c.streams = c.streams.saturating_sub(1);
