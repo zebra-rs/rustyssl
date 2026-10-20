@@ -82,6 +82,7 @@ fn run_tests(
             let mut cmd = make(test);
             side.env(&mut cmd)
                 .env("OPENSSL_CONF", MISSING_CONFIG)
+                .env("OPENSSL_MODULES", crate::test_c::modules_of(&side.lib))
                 .stdin(Stdio::null())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped());
