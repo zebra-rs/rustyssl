@@ -7,8 +7,10 @@
 # rust: rust-openssl's openssl-v0.10.81 (openssl-sys 0.9.117), the `openssl` crate's tests.
 pin rust-openssl sfackler/rust-openssl db9c9e2f5db2ad7b45fd894e8d297ee15bfd0c7c 2e36415cd90c174a63b34e06d7cf26b34924f3a930c26ff782129b044075e4a7
 
-# ruby: the openssl gem v4.0.2, its test suite (test/openssl).
+# ruby: the openssl gem v4.0.2, its test suite (test/openssl), with test-unit-ruby-core
+# v1.0.16's core_assertions (a test dependency in its Gemfile).
 pin ruby-openssl ruby/openssl 6e410b804f4c6a52c146fe651941bafdbb332754 b36966b11c377554d7c20c1f821a8c87cdd05961518a304c8f771f9f489dbd1b
+pin test-unit-ruby-core ruby/test-unit-ruby-core f7ee59842274e59123ec264b313e4c6030e62518 31f7b4b5f0bb5d2d667a71835518cf7c007f0f37fe813fec5d4a9eef9a40e75e
 
 # pyca: cryptography 50.0.2, its test suite (vectors from the same tree).
 pin cryptography pyca/cryptography 4dda5c7fe4ae71b8925f2551910a0ef959df9c7a 6471dd1d85685ec951a5457b1098161b73cccd165d267a420487ce1256bdd0eb

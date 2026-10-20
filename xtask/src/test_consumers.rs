@@ -15,6 +15,11 @@
 //! **rust** (rust-openssl): the `openssl` crate's tests, built with `OPENSSL_DIR` naming the
 //! reference (openssl-sys links its shared libraries), each run as `<test> --exact` from the
 //! crate's directory.
+//!
+//! **ruby** (the openssl gem): its extension built against the reference (`extconf.rb
+//! --with-openssl-dir`), each `test/openssl/test_*.rb` file run by Ruby's bundled test-unit
+//! with `core_assertions` from the pinned test-unit-ruby-core; each test's mark in the verbose
+//! output is its result. Needs `ruby` (skipped without it).
 
 use std::fmt::Write as _;
 use std::fs;
@@ -27,7 +32,7 @@ use crate::test_providers::{Pin, Results, Side, fetch, parse_pins, pool, wait};
 use crate::util::{Result, fresh_dir, run_logged, target_dir, workspace_root};
 
 /// The consumers the command knows, as named on its command line.
-const CONSUMERS: &[&str] = &["rust"];
+const CONSUMERS: &[&str] = &["rust", "ruby"];
 
 /// How long one test may run.
 const TEST_TIMEOUT: Duration = Duration::from_secs(300);
@@ -67,19 +72,20 @@ struct Report {
     per_side: Vec<Results>,
 }
 
-/// Runs `cmd` per test (`argv(test)` its arguments) on every side, in a pool.
+/// Runs `make(item)` per item on every side, in a pool; `results` makes the item's tests'
+/// outcomes of its exit status and output (one test per item, or a file's tests).
 fn run_tests(
     ctx: &Ctx<'_>,
-    tests: &[String],
+    items: &[String],
     make: impl Fn(&str) -> Command + Send + Sync + Clone + 'static,
-    passed: fn(bool, &str) -> bool,
+    results: fn(&str, bool, &str) -> Vec<(String, bool)>,
 ) -> Result<Vec<Vec<Outcome>>> {
     let mut all = Vec::new();
     for side in ctx.sides {
         let side = side.clone();
         let make = make.clone();
-        let outcomes = pool(tests.to_vec(), ctx.jobs, move |test| {
-            let mut cmd = make(test);
+        let per_item = pool(items.to_vec(), ctx.jobs, move |item| {
+            let mut cmd = make(item);
             side.env(&mut cmd)
                 .env("OPENSSL_CONF", MISSING_CONFIG)
                 .env("OPENSSL_MODULES", crate::test_c::modules_of(&side.lib))
@@ -90,14 +96,28 @@ fn run_tests(
                 Ok(child) => wait_both(child).unwrap_or((false, String::new())),
                 Err(e) => (false, format!("spawn: {e}")),
             };
-            let p = passed(ok, &out);
-            Outcome {
-                name: test.clone(),
-                passed: p,
-                output: (!p).then_some(out),
+            let mut outcomes: Vec<Outcome> = results(item, ok, &out)
+                .into_iter()
+                .map(|(name, passed)| Outcome {
+                    name,
+                    passed,
+                    output: None,
+                })
+                .collect();
+            // The run's output, once, with its first failing test (or the item when it
+            // reported none: a crash before any test).
+            if outcomes.is_empty() {
+                outcomes.push(Outcome {
+                    name: format!("{item} (no results)"),
+                    passed: false,
+                    output: Some(out),
+                });
+            } else if let Some(o) = outcomes.iter_mut().find(|o| !o.passed) {
+                o.output = Some(out);
             }
+            outcomes
         });
-        all.push(outcomes);
+        all.push(per_item.into_iter().flatten().collect());
     }
     Ok(all)
 }
@@ -185,10 +205,99 @@ fn run_rust(ctx: &Ctx<'_>, pins: &[Pin]) -> Result<Vec<Results>> {
             .current_dir(&crate_dir);
         cmd
     };
-    let all = run_tests(ctx, &tests, make, |ok, out| {
-        ok && out.contains("test result: ok. 1 passed")
+    let all = run_tests(ctx, &tests, make, |test, ok, out| {
+        vec![(
+            test.to_owned(),
+            ok && out.contains("test result: ok. 1 passed"),
+        )]
     })?;
     keep(ctx, "rust", all)
+}
+
+/// ruby/openssl: the gem's extension built against the reference, each `test/openssl/test_*.rb`
+/// file run by Ruby's test-unit (`core_assertions` from the pinned test-unit-ruby-core).
+fn run_ruby(ctx: &Ctx<'_>, pins: &[Pin]) -> Result<Vec<Results>> {
+    if Command::new("ruby").arg("--version").output().is_err() {
+        println!("ruby: skipped (no ruby on PATH)");
+        return Ok(Vec::new());
+    }
+    let tree = fetch(&ctx.dir, ctx.pin(pins, "ruby-openssl")?)?;
+    let core = fetch(&ctx.dir, ctx.pin(pins, "test-unit-ruby-core")?)?;
+    let build = ctx.dir.join("build/ruby-openssl");
+    let log = ctx.work.join("ruby-build.log");
+    let ext = ["openssl.bundle", "openssl.so"];
+    if !ext.iter().any(|e| build.join(e).exists()) {
+        println!(
+            "Building ruby/openssl's extension (log: {})...",
+            log.display()
+        );
+        fresh_dir(&build)?;
+        run_logged(
+            Command::new("ruby")
+                .arg(tree.join("ext/openssl/extconf.rb"))
+                .arg(format!("--with-openssl-dir={}", ctx.reference.display()))
+                .current_dir(&build),
+            &log,
+        )?;
+        run_logged(
+            Command::new("make")
+                .arg(format!("-j{}", ctx.jobs))
+                .current_dir(&build),
+            &log,
+        )?;
+    }
+    let mut files: Vec<String> = fs::read_dir(tree.join("test/openssl"))?
+        .filter_map(|e| e.ok())
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|n| n.starts_with("test_") && n.ends_with(".rb"))
+        .collect();
+    files.sort();
+    let load = [
+        tree.join("lib"),
+        build,
+        core.join("lib"),
+        tree.join("test/openssl"),
+    ];
+    let make = move |file: &str| {
+        let mut cmd = Command::new("ruby");
+        for dir in &load {
+            cmd.arg("-I").arg(dir);
+        }
+        cmd.arg(format!("test/openssl/{file}"))
+            .args(["-v", "--no-use-color"])
+            .current_dir(&tree);
+        cmd
+    };
+    let all = run_tests(ctx, &files, make, |_, _, out| test_unit_results(out))?;
+    keep(ctx, "ruby", all)
+}
+
+/// Each test's outcome in test-unit's verbose output: `Class::Name:` lines name the case,
+/// `  test_name:<tabs><mark>: (time)` its tests, `.` a pass (failures, errors, omissions and
+/// pendings are not).
+fn test_unit_results(out: &str) -> Vec<(String, bool)> {
+    let mut case = String::new();
+    let mut results = Vec::new();
+    for line in out.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("test") {
+            let Some((name, rest)) = trimmed.split_once(':') else {
+                continue;
+            };
+            let mark = rest.trim_start_matches(['\t', ' ']).chars().next();
+            if !name.contains(' ')
+                && let Some(mark) = mark.filter(|c| ".FEOPN".contains(*c))
+            {
+                results.push((format!("{case}#{name}"), mark == '.'));
+            }
+        } else if let Some(name) = trimmed.strip_suffix(':')
+            && !name.is_empty()
+            && !name.contains([' ', '\t'])
+        {
+            case = name.to_owned();
+        }
+    }
+    results
 }
 
 /// The `"executable"` of a cargo JSON artifact line.
@@ -323,6 +432,7 @@ pub fn run(args: &[String]) -> Result {
     {
         let per_side = match *c {
             "rust" => run_rust(&ctx, &pins)?,
+            "ruby" => run_ruby(&ctx, &pins)?,
             _ => unreachable!(),
         };
         let report = Report {
@@ -355,6 +465,22 @@ pub fn run(args: &[String]) -> Result {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_test_unit_results() {
+        let out = "Loaded suite test/openssl/test_hmac\nStarted\nOpenSSL::TestCase: \n  \
+                   OpenSSL::TestHMAC: \n    test_dup:\t\t\t\t\t\t.: (0.000032)\n    \
+                   test_eq:\t\t\t\t\t\tF\n===\nFailure: test_eq(OpenSSL::TestHMAC)\n    \
+                   test_x:\t\t\t\t\t\tO: (0.1)\n\nFinished in 0.0009 seconds.\n";
+        assert_eq!(
+            test_unit_results(out),
+            [
+                ("OpenSSL::TestHMAC#test_dup".to_owned(), true),
+                ("OpenSSL::TestHMAC#test_eq".to_owned(), false),
+                ("OpenSSL::TestHMAC#test_x".to_owned(), false),
+            ]
+        );
+    }
 
     #[test]
     fn reads_cargo_executables() {
