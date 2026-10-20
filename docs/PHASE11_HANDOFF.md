@@ -11,7 +11,8 @@ work stands, how to run it, and the brief for each piece.
 - Branch `apps-design`: ADR 0007.
 - Branch `cli-f0` (this one): ADR 0007 plus the user's four decisions (ADR section 7), upstream's
   `apps/` and `doc/man1/` vendored into `abi/openssl-3.6/`, `scripts/gates.sh`, `CLAUDE.md`,
-  and this note. Nothing of F0's code exists yet: the next step is F0 (below).
+  this note, and **F0, done** (`docs/IMPLEMENTATION_PLAN.md`, Phase 11, says what it holds and
+  what the command forks build on). The next step is G1–G6 (below), from F0's merged result.
 
 ## How to work
 
