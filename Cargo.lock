@@ -390,6 +390,7 @@ dependencies = [
  "rustyssl-conf",
  "rustyssl-crypto",
  "rustyssl-pki",
+ "rustyssl-quic",
  "rustyssl-tls",
  "subtle",
 ]
