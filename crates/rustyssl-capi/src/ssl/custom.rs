@@ -100,7 +100,7 @@ impl Method {
 }
 
 /// `custom_ext_find`.
-fn find(exts: &[Method], role: Option<bool>, typ: u16) -> bool {
+pub(crate) fn find(exts: &[Method], role: Option<bool>, typ: u16) -> bool {
     exts.iter()
         .any(|m| m.typ == typ && (role.is_none() || m.role.is_none() || m.role == role))
 }

@@ -92,7 +92,7 @@ pub fn construct_finished(c: &mut Connection, p: &dyn Provider) -> Result<Vec<u8
     }
     if c.is_tls13()
         && !c.cfg.server
-        && !c.cfg.quic
+        && c.cfg.quic.is_none()
         && (c.hs.sh.early_data_state != EarlyDataState::None
             || c.cfg.options & abi::SSL_OP_ENABLE_MIDDLEBOX_COMPAT != 0)
         && c.hs.sh.cert_req == 0
@@ -178,7 +178,7 @@ pub fn process_finished(c: &mut Connection, p: &dyn Provider, body: &[u8]) -> Re
         } else {
             keys::generate_master_secret(c, p)?;
             keys::store_server_finished_hash(c)?;
-            if !c.cfg.quic {
+            if c.cfg.quic.is_none() {
                 keys::change_cipher_state13(
                     c,
                     p,

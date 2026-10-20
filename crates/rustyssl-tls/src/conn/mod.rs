@@ -18,6 +18,7 @@ pub mod dtls;
 pub(crate) mod funcs;
 #[cfg(test)]
 pub(crate) mod pair;
+pub mod quic;
 mod requests;
 pub(crate) mod server;
 
@@ -27,6 +28,7 @@ use rustyssl_abi as abi;
 
 pub use config::{CertKey, Config, ExternalPsk, Session, TicketKeys};
 pub use event::{Answer, Callbacks, Event, Request, SrpParams};
+pub use quic::{Direction, QuicLevel, QuicSecret, QuicTlsConfig};
 
 use self::statem::{HsBytes, MsgFlow, Statem, msgs_type, st};
 use crate::crypto::Provider;
@@ -328,6 +330,8 @@ pub struct Connection {
     pub(crate) version_pending: bool,
     /// DTLS's state (unused in TLS).
     pub(crate) dtls: dtls::State,
+    /// QUIC mode's state (unused without it).
+    pub(crate) quic: quic::State,
 }
 
 impl core::fmt::Debug for Connection {
@@ -343,7 +347,7 @@ impl core::fmt::Debug for Connection {
 impl Connection {
     /// A connection with `cfg`, before any handshake (`TLS_ST_BEFORE`).
     #[must_use]
-    pub fn new(cfg: Config) -> Self {
+    pub fn new(mut cfg: Config) -> Self {
         // Shared fix (fork M): a flexible method's connection reports TLS 1.3 until a version
         // is negotiated (`tls1_clear`: TLS_MAX_VERSION_INTERNAL), with is_tls13 false until
         // then (the method isn't switched yet); its first records carry TLS 1.0.
@@ -361,6 +365,15 @@ impl Connection {
             (cfg.method_version, cfg.method_version)
         };
         let server = cfg.server;
+        if let Some(q) = cfg.quic.as_ref() {
+            // `ossl_quic_tls_configure`: the transport parameters extension, after the
+            // application's; `ossl_quic_tls_set_early_data_enabled`.
+            let early = q.early_data;
+            quic_extension(&mut cfg);
+            if early && server {
+                cfg.max_early_data = u32::MAX;
+            }
+        }
         // `SSL_set_session` takes the session's verification result; a resumption verifies
         // nothing, so it is what the connection reports (a full handshake's verification
         // replaces it).
@@ -444,7 +457,22 @@ impl Connection {
             security_hook: None,
             version_pending: false,
             dtls: dtls::State::default(),
+            quic: quic::State::default(),
         }
+        .with_quic_early_data()
+    }
+
+    /// QUIC mode's early data state (`ossl_quic_tls_set_early_data_enabled`): a server accepts
+    /// 0-RTT, a client offers it.
+    fn with_quic_early_data(mut self) -> Self {
+        if self.cfg.quic.as_ref().is_some_and(|q| q.early_data) {
+            self.hs.sh.early_data_state = if self.cfg.server {
+                common::EarlyDataState::Accepting
+            } else {
+                common::EarlyDataState::Connecting
+            };
+        }
+        self
     }
 
     /// The settings.
@@ -758,7 +786,7 @@ impl Connection {
                 } else if let Some(r) = &self.pending {
                     return Ok(Event::Request(r.clone()));
                 }
-                if !self.output.is_empty() {
+                if self.output_waiting() {
                     return Ok(Event::Output);
                 }
                 Ok(Event::NeedInput)
@@ -782,7 +810,7 @@ impl Connection {
         if self.hs.sh.early_data_state == common::EarlyDataState::UnauthWriting {
             // A server writing to an unauthenticated client between its Finished and the
             // client's doesn't run the handshake (`ssl3_write_bytes`).
-            if !self.output.is_empty() {
+            if self.output_waiting() {
                 return Ok(Some(Event::Output));
             }
             return Ok(Some(Event::Idle));
@@ -797,7 +825,7 @@ impl Connection {
                 if !early_stop {
                     self.first_handshake = false;
                 }
-                if !self.output.is_empty() {
+                if self.output_waiting() {
                     self.notify(Event::Output);
                 }
                 return Ok(Some(Event::HandshakeDone));
@@ -805,7 +833,7 @@ impl Connection {
             return Ok(None);
         }
         if !self.reading {
-            if !self.output.is_empty() {
+            if self.output_waiting() {
                 return Ok(Some(Event::Output));
             }
             return Ok(Some(Event::Idle));
@@ -817,6 +845,12 @@ impl Connection {
             return Ok(Some(Event::Closed));
         }
         self.read_application_data(p)
+    }
+
+    /// Whether output waits to be taken: network output, or QUIC mode's handshake octets and
+    /// alerts.
+    fn output_waiting(&self) -> bool {
+        !self.output.is_empty() || self.quic.has_output()
     }
 
     /// Queues an event.
@@ -870,7 +904,8 @@ impl Connection {
         if self.flush_marks.last() != Some(&self.output.len()) {
             self.flush_marks.push(self.output.len());
         }
-        self.output.is_empty()
+        // QUIC: the stack has taken the handshake octets (`quic_write_records` returned).
+        self.output.is_empty() && !self.quic.has_output()
     }
 
     /// Reports a message to the message callback with the connection's version.
@@ -905,6 +940,9 @@ impl Connection {
     /// Writes `data` as records of type `ty` (`ssl3_write_bytes`), reporting each record's
     /// header (and TLS 1.3's inner content type) to the message callback.
     pub(crate) fn write_record(&mut self, p: &dyn Provider, ty: u8, data: &[u8]) -> Result<()> {
+        if self.cfg.quic.is_some() {
+            return self.quic_write(ty, data);
+        }
         if self.cfg.dtls {
             let epoch = self.rw.epoch();
             return self.dtls_write_record(p, ty, data, epoch);
@@ -942,6 +980,9 @@ impl Connection {
     fn fetch_record(&mut self, p: &dyn Provider) -> Result<Option<record::Record>> {
         if self.cfg.dtls {
             return self.fetch_record_dtls(p);
+        }
+        if self.cfg.quic.is_some() {
+            return Ok(self.quic_fetch());
         }
         loop {
             self.rr.skip_undecryptable = self.skip_early_data();
@@ -1712,6 +1753,23 @@ impl Connection {
 
 /// The error that makes the state machine drop the message read and read again (DTLS: an
 /// unexpected ChangeCipherSpec).
+/// Registers QUIC's transport parameters extension (`TLSEXT_TYPE_quic_transport_parameters`)
+/// for this end, after the application's extensions, unless the caller already put it there.
+fn quic_extension(cfg: &mut Config) {
+    let typ = crate::consts::ext::QUIC_TRANSPORT_PARAMETERS;
+    let ext = config::CustomExt {
+        typ,
+        context: quic::PARAMS_CONTEXT,
+        server: Some(cfg.server),
+        has_add: true,
+        has_parse: true,
+    };
+    match cfg.custom_exts.iter_mut().find(|e| e.typ == typ) {
+        Some(e) => *e = ext,
+        None => cfg.custom_exts.push(ext),
+    }
+}
+
 pub(crate) fn dtls_retry_read() -> Error {
     Error::quiet(-1)
 }

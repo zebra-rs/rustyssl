@@ -169,6 +169,8 @@ pub mod ext {
     pub const CERTIFICATE_AUTHORITIES: u16 = w16(abi::TLSEXT_TYPE_certificate_authorities);
     /// post_handshake_auth.
     pub const POST_HANDSHAKE_AUTH: u16 = w16(abi::TLSEXT_TYPE_post_handshake_auth);
+    /// quic_transport_parameters (RFC 9001).
+    pub const QUIC_TRANSPORT_PARAMETERS: u16 = w16(abi::TLSEXT_TYPE_quic_transport_parameters);
     /// signature_algorithms_cert.
     pub const SIGNATURE_ALGORITHMS_CERT: u16 = w16(abi::TLSEXT_TYPE_signature_algorithms_cert);
     /// key_share.

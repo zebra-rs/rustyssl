@@ -443,7 +443,7 @@ fn read_transition13(c: &mut Connection, mt: u8) -> Result<bool> {
         s if s == st(abi::TLS_ST_OK) => {
             if mt == hm::NEW_SESSION_TICKET {
                 abi::TLS_ST_CR_SESSION_TICKET
-            } else if mt == hm::KEY_UPDATE && !c.cfg.quic {
+            } else if mt == hm::KEY_UPDATE && c.cfg.quic.is_none() {
                 abi::TLS_ST_CR_KEY_UPDATE
             } else if mt == hm::CERTIFICATE_REQUEST && c.hs.sh.pha == Pha::ExtSent && !ccs {
                 c.hs.sh.pha = Pha::Requested;
@@ -798,7 +798,7 @@ fn write_transition13(c: &mut Connection) -> Result<WriteTran> {
         }
     } else if is(abi::TLS_ST_PENDING_EARLY_DATA_END)
         && c.neg.early_data_status == abi::SSL_EARLY_DATA_ACCEPTED
-        && !c.cfg.quic
+        && c.cfg.quic.is_none()
     {
         abi::TLS_ST_CW_END_OF_EARLY_DATA
     } else if is(abi::TLS_ST_PENDING_EARLY_DATA_END)
@@ -853,7 +853,7 @@ pub(crate) fn write_transition(c: &mut Connection) -> Result<WriteTran> {
     } else if is(abi::TLS_ST_OK) || is(abi::TLS_ST_BEFORE) {
         abi::TLS_ST_CW_CLNT_HELLO
     } else if is(abi::TLS_ST_CW_CLNT_HELLO) {
-        if eds == EarlyDataState::Connecting && !c.cfg.quic {
+        if eds == EarlyDataState::Connecting && c.cfg.quic.is_none() {
             if middlebox(c) {
                 abi::TLS_ST_CW_CHANGE
             } else {
@@ -1035,7 +1035,7 @@ pub(crate) fn post_work(c: &mut Connection, p: &dyn Provider, _wst: Work) -> Res
                     abi::SSL3_CC_APPLICATION | abi::SSL3_CHANGE_CIPHER_CLIENT_WRITE,
                     None,
                 )?;
-                if c.cfg.quic {
+                if c.cfg.quic.is_some() {
                     keys::change_cipher_state13(
                         c,
                         p,

@@ -247,6 +247,14 @@ pub enum Request {
         /// That certificate (DER) for a Certificate entry's extensions (sent or received).
         cert: Option<Vec<u8>>,
     },
+    /// QUIC mode: the peer's transport parameters (`got_transport_params`), from its
+    /// ClientHello or EncryptedExtensions. [`Answer::Continue`] goes on (a server may set its
+    /// own parameters first, through [`super::Connection::config_mut`]); [`Answer::Fail`]
+    /// fails with its alert and `SSL_R_BAD_EXTENSION`.
+    QuicTransportParams {
+        /// The extension's body.
+        params: Vec<u8>,
+    },
     /// The DH parameters for a TLS 1.2 DHE server (`tmp_dh_callback`), at this size.
     TmpDh {
         /// The key size the callback is given.
@@ -457,4 +465,8 @@ pub enum Event {
     /// The call fails with nothing recorded, and the connection carries on: a stateless server
     /// read the client's ChangeCipherSpec between its ClientHellos.
     Interrupted,
+    /// QUIC mode: a secret to install, where TLS over TCP would install keys
+    /// (`yield_secret`). For a write secret, the handshake octets made before it are
+    /// [`super::Connection::take_quic_crypto_before_secret`].
+    QuicSecret(super::QuicSecret),
 }

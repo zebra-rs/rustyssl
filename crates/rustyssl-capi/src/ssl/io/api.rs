@@ -692,7 +692,8 @@ ffi_export! {
 }
 
 ffi_export! {
-    /// The negotiated cipher, or NULL before one is.
+    /// The negotiated cipher, else the session's (a client resuming, before the ServerHello:
+    /// QUIC stacks key 0-RTT with it), or NULL.
     ///
     /// # Safety
     /// `s` is NULL or a live connection.
@@ -701,13 +702,21 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return ptr::null() };
-        let st = x.state();
-        st.drv
-            .tls
-            .as_ref()
-            .and_then(|c| c.negotiated().cipher)
-            .or(st.drv.kept_cipher)
-            .map_or(ptr::null(), super::super::ciphers::cipher_ptr)
+        let found = {
+            let st = x.state();
+            st.drv
+                .tls
+                .as_ref()
+                .and_then(|c| c.negotiated().cipher)
+                .or(st.drv.kept_cipher)
+        };
+        if let Some(c) = found {
+            return super::super::ciphers::cipher_ptr(c);
+        }
+        // SAFETY: the live connection; no lock is held.
+        let sess = unsafe { super::super::sess_cache::rustyssl_private_SSL_get_session(s) };
+        // SAFETY: NULL or the connection's session.
+        unsafe { super::super::session::rustyssl_private_SSL_SESSION_get0_cipher(sess) }
     }
 }
 

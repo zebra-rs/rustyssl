@@ -320,7 +320,7 @@ pub(super) fn construct_client_certificate(
     };
     w.put(&list);
     if c.is_tls13()
-        && !c.cfg.quic
+        && c.cfg.quic.is_none()
         && finished::is_first_handshake(c)
         && (c.hs.sh.early_data_state != EarlyDataState::None || middlebox(c))
     {

@@ -59,19 +59,6 @@ pub fn disabled(c: &Connection, cp: &Cipher, op: c_int, ecdhe: bool) -> bool {
     if sh.max_ver == 0 {
         return true;
     }
-    if c.cfg.quic {
-        let id = cp.id;
-        let ok = [
-            abi::TLS1_3_CK_AES_128_GCM_SHA256,
-            abi::TLS1_3_CK_AES_256_GCM_SHA384,
-            abi::TLS1_3_CK_CHACHA20_POLY1305_SHA256,
-        ]
-        .iter()
-        .any(|&x| suites::cid(x) == id);
-        if !ok {
-            return true;
-        }
-    }
     let (mut minv, maxv) = range(c, cp);
     if minv == abi::TLS1_VERSION && ecdhe && cp.mkey & (SSL_kECDHE | SSL_kECDHEPSK) != 0 {
         minv = abi::SSL3_VERSION;

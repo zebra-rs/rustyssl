@@ -14,7 +14,7 @@ mod kx;
 mod ticket;
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 use core::ffi::c_int;
 
@@ -202,7 +202,7 @@ pub(crate) fn received_client_cert(c: &Connection) -> bool {
 
 /// `SSL_NO_EOED`: QUIC has no EndOfEarlyData.
 fn no_eoed(c: &Connection) -> bool {
-    c.cfg.quic
+    c.cfg.quic.is_some()
 }
 
 /// The unexpected-message failure of a read transition.
@@ -248,7 +248,7 @@ fn read_transition13(c: &Connection, mt: u8) -> Option<u32> {
             if c.hs.sh.pha == Pha::Requested && mt == ht::CERTIFICATE {
                 return Some(abi::TLS_ST_SR_CERT);
             }
-            (mt == ht::KEY_UPDATE && !c.cfg.quic).then_some(abi::TLS_ST_SR_KEY_UPDATE)
+            (mt == ht::KEY_UPDATE && c.cfg.quic.is_none()).then_some(abi::TLS_ST_SR_KEY_UPDATE)
         }
         _ => None,
     }
@@ -672,6 +672,21 @@ pub(crate) fn pre_work(c: &mut Connection, p: &dyn Provider, wst: Work) -> Resul
                 && c.hs.sh.flags & abi::TLS1_FLAGS_STATELESS == 0
             {
                 return Ok(Work::FinishedContinue);
+            }
+            // QUIC with 0-RTT carries on where a server would stop to read early data: there is
+            // no EndOfEarlyData, so the handshake read keys come now.
+            if no_eoed(c)
+                && c.neg.early_data_status == abi::SSL_EARLY_DATA_ACCEPTED
+                && c.hs.sh.early_data_state != EarlyDataState::FinishedReading
+            {
+                c.hs.sh.early_data_state = EarlyDataState::FinishedReading;
+                common::keys::change_cipher_state13(
+                    c,
+                    p,
+                    abi::SSL3_CC_HANDSHAKE | abi::SSL3_CHANGE_CIPHER_SERVER_READ,
+                    None,
+                )?;
+                return Ok(Work::FinishedSwap);
             }
             return finished::finish_handshake(c, wst, true, true);
         }

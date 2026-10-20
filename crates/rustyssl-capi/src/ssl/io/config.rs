@@ -915,6 +915,7 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
             .as_ref()
             .map(|h| h.as_bytes().to_vec()),
         session_ticket_ext: st.eap.ticket_ext.clone(),
+        quic: st.quic.config(),
         custom_exts: st
             .cert
             .custext

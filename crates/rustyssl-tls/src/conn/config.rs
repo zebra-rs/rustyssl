@@ -218,8 +218,8 @@ pub struct Config {
     pub send_ca_names: bool,
     /// An external PSK to offer (client) or the identities a server knows, via callbacks.
     pub psk: Option<ExternalPsk>,
-    /// Whether this is a QUIC connection (no middlebox compatibility mode, transport params).
-    pub quic: bool,
+    /// QUIC mode's settings, for a QUIC connection ([`super::quic`]).
+    pub quic: Option<super::quic::QuicTlsConfig>,
     /// The DTLS MTU, for later.
     pub mtu: usize,
     /// The certificate flags (`SSL_CERT_FLAG_*`: the Suite B modes and strict checking).

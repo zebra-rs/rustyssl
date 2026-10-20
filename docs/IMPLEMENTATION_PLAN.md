@@ -5808,6 +5808,13 @@ OpenSSL 3.6.5 ABI, with every 3.5 export unchanged (`abi-check compat35`).
 
 ## Phase 10: QUIC
 
+Progress (2026-10-20): the design is [ADR 0006](adr/0006-quic.md). It defines a QUIC mode on
+`rustyssl_tls::Connection` (CRYPTO bytes per level, secrets as events, transport parameters as
+a request) that serves both 10.3 and the transport; `rustyssl-quic` as a sans-IO port and
+channel; and capi's QUIC objects under one mutex per engine. Work is split into parallel forks
+with disjoint files: A (the seam and 10.3), B (the transport), then C (10.2's API) and D
+(interop and curl HTTP/3).
+
 - [ ] **10.1 Sans-IO QUIC transport** (`rustyssl-quic`):
   - packet protection and header protection
   - frames, streams, flow control
@@ -5821,8 +5828,32 @@ OpenSSL 3.6.5 ABI, with every 3.5 export unchanged (`abi-check compat35`).
   - `SSL_handle_events`, `get_event_timeout`, blocking and non-blocking, thread-assisted mode
   - `SSL_poll` and `SSL_get_value_*`/`SSL_set_value_*` (3.3)
   - `BIO_s_dgram_pair`, `BIO_sendmmsg`/`BIO_recvmmsg`
-- [ ] **10.3 Third-party QUIC stack API** (3.5: `SSL_set_quic_tls_cbs` and related), as used
-  by ngtcp2 and others.
+- [x] **10.3 Third-party QUIC stack API** (3.5: `SSL_set_quic_tls_cbs` and related), as used
+  by ngtcp2 and others. Done (2026-10-20, fork A):
+  - The seam: `rustyssl-tls/src/conn/quic.rs` (ADR 0006, section 1). Additions to the ADR's
+    types, all additive: `take_quic_crypto_before_secret` (the octets made before a write
+    secret, so a caller can call `crypto_send` and `yield_secret` in libssl's order),
+    `take_quic_alerts`, `quic_transport_params_consumed`, `fail_quic_secret`, `is_quic`.
+  - capi `ssl/quic_tls.rs` and the driver's QUIC-mode branch in `ssl/io.rs`; the three exports.
+  - Tests: `tests/c/ssl_quic_tls.c` (30 checks, identical on 3.6.5 and rustyssl), the core's
+    `conn::quic::tests` (the RFC 9001 flow in OpenSSL's order), and the `ngtcp2` consumer
+    (ngtcp2 v1.25.0's `osslclient`/`osslserver` and its examples' pytest suite, both libraries).
+  - Decisions, from measuring 3.6.5 (they correct ADR 0006 where it said otherwise):
+    - ALPN required, transport parameters required, and no `SSL_key_update`: OpenSSL's own QUIC
+      enforces these in its channel (`ossl_quic_tls_tick`, `quic_channel.c`), not in libssl, so
+      the third-party API doesn't; the core doesn't either, and 10.2's transport will. A
+      received KeyUpdate still fails (unexpected_message); a sent one goes to `crypto_send` and
+      yields a new application write secret, as on the reference.
+    - Suites aren't filtered: the third-party API negotiates CCM (`t1_lib.c` filters suites
+      only for OpenSSL's own QUIC, which never negotiates CCM, so 10.2 filters there).
+    - A failed `yield_secret` raises `ERR_R_INTERNAL_ERROR` twice (`quic_new_record_layer`,
+      `ssl_set_new_record_layer`) and sends internal_error to `alert`; a failed
+      `got_transport_params` is bad_extension with alert 0 (`custom_ext_parse`'s `al`).
+    - `SSL_get_current_cipher` falls back to the session's cipher, as OpenSSL's reads
+      `s->session->cipher`: a resuming client's 0-RTT secret is keyed with it (ngtcp2's
+      early data failed without it).
+    - A second `SSL_set_quic_tls_cbs` returns 0 (the extension is registered); the callbacks
+      stay first-wins, as `tls_callbacks_from_dispatch` keeps them (see DEVIATIONS.md).
 
 **Exit:** the quic-interop-runner core cases pass against ngtcp2, quiche, and quic-go. curl
 HTTP/3 works over the OpenSSL QUIC backend. upstream `quicapitest` and

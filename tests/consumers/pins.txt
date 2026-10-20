@@ -17,3 +17,10 @@ pin cryptography pyca/cryptography 4dda5c7fe4ae71b8925f2551910a0ef959df9c7a 6471
 
 # node: Node.js v24.22.0 (LTS), built with --shared-openssl; test/parallel/test-crypto*, test-tls*.
 pin node nodejs/node f14cd3aa7bf9ca8df2cc5b8bb14beb0f335b1d93 a56a49f1950bb1f69c2fb4ac2eb2e8aaaf79baf9250162e395670d0b5553f19c
+
+# ngtcp2: ngtcp2 v1.25.0's ossl backend and examples (examples/tests' pytest suite), with
+# nghttp3 v1.18.0; the submodules they build with (urlparse, sfparse) at their recorded commits.
+pin ngtcp2 ngtcp2/ngtcp2 f9e9ff01ad2c8116bc09de4f644b0028a61486a6 5011b0e5b53faaccc58a2c3299bcb2fd6fe6bdb895f18cc20fdea2bae1b13615
+pin ngtcp2-urlparse ngtcp2/urlparse c8168839c89fc5c5917c375e1bd6ffeddf3f7f88 8b638ee2fd2bd4d1633a8ed10bc090101ccb8050a9ff22444b7404fe21d8e8f1
+pin nghttp3 ngtcp2/nghttp3 dbfc24286138cb0b6490160e7ca87fe1ce6722a0 987c1f908cee3a708109a41c264a53728aebf91b32d1110182277df1181d21b5
+pin nghttp3-sfparse ngtcp2/sfparse 4b313cfd2e1b389ae632b36dcd50402307289af2 cc8256a65a03577654941839e100b3d61fe7f7d69f2a08f9b2f17a123b580b4c

@@ -48,29 +48,3 @@ pub extern "C" fn rustyssl_private_SSL_poll(
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_poll")
 }
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_set_quic_tls_cbs(
-    _: *mut SSL,
-    _: *const OSSL_DISPATCH,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_set_quic_tls_cbs")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_set_quic_tls_early_data_enabled(
-    _: *mut SSL,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_set_quic_tls_early_data_enabled")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_set_quic_tls_transport_params(
-    _: *mut SSL,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_set_quic_tls_transport_params")
-}
