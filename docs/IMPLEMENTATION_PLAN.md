@@ -5784,8 +5784,15 @@ OpenSSL 3.6.5 ABI, with every 3.5 export unchanged (`abi-check compat35`).
   `bntest`, `ectest`, `rsa_test`, the libssl and provider programs) pass on rustyssl wherever
   they pass on the reference, apart from QUIC and the tests that read OpenSSL's private
   structures; BoGo, tlsfuzzer, Wycheproof, the interop matrix and the differential probe agree.
-- **Not met yet:** M6's "at least 98% of eligible upstream tests" needs the rest of the
-  upstream tree (`cargo xtask test-openssl-suite` runs a subset).
+- **M6's upstream tests (`cargo xtask test-openssl-suite --all`, 2026-10-19): met on macOS.**
+  All 4333 eligible subtests of the whole 3.6.5 tree pass on rustyssl (100.00%; the bar is
+  98%); what "eligible" excludes is in TEST_PLAN.md, L6 (FIPS, QUIC, features off by default,
+  programs that import internal functions, the listed private-structure readers). The run
+  found and fixed, each with a test: handshake flights written whole as through OpenSSL's
+  buffering BIO, engines' ciphers and digests in TLS (and their stitched CBC-HMAC record
+  path), the static AES-GCM legacy functions, a client's record version after its
+  ClientHello, and reads that no longer retry a pending application write (two BIO-pair
+  deadlocks). Not measured on x86_64 Linux yet (the Docker VM here lacks the space).
 - **M6's consumer suites (`cargo xtask test-consumers`, macOS, 2026-10-19):** rust-openssl
   (433 of 459), ruby/openssl (594 of 598) and pyca/cryptography (4482 of 4482) pass exactly as
   on the reference. Node.js's crypto and TLS tests pass 375 of 376 (the reference 376): the
