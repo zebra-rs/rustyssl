@@ -1606,6 +1606,15 @@ impl Channel {
         self.streams.open(bidi)
     }
 
+    /// Opens a stream past the peer's stream limit (`SSL_STREAM_FLAG_ADVANCE`); before the
+    /// handshake too, as OpenSSL allows.
+    pub fn stream_open_advance(&mut self, bidi: bool) -> Option<u64> {
+        if self.state != State::Active {
+            return None;
+        }
+        self.streams.open_with(bidi, true)
+    }
+
     /// Writes to a stream.
     ///
     /// # Errors

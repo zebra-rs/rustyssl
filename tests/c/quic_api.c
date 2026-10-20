@@ -570,6 +570,64 @@ out:
     free_pair(&p);
 }
 
+/*
+ * Streams opened before the handshake with SSL_STREAM_FLAG_ADVANCE, as an HTTP/3 client opens
+ * its control and QPACK streams (curl's OpenSSL QUIC backend): they get their ids at once, and
+ * what is written on them arrives once the connection is up.
+ */
+static void test_streams_before_handshake(void)
+{
+    struct pair p;
+    SSL *u[3] = { NULL, NULL, NULL }, *su = NULL;
+    unsigned char buf[16];
+    size_t w = 0, n = 0;
+    int i, r;
+
+    printf("# streams opened before the handshake\n");
+    check(setup(&p), "a listener and a client");
+    SSL_set_incoming_stream_policy(p.client, SSL_INCOMING_STREAM_POLICY_ACCEPT, 0);
+    r = SSL_set_value_uint(p.client, SSL_VALUE_CLASS_FEATURE_REQUEST, SSL_VALUE_QUIC_IDLE_TIMEOUT, 0);
+    printf("  idle timeout request before the handshake: %d\n", r);
+    for (i = 0; i < 3; i++)
+        u[i] = SSL_new_stream(p.client, SSL_STREAM_FLAG_ADVANCE | SSL_STREAM_FLAG_UNI);
+    check(u[0] != NULL && u[1] != NULL && u[2] != NULL, "three uni streams with ADVANCE");
+    printf("  ids %llu %llu %llu, type %d\n", (unsigned long long)SSL_get_stream_id(u[0]),
+           (unsigned long long)SSL_get_stream_id(u[1]), (unsigned long long)SSL_get_stream_id(u[2]),
+           u[0] != NULL ? SSL_get_stream_type(u[0]) : -1);
+    errors("client");
+    if (u[0] == NULL)
+        goto out;
+    r = SSL_write_ex(u[0], "ctrl", 4, &w);
+    printf("  write before the handshake: %d, %s\n", r, err_name(SSL_get_error(u[0], r)));
+    check(handshake(&p), "the handshake completes");
+    p.server = SSL_accept_connection(p.listener, SSL_ACCEPT_CONNECTION_NO_BLOCK);
+    check(p.server != NULL, "accepted");
+    if (r != 1)
+        r = SSL_write_ex(u[0], "ctrl", 4, &w);
+    check(r == 1, "the control stream is written");
+    for (i = 0; i < 100 && su == NULL; i++) {
+        pump(&p, 1);
+        su = SSL_accept_stream(p.server, SSL_ACCEPT_STREAM_NO_BLOCK);
+    }
+    check(su != NULL, "the server accepts it");
+    if (su != NULL) {
+        for (i = 0; i < 100; i++) {
+            r = SSL_read_ex(su, buf, sizeof(buf), &n);
+            if (r == 1)
+                break;
+            pump(&p, 1);
+        }
+        printf("  server read on stream %llu: %d, %zu \"%.*s\"\n",
+               (unsigned long long)SSL_get_stream_id(su), r, n, (int)n, buf);
+    }
+out:
+    ERR_clear_error();
+    SSL_free(su);
+    for (i = 0; i < 3; i++)
+        SSL_free(u[i]);
+    free_pair(&p);
+}
+
 /* SSL_poll on what it can't poll. */
 static void test_poll_errors(void)
 {
@@ -655,6 +713,7 @@ int main(void)
     test_from_listener();
     test_streams();
     test_large_transfer();
+    test_streams_before_handshake();
     test_poll_errors();
     X509_free(cert);
     EVP_PKEY_free(key);

@@ -808,9 +808,15 @@ impl StreamMap {
     /// Opens a local stream; `None` if the peer's stream limit is reached (we'll send
     /// STREAMS_BLOCKED).
     pub fn open(&mut self, bidi: bool) -> Option<u64> {
+        self.open_with(bidi, false)
+    }
+
+    /// Opens a local stream, past the peer's stream limit too when `advance`
+    /// (`SSL_STREAM_FLAG_ADVANCE`): such a stream sends nothing until the limit lets it.
+    pub fn open_with(&mut self, bidi: bool, advance: bool) -> Option<u64> {
         let d = if bidi { BIDI } else { UNI };
         let ordinal = self.next_local[d];
-        if ordinal >= self.local_limit[d].cwm() || ordinal >= MAX_STREAM_COUNT {
+        if (!advance && ordinal >= self.local_limit[d].cwm()) || ordinal >= MAX_STREAM_COUNT {
             self.streams_blocked_want[d] = true;
             return None;
         }
@@ -1421,6 +1427,8 @@ impl StreamMap {
         let conn_credit = self.conn_tx.credit_local();
         self.streams
             .iter()
+            // A local stream opened past the peer's limit waits for it.
+            .filter(|&(&id, _)| !self.is_local(id) || (id >> 2) < self.local_limit[dir(id)].cwm())
             .filter(|(_, s)| {
                 s.send.as_ref().is_some_and(|p| {
                     p.want_reset

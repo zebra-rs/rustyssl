@@ -661,6 +661,23 @@ pub(crate) unsafe fn new_stream(s: *mut SSL, flags: u64) -> *mut SSL {
     let no_block = flags & u64::from(SSL_STREAM_FLAG_NO_BLOCK) != 0;
     let advance = flags & u64::from(SSL_STREAM_FLAG_ADVANCE) != 0;
     let engine = Arc::clone(c.engine());
+    // OpenSSL's channel exists from SSL_new, so streams can open before the handshake (an
+    // HTTP/3 client opens its control and QPACK streams then); ours is made with the first
+    // stream, as the handshake starts.
+    let idle = engine.lock().conn(c.conn).is_some_and(|r| r.ch.is_none());
+    if idle {
+        {
+            let mut es = engine.lock();
+            if !mutation_allowed(&mut es, c.conn, false) {
+                c.non_normal(&mut es, SSL_R_PROTOCOL_IS_SHUTDOWN, F);
+                return ptr::null_mut();
+            }
+        }
+        // SAFETY: no lock is held.
+        if !unsafe { start_for_stream(&c) } {
+            return ptr::null_mut();
+        }
+    }
     {
         let mut es = engine.lock();
         if !mutation_allowed(&mut es, c.conn, false) {
@@ -702,7 +719,13 @@ pub(crate) unsafe fn new_stream(s: *mut SSL, flags: u64) -> *mut SSL {
     }
     let id = {
         let mut es = engine.lock();
-        let id = es.channel_of(c.conn).and_then(|ch| ch.stream_open(!uni));
+        let id = es.channel_of(c.conn).and_then(|ch| {
+            if advance {
+                ch.stream_open_advance(!uni)
+            } else {
+                ch.stream_open(!uni)
+            }
+        });
         let Some(id) = id else {
             c.non_normal(&mut es, SSL_R_STREAM_COUNT_LIMITED, F);
             return ptr::null_mut();
@@ -714,6 +737,41 @@ pub(crate) unsafe fn new_stream(s: *mut SSL, flags: u64) -> *mut SSL {
     };
     // SAFETY: the live connection; no lock is held.
     unsafe { make_stream(&engine, c.q.s, id) }
+}
+
+/// Starts a client connection's channel for a stream opened before the handshake: as
+/// `quic_do_handshake` would (the BIOs and the peer's address are needed), then a tick.
+///
+/// # Safety
+/// No lock is held.
+unsafe fn start_for_stream(c: &Qctx<'_>) -> bool {
+    const F: &str = "quic_conn_stream_new";
+    let engine = Arc::clone(c.engine());
+    {
+        let mut es = engine.lock();
+        let (rbio, wbio) = es.bios();
+        if rbio.is_null() || wbio.is_null() {
+            c.non_normal(&mut es, SSL_R_BIO_NOT_SET, F);
+            return false;
+        }
+        if es.conn(c.conn).is_some_and(|r| r.initial_peer.is_none()) {
+            // SAFETY: no preconditions.
+            let a = unsafe { crate::bio::addr::BIO_ADDR_new() };
+            // SAFETY: the live BIO; a whole address.
+            let found = !a.is_null()
+                && unsafe { crate::bio::BIO_ctrl(wbio, BIO_CTRL_DGRAM_DETECT_PEER_ADDR, 0, a.cast()) } > 0
+                // SAFETY: as above.
+                && unsafe { crate::bio::addr::BIO_ADDR_family(a) } != libc::AF_UNSPEC;
+            if found && let Some(r) = es.conn(c.conn) {
+                // SAFETY: the address the BIO filled.
+                r.initial_peer = Some(unsafe { super::peer_of(a) });
+            }
+            // SAFETY: ours, or NULL.
+            unsafe { crate::bio::addr::BIO_ADDR_free(a) };
+        }
+    }
+    // SAFETY: the caller's guarantee.
+    unsafe { ensure_started(c) }
 }
 
 /// `SSL_accept_stream` (`ossl_quic_accept_stream`).
