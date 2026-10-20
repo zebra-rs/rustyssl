@@ -2,7 +2,9 @@
  * Conformance test for a TLS 1.2 server's ephemeral keys: the deprecated tmp_dh callback
  * (SSL_CTX_set_tmp_dh_callback(3)) giving DHE parameters, or NULL, no parameters at all, and
  * SSL_CTX_set_dh_auto(3); and SSL_get_tmp_key(3) on the server between its first flight and
- * the client's key exchange (DHE and ECDHE) and after the handshake, over a BIO pair.
+ * the client's key exchange (DHE and ECDHE) and after the handshake, over a BIO pair; and on
+ * the client, whose temporary key is its ClientHello's first key share (TLS 1.3's, replaced by
+ * the one a TLS 1.3 ServerHello picks or a HelloRetryRequest asks for, kept by TLS 1.2).
  *
  * Built once against the vendored headers, then run against the reference OpenSSL and against
  * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4).
@@ -133,6 +135,53 @@ static void handshake(const char *name, const char *cipher, int mode, X509 *x, E
     SSL_CTX_free(sctx);
 }
 
+/*
+ * The client's temporary key (SSL_get_tmp_key) after its ClientHello and after the handshake,
+ * with each side's highest version, the server's ciphers, and each side's groups.
+ */
+static void client_handshake(const char *name, int cmax, int smax, const char *cipher,
+                             const char *cgroups, const char *sgroups, X509 *x, EVP_PKEY *pk)
+{
+    SSL_CTX *cctx = SSL_CTX_new(TLS_client_method()), *sctx = SSL_CTX_new(TLS_server_method());
+    SSL *c, *s;
+    BIO *a = NULL, *b = NULL;
+    int r, round;
+
+    printf("# client: %s\n", name);
+    SSL_CTX_use_certificate(sctx, x);
+    SSL_CTX_use_PrivateKey(sctx, pk);
+    if (cmax != 0)
+        SSL_CTX_set_max_proto_version(cctx, cmax);
+    if (smax != 0)
+        SSL_CTX_set_max_proto_version(sctx, smax);
+    if (cipher != NULL)
+        SSL_CTX_set_cipher_list(sctx, cipher);
+    SSL_CTX_set1_groups_list(cctx, cgroups);
+    SSL_CTX_set1_groups_list(sctx, sgroups);
+    c = SSL_new(cctx);
+    s = SSL_new(sctx);
+    BIO_new_bio_pair(&a, 0, &b, 0);
+    SSL_set_bio(c, a, a);
+    SSL_set_bio(s, b, b);
+    SSL_set_connect_state(c);
+    SSL_set_accept_state(s);
+    SSL_connect(c);
+    tmp_key("after the ClientHello", c);
+    for (round = 0, r = 0; round < 16 && r != 2; round++) {
+        r = (SSL_do_handshake(c) == 1) + (SSL_do_handshake(s) == 1);
+        if (SSL_get_error(s, -1) == SSL_ERROR_SSL || SSL_get_error(c, -1) == SSL_ERROR_SSL)
+            break;
+    }
+    printf("  handshake %s, %s\n", r == 2 ? "done" : "failed", SSL_get_version(c));
+    tmp_key("after the handshake", c);
+    check(r == 2, name);
+    errors();
+    SSL_free(c);
+    SSL_free(s);
+    SSL_CTX_free(cctx);
+    SSL_CTX_free(sctx);
+}
+
 int main(void)
 {
     EVP_PKEY *pk = NULL;
@@ -150,6 +199,15 @@ int main(void)
     handshake("DHE with no parameters", "DHE-RSA-AES128-SHA", 0, x, pk);
     handshake("DHE with dh_auto", "DHE-RSA-AES128-SHA", 2, x, pk);
     handshake("ECDHE", "ECDHE-RSA-AES128-SHA", 0, x, pk);
+    client_handshake("TLS 1.3", 0, 0, NULL, "P-256:X25519", "P-256:X25519", x, pk);
+    client_handshake("TLS 1.3 after a HelloRetryRequest", 0, 0, NULL, "P-256:P-384", "P-384",
+                     x, pk);
+    client_handshake("TLS 1.2 ECDHE, the client TLS 1.2 only", TLS1_2_VERSION, 0,
+                     "ECDHE-RSA-AES128-SHA", "P-256", "P-256", x, pk);
+    client_handshake("TLS 1.2 RSA after offering TLS 1.3", 0, TLS1_2_VERSION, "AES128-SHA",
+                     "P-521", "P-521", x, pk);
+    client_handshake("TLS 1.2 ECDHE after offering TLS 1.3", 0, TLS1_2_VERSION,
+                     "ECDHE-RSA-AES128-SHA", "X25519:P-256", "P-256", x, pk);
     DH_free(dh_params);
     X509_free(x);
     EVP_PKEY_free(pk);
