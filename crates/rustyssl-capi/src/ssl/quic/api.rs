@@ -364,8 +364,36 @@ unsafe fn do_handshake(c: &Qctx<'_>) -> c_int {
             return 1;
         }
     }
+    if blocking(c) {
+        // `quic_handshake_wait`.
+        // SAFETY: no lock is held.
+        let r = unsafe {
+            block_until(&engine, |es| {
+                if !mutation_allowed(es, c.conn, true) {
+                    return -1;
+                }
+                if handshake_complete(es, c.conn) || non_io_retry(c.x).is_some() {
+                    return 1;
+                }
+                0
+            })
+        };
+        let mut es = engine.lock();
+        if !mutation_allowed(&mut es, c.conn, true) {
+            return c.non_normal(&mut es, SSL_R_PROTOCOL_IS_SHUTDOWN, F);
+        }
+        if r <= 0 {
+            c.non_normal(&mut es, ERR_R_INTERNAL_ERROR, F);
+            return -1;
+        }
+        if let Some(e) = non_io_retry(c.x) {
+            c.normal(&mut es, e);
+            return -1;
+        }
+        return 1;
+    }
     // SAFETY: as above.
-    unsafe { super::tick(&engine) };
+    unsafe { maybe_tick(c) };
     let mut es = engine.lock();
     if handshake_complete(&mut es, c.conn) {
         return 1;
@@ -373,8 +401,27 @@ unsafe fn do_handshake(c: &Qctx<'_>) -> c_int {
     if term_any(&mut es, c.conn) {
         return c.non_normal(&mut es, SSL_R_PROTOCOL_IS_SHUTDOWN, F);
     }
+    if let Some(e) = non_io_retry(c.x) {
+        c.normal(&mut es, e);
+        return -1;
+    }
     c.normal(&mut es, SSL_ERROR_WANT_READ);
     -1
+}
+
+/// `tls_wants_non_io_retry`: what `SSL_get_error` reports when the handshake layer waits for
+/// the application (a certificate lookup, the ClientHello callback, a verification retry).
+fn non_io_retry(x: &Ssl) -> Option<c_int> {
+    use rustyssl_abi::{
+        SSL_CLIENT_HELLO_CB, SSL_ERROR_WANT_CLIENT_HELLO_CB, SSL_ERROR_WANT_RETRY_VERIFY,
+        SSL_ERROR_WANT_X509_LOOKUP, SSL_RETRY_VERIFY, SSL_X509_LOOKUP,
+    };
+    match x.state().rwstate {
+        SSL_X509_LOOKUP => Some(SSL_ERROR_WANT_X509_LOOKUP),
+        SSL_CLIENT_HELLO_CB => Some(SSL_ERROR_WANT_CLIENT_HELLO_CB),
+        SSL_RETRY_VERIFY => Some(SSL_ERROR_WANT_RETRY_VERIFY),
+        _ => None,
+    }
 }
 
 /// `ensure_channel_started`: a client's channel, made on its first handshake call.
@@ -424,6 +471,12 @@ unsafe fn ensure_started(c: &Qctx<'_>) -> bool {
                 r.started = true;
             }
             es.by_channel.insert(id, c.conn);
+            let assisted =
+                es.domain_flags & u64::from(rustyssl_abi::SSL_DOMAIN_FLAG_THREAD_ASSISTED) != 0;
+            drop(es);
+            if assisted {
+                engine.start_assist();
+            }
             true
         }
         Err(_) => {
@@ -600,14 +653,50 @@ pub(crate) unsafe fn new_stream(s: *mut SSL, flags: u64) -> *mut SSL {
         return ptr::null_mut();
     };
     let uni = flags & u64::from(SSL_STREAM_FLAG_UNI) != 0;
-    let _ = flags & u64::from(SSL_STREAM_FLAG_NO_BLOCK | SSL_STREAM_FLAG_ADVANCE);
+    let no_block = flags & u64::from(SSL_STREAM_FLAG_NO_BLOCK) != 0;
+    let advance = flags & u64::from(SSL_STREAM_FLAG_ADVANCE) != 0;
     let engine = Arc::clone(c.engine());
-    let id = {
+    {
         let mut es = engine.lock();
         if !mutation_allowed(&mut es, c.conn, false) {
             c.non_normal(&mut es, SSL_R_PROTOCOL_IS_SHUTDOWN, F);
             return ptr::null_mut();
         }
+        let admissible = es
+            .channel_of(c.conn)
+            .is_some_and(|ch| ch.streams().local_avail(uni) > 0);
+        if !advance && !admissible {
+            if no_block || !blocking(&c) {
+                c.non_normal(&mut es, SSL_R_STREAM_COUNT_LIMITED, F);
+                return ptr::null_mut();
+            }
+            drop(es);
+            // Wait until the peer lets another stream open (`quic_new_stream_wait`).
+            // SAFETY: no lock is held.
+            let r = unsafe {
+                block_until(&engine, |es| {
+                    if !mutation_allowed(es, c.conn, true) {
+                        return -1;
+                    }
+                    c_int::from(
+                        es.channel_of(c.conn)
+                            .is_some_and(|ch| ch.streams().local_avail(uni) > 0),
+                    )
+                })
+            };
+            let mut es = engine.lock();
+            if !mutation_allowed(&mut es, c.conn, true) {
+                c.non_normal(&mut es, SSL_R_PROTOCOL_IS_SHUTDOWN, F);
+                return ptr::null_mut();
+            }
+            if r <= 0 {
+                c.non_normal(&mut es, ERR_R_INTERNAL_ERROR, F);
+                return ptr::null_mut();
+            }
+        }
+    }
+    let id = {
+        let mut es = engine.lock();
         let id = es.channel_of(c.conn).and_then(|ch| ch.stream_open(!uni));
         let Some(id) = id else {
             c.non_normal(&mut es, SSL_R_STREAM_COUNT_LIMITED, F);
@@ -632,9 +721,42 @@ pub(crate) unsafe fn accept_stream(s: *mut SSL, flags: u64) -> *mut SSL {
         return ptr::null_mut();
     };
     let engine = Arc::clone(c.engine());
-    let _ = flags & u64::from(SSL_ACCEPT_STREAM_NO_BLOCK);
+    let no_block = flags & u64::from(SSL_ACCEPT_STREAM_NO_BLOCK) != 0;
     let uni = flags & u64::from(SSL_ACCEPT_STREAM_UNI) != 0;
     let bidi = flags & u64::from(SSL_ACCEPT_STREAM_BIDI) != 0;
+    let queued = |es: &mut EngineState| {
+        es.channel_of(c.conn).is_some_and(|ch| match (uni, bidi) {
+            (true, false) => ch.streams().accept_queue_len_of(true) > 0,
+            (false, true) => ch.streams().accept_queue_len_of(false) > 0,
+            _ => ch.streams().accept_queue_len() > 0,
+        })
+    };
+    let wait = {
+        let mut es = engine.lock();
+        !queued(&mut es)
+            && effective_policy(&mut es, c.conn) != SSL_INCOMING_STREAM_POLICY_REJECT
+            && !no_block
+    };
+    if wait && blocking(&c) {
+        // `wait_for_incoming_stream`.
+        // SAFETY: no lock is held.
+        let r = unsafe {
+            block_until(&engine, |es| {
+                if !mutation_allowed(es, c.conn, true) {
+                    c.non_normal(es, SSL_R_PROTOCOL_IS_SHUTDOWN, "wait_for_incoming_stream");
+                    return -1;
+                }
+                c_int::from(queued(es))
+            })
+        };
+        if r == 0 {
+            let mut es = engine.lock();
+            c.non_normal(&mut es, ERR_R_INTERNAL_ERROR, "ossl_quic_accept_stream");
+        }
+        if r <= 0 {
+            return ptr::null_mut();
+        }
+    }
     let id = {
         let mut es = engine.lock();
         if effective_policy(&mut es, c.conn) == SSL_INCOMING_STREAM_POLICY_REJECT {
@@ -729,6 +851,7 @@ unsafe fn default_for_read(c: &Qctx<'_>, peek: bool) -> bool {
         let (mode, opts) = (r.default_ssl_mode, r.default_ssl_options);
         // The peer's first stream: ordinal 0, bidi or uni.
         let first = [u64::from(!server), u64::from(!server) | 2];
+        let first = &first;
         let now = es.now();
         let found = es.channel_of(c.conn).and_then(|ch| {
             first
@@ -750,14 +873,40 @@ unsafe fn default_for_read(c: &Qctx<'_>, peek: bool) -> bool {
         if ticked {
             if term_any(&mut es, c.conn) {
                 c.non_normal(&mut es, SSL_R_PROTOCOL_IS_SHUTDOWN, F);
-            } else {
-                c.normal(&mut es, SSL_ERROR_WANT_READ);
+                return false;
             }
-            return false;
+            drop(es);
+            if !blocking(c) {
+                let mut es = engine.lock();
+                c.normal(&mut es, SSL_ERROR_WANT_READ);
+                return false;
+            }
+            // `quic_wait_for_stream`: until the peer's first stream exists.
+            // SAFETY: no lock is held.
+            let r =
+                unsafe {
+                    block_until(&engine, |es| {
+                        if !mutation_allowed(es, c.conn, true) {
+                            c.non_normal(es, SSL_R_PROTOCOL_IS_SHUTDOWN, "quic_wait_for_stream");
+                            return -1;
+                        }
+                        c_int::from(es.channel_of(c.conn).is_some_and(|ch| {
+                            first.iter().any(|id| ch.streams().get(*id).is_some())
+                        }))
+                    })
+                };
+            if r == 0 {
+                let mut es = engine.lock();
+                c.non_normal(&mut es, ERR_R_INTERNAL_ERROR, F);
+            }
+            if r <= 0 {
+                return false;
+            }
+            continue;
         }
         drop(es);
         // SAFETY: no lock is held.
-        unsafe { super::tick(&engine) };
+        unsafe { maybe_tick(c) };
         ticked = true;
     }
 }
@@ -909,8 +1058,56 @@ pub(crate) unsafe fn write(
         let _ = ch.stream_send(id, &[], true);
     }
     drop(es);
+    if blocking(&c) {
+        // `quic_write_blocking`: the rest as room comes (`quic_write_again`).
+        let mut done = skip.saturating_add(n);
+        let mut err = ERR_R_INTERNAL_ERROR;
+        // SAFETY: no lock is held.
+        let r = unsafe {
+            block_until(&engine, |es| {
+                if done >= len {
+                    return 1;
+                }
+                if !mutation_allowed(es, c.conn, true) {
+                    return -2;
+                }
+                if let Err(e) = validate_for_write(es, c.conn, id) {
+                    err = e;
+                    return -2;
+                }
+                let more = data.get(done..).unwrap_or_default();
+                let Some(Ok(k)) = es
+                    .channel_of(c.conn)
+                    .map(|ch| ch.stream_send(id, more, false))
+                else {
+                    return -2;
+                };
+                done = done.saturating_add(k);
+                if done >= len {
+                    if conclude && let Some(ch) = es.channel_of(c.conn) {
+                        let _ = ch.stream_send(id, &[], true);
+                    }
+                    return 1;
+                }
+                0
+            })
+        };
+        let mut es = engine.lock();
+        if let Some(api) = c.stream_api(&mut es) {
+            api.aon = None;
+        }
+        if r <= 0 {
+            *written = done.saturating_sub(skip);
+            if !mutation_allowed(&mut es, c.conn, true) {
+                return c.non_normal(&mut es, SSL_R_PROTOCOL_IS_SHUTDOWN, F);
+            }
+            return c.non_normal(&mut es, err, F);
+        }
+        *written = len;
+        return 1;
+    }
     // SAFETY: no lock is held.
-    unsafe { super::tick(&engine) };
+    unsafe { maybe_tick(&c) };
     let mut es = engine.lock();
     let Some(api) = c.stream_api(&mut es) else {
         return 0;
@@ -1071,20 +1268,45 @@ pub(crate) unsafe fn read(
             return 0;
         }
         if *n > 0 {
+            let allowed = mutation_allowed(&mut es, c.conn, false);
             drop(es);
-            // SAFETY: no lock is held.
-            unsafe { super::tick(&engine) };
+            if allowed {
+                // SAFETY: no lock is held.
+                unsafe { maybe_tick(&c) };
+            }
             return 1;
         }
         if !mutation_allowed(&mut es, c.conn, false) {
             return c.non_normal(&mut es, SSL_R_PROTOCOL_IS_SHUTDOWN, "quic_read");
         }
+        drop(es);
+        if blocking(&c) {
+            // `quic_read_again`: until at least one octet (or the end, or an error).
+            // SAFETY: no lock is held.
+            let r = unsafe {
+                block_until(&engine, |es| {
+                    if !mutation_allowed(es, c.conn, true) {
+                        c.non_normal(es, SSL_R_PROTOCOL_IS_SHUTDOWN, "quic_read_again");
+                        return -1;
+                    }
+                    if read_actual(&c, es, id, out, peek, n) == 0 {
+                        return -1;
+                    }
+                    c_int::from(*n > 0)
+                })
+            };
+            if r == 0 {
+                let mut es = engine.lock();
+                return c.non_normal(&mut es, ERR_R_INTERNAL_ERROR, "quic_read");
+            }
+            return c_int::from(r > 0);
+        }
         if attempt == 1 {
+            let mut es = engine.lock();
             return c.normal(&mut es, SSL_ERROR_WANT_READ);
         }
-        drop(es);
         // SAFETY: no lock is held.
-        unsafe { super::tick(&engine) };
+        unsafe { maybe_tick(&c) };
     }
     0
 }
@@ -1114,9 +1336,22 @@ pub(crate) unsafe fn accept_connection(s: *mut SSL, flags: u64) -> *mut SSL {
     let Some(c) = (unsafe { expect(s, L) }) else {
         return ptr::null_mut();
     };
-    let _ = flags & u64::from(SSL_ACCEPT_CONNECTION_NO_BLOCK);
+    let no_block = flags & u64::from(SSL_ACCEPT_CONNECTION_NO_BLOCK) != 0;
     let engine = Arc::clone(c.engine());
     listen(s);
+    let empty = engine.lock().accept_queue.is_empty();
+    if empty {
+        if !no_block && blocking(&c) {
+            // `quic_accept_connection_wait`.
+            // SAFETY: no lock is held.
+            if unsafe { block_until(&engine, |es| c_int::from(!es.accept_queue.is_empty())) } < 1 {
+                return ptr::null_mut();
+            }
+        } else {
+            // SAFETY: no lock is held.
+            unsafe { maybe_tick(&c) };
+        }
+    }
     for attempt in 0..2 {
         {
             let mut es = engine.lock();
@@ -2047,7 +2282,10 @@ pub(crate) unsafe fn shutdown(
     args: *const rustyssl_abi::SSL_SHUTDOWN_EX_ARGS,
     _args_len: usize,
 ) -> c_int {
-    use rustyssl_abi::{SSL_SHUTDOWN_FLAG_NO_STREAM_FLUSH, SSL_SHUTDOWN_FLAG_WAIT_PEER};
+    use rustyssl_abi::{
+        SSL_SHUTDOWN_FLAG_NO_BLOCK, SSL_SHUTDOWN_FLAG_NO_STREAM_FLUSH, SSL_SHUTDOWN_FLAG_RAPID,
+        SSL_SHUTDOWN_FLAG_WAIT_PEER,
+    };
     // SAFETY: the caller's guarantee.
     let Some(c) = (unsafe { expect(s, C | S) }) else {
         return -1;
@@ -2058,6 +2296,9 @@ pub(crate) unsafe fn shutdown(
     }
     let stream_flush = flags & u64::from(SSL_SHUTDOWN_FLAG_NO_STREAM_FLUSH) == 0;
     let wait_peer = flags & u64::from(SSL_SHUTDOWN_FLAG_WAIT_PEER) != 0;
+    let no_block = flags & u64::from(SSL_SHUTDOWN_FLAG_NO_BLOCK) != 0;
+    let rapid = flags & u64::from(SSL_SHUTDOWN_FLAG_RAPID) != 0;
+    let block = !no_block && blocking(&c);
     let given = if args.is_null() {
         None
     } else {
@@ -2096,16 +2337,36 @@ pub(crate) unsafe fn shutdown(
                 .is_none_or(|ch| ch.streams().is_flushed())
         };
         let mut es = engine.lock();
+        let begin = es.conn(c.conn).is_some_and(|r| !r.shutting_down);
+        let needs = es
+            .channel_of(c.conn)
+            .is_some_and(|ch| ch.streams().needs_flush());
         if let Some(r) = es.conn(c.conn) {
+            if begin && needs {
+                r.flushing = true;
+            }
             r.shutting_down = true;
         }
         if !flushed(&mut es) {
             drop(es);
-            // SAFETY: no lock is held.
-            unsafe { super::tick(&engine) };
+            if block {
+                // `quic_shutdown_flush_wait`.
+                // SAFETY: no lock is held.
+                let r = unsafe {
+                    block_until(&engine, |es| {
+                        c_int::from(term_any(es, c.conn) || flushed(es))
+                    })
+                };
+                if r < 1 {
+                    return 0;
+                }
+            } else {
+                // SAFETY: no lock is held.
+                unsafe { maybe_tick(&c) };
+            }
             es = engine.lock();
         }
-        if !flushed(&mut es) {
+        if !term_any(&mut es, c.conn) && !flushed(&mut es) {
             return 0;
         }
     }
@@ -2113,8 +2374,16 @@ pub(crate) unsafe fn shutdown(
         let mut es = engine.lock();
         if !term_any(&mut es, c.conn) {
             drop(es);
-            // SAFETY: no lock is held.
-            unsafe { super::tick(&engine) };
+            if block {
+                // `quic_shutdown_peer_wait`.
+                // SAFETY: no lock is held.
+                if unsafe { block_until(&engine, |es| c_int::from(term_any(es, c.conn))) } < 1 {
+                    return 0;
+                }
+            } else {
+                // SAFETY: no lock is held.
+                unsafe { maybe_tick(&c) };
+            }
             es = engine.lock();
             if !term_any(&mut es, c.conn) {
                 return 0;
@@ -2139,8 +2408,16 @@ pub(crate) unsafe fn shutdown(
             return 1;
         }
     }
-    // SAFETY: no lock is held.
-    unsafe { super::tick(&engine) };
+    if block && !rapid {
+        // `quic_shutdown_wait`.
+        // SAFETY: no lock is held.
+        if unsafe { block_until(&engine, |es| c_int::from(terminated(es))) } < 1 {
+            return 0;
+        }
+    } else {
+        // SAFETY: no lock is held.
+        unsafe { maybe_tick(&c) };
+    }
     let mut es = engine.lock();
     c_int::from(terminated(&mut es))
 }
@@ -2671,4 +2948,121 @@ pub(crate) fn default_domain_flags(m: &crate::ssl::method::Method) -> u64 {
 pub(super) unsafe fn expect_csl<'a>(s: *const SSL) -> Option<Qctx<'a>> {
     // SAFETY: the caller's guarantee.
     unsafe { expect(s, C | S | L) }
+}
+
+// ---- Blocking ----
+
+/// Whether calls on `c` block (`qctx_blocking`): wanted, and the network BIOs can be polled.
+pub(super) fn blocking(c: &Qctx<'_>) -> bool {
+    let es = c.engine().lock();
+    es.desires_blocking && can_block(&es)
+}
+
+/// `qctx_should_autotick`: whether calls tick the engine themselves (not in the explicit event
+/// handling mode, the object's or, inherited, its connection's).
+pub(super) fn autotick(c: &Qctx<'_>) -> bool {
+    use rustyssl_abi::{
+        SSL_VALUE_EVENT_HANDLING_MODE_EXPLICIT, SSL_VALUE_EVENT_HANDLING_MODE_INHERIT,
+    };
+    let es = c.engine().lock();
+    let inherit = u64::try_from(SSL_VALUE_EVENT_HANDLING_MODE_INHERIT).unwrap_or(0);
+    let explicit = u64::try_from(SSL_VALUE_EVENT_HANDLING_MODE_EXPLICIT).unwrap_or(2);
+    let own = es.event_mode.get(&c.q.key()).copied().unwrap_or(inherit);
+    let mode = if own == inherit && c.is_stream {
+        es.event_mode.get(&c.conn).copied().unwrap_or(inherit)
+    } else {
+        own
+    };
+    let mode = if mode == inherit {
+        es.event_mode
+            .get(&es.owner.addr())
+            .copied()
+            .unwrap_or(inherit)
+    } else {
+        mode
+    };
+    mode != explicit
+}
+
+/// `qctx_maybe_autotick`.
+///
+/// # Safety
+/// No lock is held.
+pub(super) unsafe fn maybe_tick(c: &Qctx<'_>) {
+    if autotick(c) {
+        // SAFETY: the caller's guarantee.
+        unsafe { super::tick(c.engine()) };
+    }
+}
+
+/// The poll descriptor's socket of a network BIO, if it has one.
+///
+/// # Safety
+/// `b` is NULL or a live BIO.
+unsafe fn socket_of(b: *mut BIO) -> Option<c_int> {
+    if b.is_null() {
+        return None;
+    }
+    // SAFETY: an all-zero descriptor is the empty one.
+    let mut d: rustyssl_abi::BIO_POLL_DESCRIPTOR = unsafe { core::mem::zeroed() };
+    // SAFETY: the caller's BIO; a whole descriptor.
+    if unsafe { crate::bio::BIO_get_rpoll_descriptor(b, &raw mut d) } != 1
+        || c_int::try_from(d.type_).ok() != Some(rustyssl_abi::BIO_POLL_DESCRIPTOR_TYPE_SOCK_FD)
+    {
+        return None;
+    }
+    // SAFETY: the union's `fd` member for a socket descriptor.
+    Some(unsafe { d.value.fd })
+}
+
+/// `ossl_quic_reactor_block_until_pred`: ticks, then waits on the network and the timers with
+/// no lock held, until `pred` (run under the engine's lock) gives a non-zero value, which it
+/// returns; 0 if there is nothing to wait for.
+///
+/// # Safety
+/// No lock is held.
+pub(super) unsafe fn block_until(
+    engine: &Arc<Engine>,
+    mut pred: impl FnMut(&mut EngineState) -> c_int,
+) -> c_int {
+    loop {
+        // SAFETY: the caller's guarantee.
+        unsafe { super::tick(engine) };
+        let (fd, wait) = {
+            let mut es = engine.lock();
+            let r = pred(&mut es);
+            if r != 0 {
+                return r;
+            }
+            let now = es.now();
+            let wait = es.port.next_timeout(now).map(|t| t.0.saturating_sub(now.0));
+            // SAFETY: the port's BIO, NULL or live.
+            (unsafe { socket_of(es.net_rbio) }, wait)
+        };
+        let timeout = wait.map_or(-1, |ns| {
+            c_int::try_from(ns.div_ceil(1_000_000)).unwrap_or(c_int::MAX)
+        });
+        match fd {
+            Some(fd) => {
+                let mut p = libc::pollfd {
+                    fd,
+                    events: libc::POLLIN,
+                    revents: 0,
+                };
+                // SAFETY: one local descriptor; no lock is held.
+                let r = unsafe { libc::poll(&raw mut p, 1, timeout) };
+                if r < 0
+                    && std::io::Error::last_os_error().kind() != std::io::ErrorKind::Interrupted
+                {
+                    return 0;
+                }
+            }
+            None if timeout >= 0 => {
+                std::thread::sleep(core::time::Duration::from_millis(
+                    u64::try_from(timeout).unwrap_or(0),
+                ));
+            }
+            None => return 0,
+        }
+    }
 }

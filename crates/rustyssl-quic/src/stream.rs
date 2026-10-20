@@ -834,6 +834,16 @@ impl StreamMap {
         Some(id)
     }
 
+    /// Whether a stream still has data to flush at shutdown (`eligible_for_shutdown_flush`).
+    #[must_use]
+    pub fn needs_flush(&self) -> bool {
+        self.streams.values().any(|s| {
+            s.send.as_ref().is_some_and(|p| {
+                matches!(p.state, SendState::Send | SendState::DataSent) && !p.buf.all_acked()
+            })
+        })
+    }
+
     /// Whether every stream's written data was acknowledged or the stream reset (the end of
     /// OpenSSL's shutdown flush).
     #[must_use]

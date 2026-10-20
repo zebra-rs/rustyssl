@@ -613,6 +613,22 @@ impl Channel {
         );
     }
 
+    /// Closes with a transport error (`NO_ERROR` when OpenSSL's shutdown flush ends without an
+    /// application close set: `ossl_quic_channel_notify_flush_done`).
+    pub fn close_transport(&mut self, code: u64, reason: &[u8], now: Time) {
+        self.start_terminating(
+            TerminateCause {
+                remote: false,
+                app: false,
+                code,
+                frame_type: 0,
+                reason: reason.to_vec(),
+            },
+            false,
+            now,
+        );
+    }
+
     // ---- TLS ----
 
     /// Answers the last [`ChannelEvent::TlsRequest`].

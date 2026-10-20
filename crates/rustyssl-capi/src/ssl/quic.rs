@@ -68,6 +68,11 @@ impl Quic {
 
 impl Drop for Quic {
     fn drop(&mut self) {
+        // A connection that owns its engine stops its assist thread first.
+        let owns = self.engine.lock().owner == self.s;
+        if owns {
+            self.engine.stop_assist();
+        }
         let mut free = Vec::new();
         {
             let mut es = self.engine.lock();
@@ -139,6 +144,9 @@ pub(crate) struct ConnRec {
     pub(crate) idle_timeout_req: u64,
     /// The close `SSL_shutdown_ex` asked for (code and reason).
     pub(crate) close: Option<(u64, Vec<u8>)>,
+    /// A shutdown flush waits for streams; when they are done the channel closes (as
+    /// `ossl_quic_channel_notify_flush_done`: with `close`, else transport NO_ERROR).
+    pub(crate) flushing: bool,
     /// The peer's or our close reason, NUL-terminated, for `SSL_get_conn_close_info`.
     pub(crate) close_reason: Option<Vec<u8>>,
 }
@@ -172,6 +180,83 @@ pub(crate) enum Rec {
 /// A port, and the objects on it.
 pub(crate) struct Engine {
     st: Mutex<EngineState>,
+    assist: Assist,
+}
+
+/// The thread of thread-assisted mode (`quic_thread_assist.c`): it ticks the engine when its
+/// timers are due, woken early when a call changes them.
+#[derive(Default)]
+struct Assist {
+    stop: Mutex<bool>,
+    cv: std::sync::Condvar,
+    thread: Mutex<Option<std::thread::JoinHandle<()>>>,
+}
+
+/// The longest the assist thread sleeps without a timer (it is woken after every tick anyway).
+const ASSIST_IDLE: core::time::Duration = core::time::Duration::from_millis(250);
+
+impl Engine {
+    /// Starts the assist thread (once).
+    pub(crate) fn start_assist(self: &Arc<Self>) {
+        let mut t = self
+            .assist
+            .thread
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        if t.is_some() {
+            return;
+        }
+        let weak = Arc::downgrade(self);
+        let spawned = std::thread::Builder::new()
+            .name("rustyssl-quic-assist".into())
+            .spawn(move || {
+                loop {
+                    let Some(e) = weak.upgrade() else { break };
+                    if *e.assist.stop.lock().unwrap_or_else(PoisonError::into_inner) {
+                        break;
+                    }
+                    // SAFETY: no lock is held.
+                    unsafe { tick_inner(&e) };
+                    let wait = {
+                        let es = e.lock();
+                        let now = es.now();
+                        es.port.next_timeout(now).map_or(ASSIST_IDLE, |t| {
+                            core::time::Duration::from_nanos(t.0.saturating_sub(now.0))
+                                .min(ASSIST_IDLE)
+                        })
+                    };
+                    let stop = e.assist.stop.lock().unwrap_or_else(PoisonError::into_inner);
+                    if *stop {
+                        break;
+                    }
+                    let _ = e.assist.cv.wait_timeout(stop, wait);
+                }
+            });
+        if let Ok(h) = spawned {
+            *t = Some(h);
+        }
+    }
+
+    /// Stops the assist thread and waits for it (unless this is it).
+    fn stop_assist(&self) {
+        *self
+            .assist
+            .stop
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = true;
+        self.assist.cv.notify_all();
+        let h = self
+            .assist
+            .thread
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take();
+        if let Some(h) = h
+            && h.thread().id() != std::thread::current().id()
+        {
+            let _ = h.join();
+        }
+    }
 }
 
 pub(crate) struct EngineState {
@@ -251,6 +336,7 @@ impl Engine {
             ..PortConfig::default()
         };
         Arc::new(Self {
+            assist: Assist::default(),
             st: Mutex::new(EngineState {
                 port: Port::new(cfg),
                 prov: None,
@@ -508,6 +594,41 @@ impl EngineState {
         }
     }
 
+    /// Closes the connections whose shutdown flush finished.
+    pub(crate) fn finish_flushes(&mut self) {
+        let keys: Vec<usize> = self
+            .objs
+            .iter()
+            .filter_map(|(k, r)| match r {
+                Rec::Conn(c) if c.flushing => Some(*k),
+                _ => None,
+            })
+            .collect();
+        let now = self.now();
+        for k in keys {
+            let close = self.conn(k).and_then(|c| c.close.clone());
+            let Some(ch) = self.channel_of(k) else {
+                continue;
+            };
+            if ch.state() != rustyssl_quic::channel::State::Active {
+                if let Some(c) = self.conn(k) {
+                    c.flushing = false;
+                }
+                continue;
+            }
+            if !ch.streams().is_flushed() {
+                continue;
+            }
+            match close {
+                Some((code, reason)) => ch.shutdown(code, &reason, now),
+                None => ch.close_transport(0, &[], now),
+            }
+            if let Some(c) = self.conn(k) {
+                c.flushing = false;
+            }
+        }
+    }
+
     /// Network in, timers, events, network out.
     fn run(&mut self) {
         self.net_read();
@@ -516,6 +637,7 @@ impl EngineState {
             self.port.handle_timeout(&*p, now);
         }
         self.collect();
+        self.finish_flushes();
         self.net_write();
     }
 
@@ -701,6 +823,17 @@ fn alert_internal() -> u8 {
 /// # Safety
 /// Called with no lock held.
 pub(crate) unsafe fn tick(engine: &Arc<Engine>) {
+    // SAFETY: the caller's guarantee.
+    unsafe { tick_inner(engine) };
+    // The assist thread looks at the timers again.
+    engine.assist.cv.notify_all();
+}
+
+/// [`tick`] itself.
+///
+/// # Safety
+/// Called with no lock held.
+unsafe fn tick_inner(engine: &Arc<Engine>) {
     let owner = api::owner(&engine.lock());
     if let Some(o) = owner {
         // SAFETY: the engine's live owner; no lock is held.
@@ -826,6 +959,7 @@ impl ConnRec {
             as_server_state: server,
             idle_timeout_req: rustyssl_quic::channel::DEFAULT_IDLE_TIMEOUT_MS,
             close: None,
+            flushing: false,
             close_reason: None,
         }
     }
