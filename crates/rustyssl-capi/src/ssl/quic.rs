@@ -1070,3 +1070,61 @@ pub(crate) fn quic_suite(c: &rustyssl_tls::suites::Cipher) -> bool {
     .iter()
     .any(|&id| u32::try_from(id).is_ok_and(|id| id == c.id))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rustyssl_quic::tls::Level;
+
+    #[test]
+    fn peer_addresses_round_trip() {
+        let raw = [127u8, 0, 0, 1];
+        // SAFETY: no preconditions.
+        let a = unsafe { addr::BIO_ADDR_new() };
+        // SAFETY: the new address; four octets.
+        let ok = unsafe {
+            addr::BIO_ADDR_rawmake(a, libc::AF_INET, raw.as_ptr().cast(), 4, 4433u16.to_be())
+        };
+        assert_eq!(ok, 1);
+        // SAFETY: the live address.
+        let p = unsafe { peer_of(a) };
+        let b = addr_of(&p);
+        assert!(!b.is_null());
+        // SAFETY: the live addresses.
+        assert_eq!(unsafe { peer_of(b) }, p);
+        // SAFETY: as above.
+        assert_eq!(unsafe { addr::BIO_ADDR_rawport(b) }, 4433u16.to_be());
+        // SAFETY: ours.
+        unsafe { addr::BIO_ADDR_free(a) };
+        // SAFETY: ours.
+        unsafe { addr::BIO_ADDR_free(b) };
+        assert!(addr_of(&PeerAddr(vec![1, 2])).is_null());
+    }
+
+    #[test]
+    fn handshake_queues_keep_the_levels() {
+        use super::super::quic_tls::Sink as _;
+        use rustyssl_quic::tls::Handshake as _;
+        let sh = Shared::new(true);
+        let mut hs = Hs(Arc::clone(&sh));
+        assert!(hs.alpn_configured());
+        hs.start();
+        assert!(sh.lock().need_drive);
+        sh.send(b"client hello");
+        hs.feed_quic_crypto(Level::Initial, b"server hello")
+            .unwrap_or_default();
+        assert_eq!(sh.recv().map(|(_, d)| d), Some(b"server hello".to_vec()));
+        assert_eq!(
+            hs.take_quic_crypto(),
+            vec![(Level::Initial, b"client hello".to_vec())]
+        );
+        sh.got_params(b"tp");
+        sh.complete(Some(b"h3".to_vec()));
+        sh.fail(80);
+        assert!(sh.has_output());
+        let q = sh.lock();
+        // A failure after completion (post-handshake) still counts.
+        assert!(q.completed && q.failed);
+        assert_eq!(q.alpn.as_deref(), Some(&b"h3"[..]));
+    }
+}

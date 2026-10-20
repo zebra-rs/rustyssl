@@ -52,11 +52,7 @@ ffi_export! {
             unsafe { super::peer_of(peer) }
         };
         let mut es = c.q.engine.lock();
-        if es.injected.len() >= MAX_INJECTED {
-            return 0;
-        }
-        es.injected.push_back((from, data));
-        1
+        c_int::from(queue_injected(&mut es, from, data))
     }
 }
 
@@ -408,5 +404,30 @@ ffi_export! {
                 return 0;
             }
         }
+    }
+}
+
+/// Queues an injected datagram for the next tick: false once [`MAX_INJECTED`] wait.
+fn queue_injected(es: &mut EngineState, from: PeerAddr, data: Vec<u8>) -> bool {
+    if es.injected.len() >= MAX_INJECTED {
+        return false;
+    }
+    es.injected.push_back((from, data));
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn injected_datagrams_are_bounded() {
+        let engine = super::super::Engine::new(core::ptr::null_mut(), false, false);
+        let mut es = engine.lock();
+        for _ in 0..MAX_INJECTED {
+            assert!(queue_injected(&mut es, PeerAddr::default(), vec![0; 4]));
+        }
+        assert!(!queue_injected(&mut es, PeerAddr::default(), vec![0; 4]));
+        assert_eq!(es.injected.len(), MAX_INJECTED);
     }
 }

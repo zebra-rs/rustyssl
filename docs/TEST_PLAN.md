@@ -209,14 +209,14 @@ rustyssl itself**. You can only regenerate golden files with
   reported per recipe in `target/upstream-report.md`.
   - **Eligible:** a subtest that passes on the reference and isn't excluded. Excluded, and
     reported apart: recipes `tests/openssl-suite/recipes.txt` skips, each with its reason
-    (FIPS, there being no FIPS provider; QUIC, Phase 10; features the default build leaves
-    out); subtests running a program that imports libcrypto's or libssl's internal functions
+    (FIPS, there being no FIPS provider; features the default build leaves out); subtests running a program that imports libcrypto's or libssl's internal functions
     (found from the programs' own imports, so they can't load on another library by
     construction); subtests `recipes.txt` lists as reading the libraries' private structures
     (`internal` lines, with reasons); subtests skipped on both; and subtests failing on the
     reference itself.
-  - **Measured (2026-10-19, OpenSSL 3.6.5, macOS arm64):** all 4333 eligible subtests pass on
-    rustyssl (100.00%; M6 asks for 98%). 103 are excluded as internal, 83 skipped on both, none
+  - **Measured (2026-10-20, OpenSSL 3.6.5, macOS arm64, with the QUIC recipes):** all 4334
+    eligible subtests pass on rustyssl (100.00%; M6 asks for 98%). 103 are excluded as internal
+    (the QUIC programs built on OpenSSL's internal QUIC among them), 83 skipped on both, none
     fails on the reference. x86_64 Linux isn't measured yet: the whole tree's build and
     rustyssl's need more than the Docker VM's free space here.
 - Classify every test, and keep the list in `tests/openssl-suite/classification.toml`:
@@ -311,6 +311,12 @@ rustyssl itself**. You can only regenerate golden files with
     reference too.
   - Status (2026-10-18): 64 cases pass in all four pairings, the eight fault cases under
     seeds 1 to 6, and the 17 GnuTLS cases on both libraries.
+- **QUIC (OpenSSL's API, 10.2):** `tests/c/quic_api.c` and `tests/c/quic_blocking.c` (L4);
+  `cargo xtask test-interop --peer quic` (`tests/interop/quic.txt`): OpenSSL's guide QUIC demo
+  servers and clients, built from the reference's source, and the reference's `s_client
+  -quic`, in four library pairings; upstream `quicapitest`'s public-API tests and
+  `ssl_ctx_test`'s QUIC iterations under `test-openssl-suite --ssl` (the tests built on
+  OpenSSL's internal test server are excluded as internal, ADR 0006 section 6).
 - **QUIC:** quic-interop-runner cases (handshake, transfer, retry, resumption, zerortt,
   chacha20, keyupdate, multiplexing), plus curl and nghttp3 over HTTP/3.
 - **PKI:** the full x509-limbo suite. Results equal the reference's or are stricter only
