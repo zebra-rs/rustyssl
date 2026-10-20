@@ -329,7 +329,7 @@ reference run.** Any difference is the signal to investigate.
 | Node.js (`--shared-openssl`) | broad | `test/parallel/test-crypto*`, `test-tls*` | M6 |
 | OpenVPN, stunnel, socat, wget, git, Tor, BIND 9, Unbound, OpenLDAP, Postfix | mixed | their own suites, or smoke tests | M6 |
 | pkcs11-provider, oqs-provider, tpm2-openssl | the provider ABI | their own suites (`cargo xtask test-providers`) | Phase 9 |
-| ngtcp2 (ossl backend) | third-party QUIC API | its tests | Phase 10 |
+| ngtcp2 (ossl backend) | third-party QUIC API | its examples' pytest suite (`cargo xtask test-consumers ngtcp2`) | Phase 10 |
 
 The providers run under `cargo xtask test-providers [oqs|pkcs11|tpm2]`, pinned to commits
 with their tarballs' SHA-256 in `tests/providers/pins.txt` and built against the reference;

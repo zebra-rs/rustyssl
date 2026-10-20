@@ -206,6 +206,12 @@ static int yield_secret(SSL *s, uint32_t level, int direction, const unsigned ch
     if (!e->quiet)
         printf("    %s yield %s %s (%zu)\n", e->name, level_name((int)level),
                direction ? "write" : "read", len);
+    /* A QUIC stack keys 0-RTT with the session's suite (ngtcp2 asks SSL_get_current_cipher). */
+    if (!e->quiet && level == OSSL_RECORD_PROTECTION_LEVEL_EARLY) {
+        const SSL_CIPHER *c = SSL_get_current_cipher(s);
+
+        printf("    %s current cipher %s\n", e->name, c != NULL ? SSL_CIPHER_get_name(c) : "none");
+    }
     if (e->fail_yield_at == (int)level + 1)
         return 0;
     memcpy(e->secret[direction][level], secret, len);

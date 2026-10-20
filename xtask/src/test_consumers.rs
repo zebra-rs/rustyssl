@@ -30,6 +30,14 @@
 //! **node** (Node.js): built once with `--shared-openssl` against the reference (long; kept under
 //! `target/consumers/build/` until the pin changes), its `test/parallel/test-crypto*` and
 //! `test-tls*` run by `tools/test.py` with TAP output, each `ok`/`not ok` line a result.
+//!
+//! **ngtcp2**: its `ossl` crypto backend (OpenSSL 3.5's third-party QUIC API,
+//! `SSL_set_quic_tls_cbs`) and its `osslclient`/`osslserver` examples, built by cmake against the
+//! reference with nghttp3 (pinned too) and libev (the system's); the submodules they build with
+//! are pinned as trees of their own. Its examples' pytest suite (`examples/tests`: handshake,
+//! resumption, early data, client certificates, ciphers; the client against the server over
+//! loopback) runs in a virtualenv with pytest and cryptography. Needs cmake, libev (Debian
+//! `libev-dev`, Homebrew `libev`) and Python 3 with `venv`; skipped without them.
 
 use std::fmt::Write as _;
 use std::fs;
@@ -38,11 +46,11 @@ use std::process::{Command, Stdio};
 use std::time::Duration;
 
 use crate::test_c::prepare;
-use crate::test_providers::{Pin, Results, Side, fetch, parse_pins, pool, wait};
+use crate::test_providers::{Pin, Results, Side, cmake, fetch, parse_pins, pool, wait};
 use crate::util::{Result, fresh_dir, run_logged, target_dir, workspace_root};
 
 /// The consumers the command knows, as named on its command line.
-const CONSUMERS: &[&str] = &["rust", "ruby", "pyca", "node"];
+const CONSUMERS: &[&str] = &["rust", "ruby", "pyca", "node", "ngtcp2"];
 
 /// How long one test may run.
 const TEST_TIMEOUT: Duration = Duration::from_secs(300);
@@ -434,6 +442,130 @@ fn run_node(ctx: &Ctx<'_>, pins: &[Pin]) -> Result<Vec<Results>> {
     keep(ctx, "node", all)
 }
 
+/// The examples' test requirements (`examples/tests/README.rst`: pytest and cryptography).
+const NGTCP2_TEST_REQUIREMENTS: &[&str] = &["pytest==8.3.5", "cryptography==44.0.2"];
+
+/// Copies a pinned submodule's tree into its place in its parent's tree (once: a GitHub
+/// tarball leaves the directory empty).
+fn submodule(ctx: &Ctx<'_>, pins: &[Pin], name: &str, place: &Path) -> Result {
+    let tree = fetch(&ctx.dir, ctx.pin(pins, name)?)?;
+    if fs::read_dir(place).is_ok_and(|mut d| d.next().is_some()) {
+        return Ok(());
+    }
+    fs::create_dir_all(place)?;
+    crate::util::run_output(Command::new("cp").arg("-R").arg(tree.join(".")).arg(place))?;
+    Ok(())
+}
+
+/// ngtcp2: nghttp3 and ngtcp2 (its `ossl` backend and examples) built against the reference,
+/// the examples' pytest suite run over loopback.
+fn run_ngtcp2(ctx: &Ctx<'_>, pins: &[Pin]) -> Result<Vec<Results>> {
+    if Command::new("cmake").arg("--version").output().is_err() {
+        println!("ngtcp2: skipped (no cmake on PATH)");
+        return Ok(Vec::new());
+    }
+    let Some(python) = ["python3.13", "python3.12", "python3"]
+        .into_iter()
+        .find(|p| Command::new(p).arg("--version").output().is_ok())
+    else {
+        println!("ngtcp2: skipped (no python3 on PATH)");
+        return Ok(Vec::new());
+    };
+    let nghttp3 = fetch(&ctx.dir, ctx.pin(pins, "nghttp3")?)?;
+    submodule(ctx, pins, "nghttp3-sfparse", &nghttp3.join("lib/sfparse"))?;
+    let tree = fetch(&ctx.dir, ctx.pin(pins, "ngtcp2")?)?;
+    submodule(
+        ctx,
+        pins,
+        "ngtcp2-urlparse",
+        &tree.join("third-party/urlparse"),
+    )?;
+    let build = ctx.dir.join("build/ngtcp2");
+    let prefix = build.join("prefix");
+    let log = ctx.work.join("ngtcp2-build.log");
+    cmake(
+        &nghttp3,
+        &build.join("nghttp3"),
+        &[
+            "-DENABLE_LIB_ONLY=ON".to_owned(),
+            "-DBUILD_TESTING=OFF".to_owned(),
+            "-DENABLE_SHARED_LIB=OFF".to_owned(),
+            "-DENABLE_STATIC_LIB=ON".to_owned(),
+            "-DCMAKE_BUILD_TYPE=RelWithDebInfo".to_owned(),
+            format!("-DCMAKE_INSTALL_PREFIX={}", prefix.display()),
+        ],
+        true,
+        &log,
+    )?;
+    // libev where Homebrew keeps it (it isn't on the default search path there).
+    let mut search = vec![prefix.display().to_string()];
+    for p in ["/opt/homebrew/opt/libev", "/usr/local/opt/libev"] {
+        if Path::new(p).is_dir() {
+            search.push(p.to_owned());
+        }
+    }
+    let ngbuild = build.join("ngtcp2");
+    cmake(
+        &tree,
+        &ngbuild,
+        &[
+            "-DENABLE_OPENSSL=ON".to_owned(),
+            "-DBUILD_TESTING=OFF".to_owned(),
+            "-DCMAKE_BUILD_TYPE=RelWithDebInfo".to_owned(),
+            format!("-DOPENSSL_ROOT_DIR={}", ctx.reference.display()),
+            format!("-DCMAKE_PREFIX_PATH={}", search.join(";")),
+        ],
+        false,
+        &log,
+    )?;
+    let examples = tree.join("examples");
+    for program in ["osslclient", "osslserver"] {
+        let built = ngbuild.join("examples").join(program);
+        if !built.exists() {
+            println!(
+                "ngtcp2: skipped (no {program}: its examples need libev; log: {})",
+                log.display()
+            );
+            return Ok(Vec::new());
+        }
+        fs::copy(&built, examples.join(program))?;
+    }
+    // What its configure would write (cmake doesn't): the ossl examples only.
+    fs::write(
+        examples.join("tests/config.ini"),
+        "[ngtcp2]\nversion = rustyssl\nexamples = yes\n\n[crypto]\nossl = yes\n\n\
+         [examples]\nport = 4433\nossl = yes\n\n[clients]\nossl = osslclient\n\n\
+         [servers]\nossl = osslserver\n",
+    )?;
+    let venv = build.join("venv");
+    let py = venv.join("bin/python");
+    let stamp = venv.join("rustyssl-requirements");
+    let wanted = NGTCP2_TEST_REQUIREMENTS.join("\n");
+    if fs::read_to_string(&stamp).ok().as_deref() != Some(wanted.as_str()) {
+        fresh_dir(&venv)?;
+        run_logged(Command::new(python).args(["-m", "venv"]).arg(&venv), &log)?;
+        run_logged(
+            Command::new(&py)
+                .args(["-m", "pip", "install", "-q"])
+                .args(NGTCP2_TEST_REQUIREMENTS),
+            &log,
+        )?;
+        fs::write(&stamp, &wanted)?;
+    }
+    let dir = examples.join("tests");
+    let make = move |_: &str| {
+        let mut cmd = Command::new(&py);
+        cmd.args(["-m", "pytest", "-q", "-rA", "-p", "no:cacheprovider"])
+            .current_dir(&dir);
+        cmd
+    };
+    // One run per side: the server listens on a fixed port.
+    let all = run_tests(ctx, &["examples".to_owned()], make, |_, _, out| {
+        pytest_results(out)
+    })?;
+    keep(ctx, "ngtcp2", all)
+}
+
 /// Each test's outcome in TAP: `ok N name` passes (a `# skip` isn't a result), `not ok N
 /// name` fails.
 fn tap_results(out: &str) -> Vec<(String, bool)> {
@@ -632,6 +764,7 @@ pub fn run(args: &[String]) -> Result {
             "ruby" => run_ruby(&ctx, &pins)?,
             "pyca" => run_pyca(&ctx, &pins)?,
             "node" => run_node(&ctx, &pins)?,
+            "ngtcp2" => run_ngtcp2(&ctx, &pins)?,
             _ => unreachable!(),
         };
         let report = Report {

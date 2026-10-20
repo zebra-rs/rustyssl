@@ -157,7 +157,13 @@ pub(crate) fn fetch(dir: &Path, pin: &Pin) -> Result<PathBuf> {
 }
 
 /// Builds a cmake project once per pin (the stamp names its sources and options).
-fn cmake(source: &Path, build: &Path, options: &[String], install: bool, log: &Path) -> Result {
+pub(crate) fn cmake(
+    source: &Path,
+    build: &Path,
+    options: &[String],
+    install: bool,
+    log: &Path,
+) -> Result {
     let stamp = build.join("rustyssl-built");
     let key = format!("{}\n{}", source.display(), options.join("\n"));
     if fs::read_to_string(&stamp).ok().as_deref() == Some(key.as_str()) {
