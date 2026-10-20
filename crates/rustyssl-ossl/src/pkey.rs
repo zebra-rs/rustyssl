@@ -149,6 +149,13 @@ fn opt_ptr(s: &Option<std::ffi::CString>) -> *const c_char {
     s.as_ref().map_or(core::ptr::null(), |c| c.as_ptr())
 }
 
+/// `EVP_PKEY_get_bits(pkey)`, NULL when `None` (which the library reports).
+pub fn bits_of(pkey: Option<&Pkey>) -> c_int {
+    let k = pkey.map_or(core::ptr::null(), |k| k.as_ptr().cast_const());
+    // SAFETY: k is NULL or a live key.
+    unsafe { ffi::EVP_PKEY_get_bits(k) }
+}
+
 impl Pkey {
     /// `EVP_PKEY_get_bits`.
     pub fn bits(&self) -> c_int {

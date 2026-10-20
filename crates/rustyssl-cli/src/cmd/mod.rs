@@ -24,9 +24,9 @@ pub mod version;
 // pub mod engine;
 // pub mod errstr;
 // pub mod fipsinstall;
-// pub mod gendsa;
+pub mod gendsa;
 pub mod genpkey;
-// pub mod genrsa;
+pub mod genrsa;
 // pub mod info;
 // pub mod kdf;
 // pub mod list;
@@ -38,7 +38,7 @@ pub mod genpkey;
 // pub mod pkcs7;
 // pub mod pkcs8;
 pub mod pkey;
-// pub mod pkeyparam;
+pub mod pkeyparam;
 // pub mod pkeyutl;
 // pub mod prime;
 // pub mod rand;
@@ -83,9 +83,9 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "engine" => engine::main,
         // "errstr" => errstr::main,
         // "fipsinstall" => fipsinstall::main,
-        // "gendsa" => gendsa::main,
+        "gendsa" => gendsa::main,
         "genpkey" => genpkey::main,
-        // "genrsa" => genrsa::main,
+        "genrsa" => genrsa::main,
         // "info" => info::main,
         // "kdf" => kdf::main,
         // "list" => list::main,
@@ -97,7 +97,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "pkcs7" => pkcs7::main,
         // "pkcs8" => pkcs8::main,
         "pkey" => pkey::main,
-        // "pkeyparam" => pkeyparam::main,
+        "pkeyparam" => pkeyparam::main,
         // "pkeyutl" => pkeyutl::main,
         // "prime" => prime::main,
         // "rand" => rand::main,

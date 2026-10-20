@@ -1,0 +1,37 @@
+# `openssl genrsa`. Generated keys are random: `| check` re-parses each run's output with
+# upstream's tool on the reference (hex dumps collapsed).
+genrsa -help
+genrsa 1024 | pkey -noout -text
+genrsa | pkey -noout -text_pub
+genrsa -verbose 1024 | pkey -noout -check
+genrsa -quiet 1024 | pkey -noout -check
+genrsa -verbose -quiet 1024 | pkey -noout -check
+genrsa -3 1024 | pkey -noout -text_pub
+genrsa -3 -verbose 1024 | pkey -noout -text_pub
+genrsa -F4 1024 | pkey -noout -text_pub
+genrsa -f4 -primes 3 1024 | pkey -noout -text
+genrsa -primes 3 -verbose 1024 | pkey -noout -text
+genrsa -primes 7 1024
+genrsa -primes 0 1024
+genrsa -traditional 1024 | rsa -noout -check
+genrsa -aes128 -passout pass:secret 1024 | pkey -passin pass:secret -noout -check
+genrsa -aes256 -passout pass:secret -traditional 1024 | rsa -passin pass:secret -noout -check
+genrsa -aes-128-gcm -passout pass:secret 1024
+genrsa -nosuchcipher 1024
+genrsa -passout nosuch:x 1024
+genrsa -out {dir}/genrsa.pem 1024 | pkey -in {dir}/genrsa.pem -noout -check
+genrsa -out /nonexistent/dir/key.pem 1024
+genrsa 0
+genrsa -5
+genrsa abc
+genrsa 512 1024
+genrsa 100
+genrsa 20000 -verbose -out /nonexistent/dir/k.pem
+genrsa -engine /nonexistent/eng.so 1024 | pkey -noout -check
+genrsa -provider default 1024 | pkey -noout -check
+genrsa -provider /nonexistent/prov.so 1024
+genrsa -propquery provider=nosuch 1024
+genrsa -rand {bin} -writerand {dir}/genrsa.rnd 1024 | pkey -noout -check
+genrsa -rand /nonexistent/rand.bin 1024
+genrsa -nosuchoption
+genrsa -out

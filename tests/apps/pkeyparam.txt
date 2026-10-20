@@ -1,0 +1,25 @@
+# `openssl pkeyparam`. Parameters from the reference's test/ tree.
+pkeyparam -help
+pkeyparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem
+pkeyparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -text
+pkeyparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -text -noout
+pkeyparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -check
+pkeyparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -check -noout -out {dir}/pkeyparam.out | pkeyparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -noout -check
+pkeyparam -in {src}/test/certs/dhp2048.pem -text -check
+pkeyparam -in {src}/test/recipes/15-test_dsaparam_data/invalid/p1024_q160_t1862.pem -check
+pkeyparam -in {src}/test/recipes/15-test_dsaparam_data/invalid/p1024_q160_t1862.pem -text -noout
+pkeyparam -in {src}/test/testrsa.pem
+pkeyparam -in {src}/test/testdsa.pem -noout -text
+pkeyparam -in {txt}
+pkeyparam -in /nonexistent/params.pem
+pkeyparam -out /nonexistent/dir/out.pem < {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem
+pkeyparam -noout -check < {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem
+genpkey -genparam -algorithm EC -pkeyopt ec_paramgen_curve:P-384 -out {dir}/pkeyparam-ec.pem
+pkeyparam -in {dir}/pkeyparam-ec.pem -text -check
+pkeyparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -engine /nonexistent/eng.so -check -noout
+pkeyparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -provider default -check -noout
+pkeyparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -provider-path {dir} -provider default -noout
+pkeyparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -propquery provider=nosuch -check -noout
+pkeyparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem extra
+pkeyparam -nosuchoption
+pkeyparam -in

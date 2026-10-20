@@ -1,0 +1,25 @@
+# `openssl gendsa`. Generated keys are random: `| check` re-parses each run's output with
+# upstream's tool on the reference (hex dumps collapsed).
+gendsa -help
+gendsa {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem | pkey -noout -text
+gendsa -verbose {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem | pkey -noout -check
+gendsa -quiet {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem | pkey -noout -check
+gendsa -out {dir}/gendsa.pem {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem | pkey -in {dir}/gendsa.pem -noout -text_pub
+gendsa -out /nonexistent/dir/key.pem {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem
+gendsa -aes128 -passout pass:secret {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem | pkey -passin pass:secret -noout -check
+gendsa -aes-128-gcm -passout pass:secret {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem
+gendsa -nosuchcipher {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem
+gendsa -passout nosuch:x {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem
+gendsa {src}/test/certs/dhp2048.pem
+gendsa {src}/test/testrsa.pem
+gendsa {src}/test/testdsa.pem | pkey -noout -check
+gendsa /nonexistent/params.pem
+gendsa {txt}
+gendsa
+gendsa {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem extra
+gendsa -engine /nonexistent/eng.so {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem | pkey -noout -check
+gendsa -provider default {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem | pkey -noout -check
+gendsa -provider /nonexistent/prov.so {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem
+gendsa -propquery provider=nosuch {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem
+gendsa -rand {bin} -writerand {dir}/gendsa.rnd {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem | pkey -noout -check
+gendsa -nosuchoption
