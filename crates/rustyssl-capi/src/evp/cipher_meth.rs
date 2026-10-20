@@ -422,12 +422,12 @@ mod tests {
         unsafe { EVP_CIPHER_meth_free(copy) };
     }
 
-    /// docs/DEVIATIONS.md: a static cipher whose state OpenSSL doesn't publish (AES-GCM) has
+    /// docs/DEVIATIONS.md: a static cipher whose state OpenSSL doesn't publish (AES-OCB) has
     /// functions that fail, in the slots OpenSSL's fill (no NULL to call), and no state size.
     #[test]
     fn private_state_ciphers_have_failing_functions() {
         // SAFETY: no preconditions.
-        let gcm = unsafe { crate::evp::legacy_cipher::EVP_aes_128_gcm() };
+        let gcm = unsafe { crate::evp::legacy_cipher::EVP_aes_128_ocb() };
         // SAFETY: a static cipher, for each call below.
         let init = unsafe { EVP_CIPHER_meth_get_init(gcm) };
         // SAFETY: as above.

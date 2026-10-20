@@ -49,8 +49,16 @@ use rustyssl_abi::{
     NID_rc2_ofb64, NID_rc4, NID_rc4_40, NID_rc4_hmac_md5, NID_seed_cbc, NID_seed_cfb128,
     NID_seed_ecb, NID_seed_ofb128, NID_undef, RC2_KEY, RC4_KEY, SEED_KEY_SCHEDULE, block128_f,
 };
+use rustyssl_abi::{
+    EVP_AEAD_TLS1_AAD_LEN, EVP_CTRL_AEAD_GET_TAG, EVP_CTRL_AEAD_SET_IVLEN, EVP_CTRL_AEAD_SET_TAG,
+    EVP_CTRL_AEAD_TLS1_AAD, EVP_CTRL_COPY, EVP_CTRL_GCM_IV_GEN, EVP_CTRL_GCM_SET_IV_FIXED,
+    EVP_CTRL_GCM_SET_IV_INV, EVP_CTRL_GET_IVLEN, EVP_GCM_TLS_EXPLICIT_IV_LEN, EVP_GCM_TLS_TAG_LEN,
+    EVP_R_TOO_MANY_RECORDS, NID_aes_128_gcm, NID_aes_192_gcm, NID_aes_256_gcm,
+};
 
-use super::cipher::{EVP_CIPHER_get_flags, Legacy, LegacyDoCipherFn, LegacyInitFn};
+use super::cipher::{
+    EVP_CIPHER_get_flags, EVP_CIPHER_get_iv_length, Legacy, LegacyDoCipherFn, LegacyInitFn,
+};
 use super::cipher_asn1::{EVP_CIPHER_get_asn1_iv, EVP_CIPHER_set_asn1_iv};
 use super::cipher_ctx::{
     EVP_CIPHER_CTX_buf_noconst, EVP_CIPHER_CTX_ctrl, EVP_CIPHER_CTX_get_block_size,
@@ -62,6 +70,7 @@ use super::cipher_ctx::{
 use crate::asn1::tpl::util::{ASN1_TYPE_get_int_octetstring, ASN1_TYPE_set_int_octetstring};
 use crate::err;
 use crate::ffi::ffi_callback;
+use crate::lowlevel::CBlock;
 use crate::lowlevel::aes::{AES_decrypt, AES_encrypt, AES_set_decrypt_key, AES_set_encrypt_key};
 use crate::lowlevel::ciphers::{
     Camellia_decrypt, Camellia_encrypt, Camellia_set_key, IDEA_cbc_encrypt, IDEA_cfb64_encrypt,
@@ -83,7 +92,9 @@ use crate::lowlevel::modes::{
     CRYPTO_cbc128_decrypt, CRYPTO_cbc128_encrypt, CRYPTO_cfb128_1_encrypt, CRYPTO_cfb128_8_encrypt,
     CRYPTO_cfb128_encrypt, CRYPTO_ctr128_encrypt, CRYPTO_ofb128_encrypt,
 };
-use crate::rand_lib::RAND_priv_bytes;
+use crate::rand_lib::{RAND_bytes, RAND_priv_bytes};
+use rustyssl_crypto::lowlevel::aead::Gcm;
+use subtle::ConstantTimeEq;
 
 /// `EVP_MAXCHUNK`: the most the mode functions taking a `long` length get at once.
 const MAXCHUNK: usize = 1 << 30;
@@ -1540,6 +1551,642 @@ do_fn!(rc4_do, rc4_do_imp, "`rc4_cipher`.");
 init_fn!(null_init, null_init_imp, "`null_init_key`.");
 do_fn!(null_do, null_do_imp, "`null_cipher`.");
 
+// ---- AES-GCM (`aes_gcm_*`): engines such as `ossltest` call these through `EVP_aes_128_gcm()` ----
+
+/// The longest IV the state keeps; OpenSSL allocates any length (a resource cap,
+/// docs/DEVIATIONS.md).
+const GCM_MAX_IV: usize = 128;
+
+/// `EVP_AES_GCM_CTX`: the key, the GCM context, and the flags OpenSSL keeps. The tag and the
+/// TLS AAD are in the context's `buf`, and an IV of up to `EVP_MAX_IV_LENGTH` octets is in its
+/// `iv`, as OpenSSL keeps them; a longer one is in `long_iv`.
+#[repr(C)]
+pub(crate) struct GcmKey {
+    key: Key128<AES_KEY>,
+    gcm: Gcm,
+    key_set: c_int,
+    iv_set: c_int,
+    ivlen: c_int,
+    taglen: c_int,
+    iv_gen: c_int,
+    tls_aad_len: c_int,
+    tls_enc_records: u64,
+    long_iv: [u8; GCM_MAX_IV],
+}
+
+/// The state's IV: the context's for a standard length, the state's own past it.
+///
+/// # Safety
+/// `ctx` is a live cipher context whose state `d` is a `GcmKey`.
+unsafe fn gcm_iv(ctx: *mut EVP_CIPHER_CTX, d: *mut GcmKey) -> *mut u8 {
+    // SAFETY: the caller's state.
+    if unsafe { gcm_ivlen(d) } > MAX_IV {
+        field::<_, u8>(d, offset_of!(GcmKey, long_iv))
+    } else {
+        // SAFETY: the caller's context.
+        unsafe { iv(ctx) }
+    }
+}
+
+/// The state's IV length as a `usize`.
+///
+/// # Safety
+/// `d` is a live `GcmKey`.
+unsafe fn gcm_ivlen(d: *mut GcmKey) -> usize {
+    // SAFETY: the caller's state.
+    usize::try_from(unsafe { (*d).ivlen }).unwrap_or(0)
+}
+
+/// The state's block function over its key.
+fn gcm_block(d: *mut GcmKey) -> CBlock {
+    let ks = field::<_, c_void>(d, offset_of!(GcmKey, key) + offset_of!(Key128<AES_KEY>, ks));
+    CBlock {
+        f: aes_encrypt_block,
+        key: ks.cast_const(),
+    }
+}
+
+ffi_callback! {
+    /// `AES_encrypt` as a `block128_f`.
+    ///
+    /// # Safety
+    /// `in_` and `out` hold a block; `key` is an `AES_KEY`.
+    pub(crate) unsafe extern "C" fn aes_encrypt_block(in_: *const u8, out: *mut u8, key: *const c_void)
+    where failure = (), library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { AES_encrypt(in_, out, key.cast()) };
+    }
+}
+
+/// `CRYPTO_gcm128_setiv` with `iv_` (NULL: the state's IV).
+///
+/// # Safety
+/// `ctx` is a live cipher context whose state `d` is a `GcmKey` with its key set; `iv_` is NULL
+/// or holds the state's IV length.
+unsafe fn gcm_setiv(ctx: *mut EVP_CIPHER_CTX, d: *mut GcmKey, iv_: *const u8) {
+    // SAFETY: the caller's guarantee.
+    let n = unsafe { gcm_ivlen(d) };
+    let src = if iv_.is_null() {
+        // SAFETY: as above.
+        unsafe { gcm_iv(ctx, d) }.cast_const()
+    } else {
+        iv_
+    };
+    // SAFETY: the IV holds `n` octets (the context's or the state's buffer, or the caller's).
+    let ivs = unsafe { core::slice::from_raw_parts(src, n) }.to_vec();
+    let b = gcm_block(d);
+    // SAFETY: the caller's state; no other reference to it is live.
+    unsafe { (*d).gcm.setiv(&ivs, &b) };
+}
+
+/// `aes_gcm_init_key`.
+///
+/// # Safety
+/// `ctx` is a live cipher context whose state is a `GcmKey`; `key` and `iv_` are NULL or hold
+/// the context's key and IV lengths.
+unsafe fn gcm_init_imp(ctx: *mut EVP_CIPHER_CTX, key: *const u8, iv_: *const u8) -> c_int {
+    if iv_.is_null() && key.is_null() {
+        return 1;
+    }
+    // SAFETY: the caller's guarantee.
+    let Some(d) = (unsafe { state::<GcmKey>(ctx) }) else {
+        return 0;
+    };
+    if key.is_null() {
+        // SAFETY: the caller's state.
+        if unsafe { (*d).key_set } != 0 {
+            // SAFETY: the key is set; the caller's IV.
+            unsafe { gcm_setiv(ctx, d, iv_) };
+        } else {
+            // SAFETY: the state's IV buffer.
+            let to = unsafe { gcm_iv(ctx, d) };
+            // SAFETY: the caller's state.
+            let n = unsafe { gcm_ivlen(d) };
+            // SAFETY: the caller's IV of the state's length into it.
+            unsafe { ptr::copy_nonoverlapping(iv_, to, n) };
+        }
+        // SAFETY: the caller's state.
+        unsafe { (*d).iv_set = 1 };
+        // SAFETY: as above.
+        unsafe { (*d).iv_gen = 0 };
+        return 1;
+    }
+    // SAFETY: the caller's context.
+    let bits = unsafe { EVP_CIPHER_CTX_get_key_length(ctx) }.saturating_mul(8);
+    if bits <= 0 {
+        err::raise(ERR_LIB_EVP, EVP_R_INVALID_KEY_LENGTH, "aes_gcm_init_key");
+        return 0;
+    }
+    let ks = field::<_, AES_KEY>(d, offset_of!(GcmKey, key) + offset_of!(Key128<AES_KEY>, ks));
+    // SAFETY: the caller's key of `bits` bits; the state's schedule.
+    unsafe { AES_set_encrypt_key(key, bits, ks) };
+    let b = gcm_block(d);
+    let gcm = field::<_, Gcm>(d, offset_of!(GcmKey, gcm));
+    // SAFETY: the state's GCM context, plain data (no drop owed for the old value).
+    unsafe { gcm.write(Gcm::new(&b)) };
+    // SAFETY: the caller's state.
+    let saved = iv_.is_null() && unsafe { (*d).iv_set } != 0;
+    if saved || !iv_.is_null() {
+        // SAFETY: the key is set; the caller's IV, or (NULL) the state's.
+        unsafe { gcm_setiv(ctx, d, iv_) };
+        // SAFETY: the caller's state.
+        unsafe { (*d).iv_set = 1 };
+    }
+    // SAFETY: as above.
+    unsafe { (*d).key_set = 1 };
+    1
+}
+
+/// Adds one to the 64-bit big-endian counter at `p` (`ctr64_inc`).
+///
+/// # Safety
+/// `p` holds 8 octets.
+unsafe fn ctr64_inc(p: *mut u8) {
+    // SAFETY: the caller's 8 octets.
+    let c = unsafe { p.cast::<[u8; 8]>().read_unaligned() };
+    let next = u64::from_be_bytes(c).wrapping_add(1).to_be_bytes();
+    // SAFETY: as above.
+    unsafe { p.cast::<[u8; 8]>().write_unaligned(next) };
+}
+
+/// `EVP_CTRL_AEAD_TLS1_AAD`: the record header saved, its length corrected for the explicit IV
+/// (and the tag, decrypting); the tag's length.
+///
+/// # Safety
+/// `ctx` is a live cipher context whose state `d` is a `GcmKey`; `p` holds 13 octets.
+unsafe fn gcm_tls_aad(
+    ctx: *mut EVP_CIPHER_CTX,
+    d: *mut GcmKey,
+    p: *const u8,
+    encrypt: bool,
+) -> c_int {
+    let n = usize::try_from(EVP_AEAD_TLS1_AAD_LEN).unwrap_or(13);
+    // SAFETY: the context's buffer (`EVP_MAX_BLOCK_LENGTH` octets).
+    let buf = unsafe { EVP_CIPHER_CTX_buf_noconst(ctx) };
+    // SAFETY: the caller's 13 octets into it.
+    unsafe { ptr::copy_nonoverlapping(p, buf, n) };
+    // SAFETY: the caller's state.
+    unsafe { (*d).tls_aad_len = EVP_AEAD_TLS1_AAD_LEN };
+    // SAFETY: as above.
+    unsafe { (*d).tls_enc_records = 0 };
+    let lenp = buf.wrapping_add(n - 2);
+    // SAFETY: the header's length, its last two octets.
+    let mut len = usize::from(u16::from_be_bytes(unsafe {
+        lenp.cast::<[u8; 2]>().read_unaligned()
+    }));
+    let explicit = usize::try_from(EVP_GCM_TLS_EXPLICIT_IV_LEN).unwrap_or(8);
+    let tag = usize::try_from(EVP_GCM_TLS_TAG_LEN).unwrap_or(16);
+    let Some(l) = len.checked_sub(explicit) else {
+        return 0;
+    };
+    len = l;
+    if !encrypt {
+        let Some(l) = len.checked_sub(tag) else {
+            return 0;
+        };
+        len = l;
+    }
+    let Ok(len) = u16::try_from(len) else {
+        return 0;
+    };
+    // SAFETY: as above.
+    unsafe { lenp.cast::<[u8; 2]>().write_unaligned(len.to_be_bytes()) };
+    EVP_GCM_TLS_TAG_LEN
+}
+
+/// `EVP_CTRL_GCM_SET_IV_FIXED`: the whole IV (-1), or its fixed field and, encrypting, a random
+/// invocation field.
+///
+/// # Safety
+/// `ctx` is a live cipher context whose state `d` is a `GcmKey`; `p` holds `arg` octets (the
+/// state's IV length for -1).
+unsafe fn gcm_iv_fixed(
+    ctx: *mut EVP_CIPHER_CTX,
+    d: *mut GcmKey,
+    arg: c_int,
+    p: *const u8,
+    encrypt: bool,
+) -> c_int {
+    // SAFETY: the caller's state.
+    let ivlen = unsafe { gcm_ivlen(d) };
+    // SAFETY: as above.
+    let ivp = unsafe { gcm_iv(ctx, d) };
+    if arg == -1 {
+        // SAFETY: the caller's whole IV into the state's.
+        unsafe { ptr::copy_nonoverlapping(p, ivp, ivlen) };
+        // SAFETY: the caller's state.
+        unsafe { (*d).iv_gen = 1 };
+        return 1;
+    }
+    let Ok(fixed) = usize::try_from(arg) else {
+        return 0;
+    };
+    if fixed < 4 || fixed > ivlen || ivlen - fixed < 8 {
+        return 0;
+    }
+    // SAFETY: the caller's fixed field into the IV's start.
+    unsafe { ptr::copy_nonoverlapping(p, ivp, fixed) };
+    if encrypt {
+        let Ok(n) = c_int::try_from(ivlen - fixed) else {
+            return 0;
+        };
+        // SAFETY: the IV's invocation field, `ivlen - fixed` octets.
+        if unsafe { RAND_bytes(ivp.wrapping_add(fixed), n) } <= 0 {
+            return 0;
+        }
+    }
+    // SAFETY: the caller's state.
+    unsafe { (*d).iv_gen = 1 };
+    1
+}
+
+/// `EVP_CTRL_GCM_IV_GEN`: the IV set, its last `arg` octets given, its invocation field
+/// counted on.
+///
+/// # Safety
+/// `ctx` is a live cipher context whose state `d` is a `GcmKey`; `p` has room for `arg`
+/// octets (the IV's length when `arg` is out of range).
+unsafe fn gcm_iv_gen(ctx: *mut EVP_CIPHER_CTX, d: *mut GcmKey, arg: c_int, p: *mut u8) -> c_int {
+    // SAFETY: the caller's state.
+    if unsafe { (*d).iv_gen } == 0 || unsafe { (*d).key_set } == 0 {
+        return 0;
+    }
+    // SAFETY: the key is set; the state's IV.
+    unsafe { gcm_setiv(ctx, d, ptr::null()) };
+    // SAFETY: the caller's state.
+    let ivlen = unsafe { gcm_ivlen(d) };
+    let n = usize::try_from(arg)
+        .ok()
+        .filter(|&n| n > 0 && n <= ivlen)
+        .unwrap_or(ivlen);
+    // SAFETY: as above.
+    let ivp = unsafe { gcm_iv(ctx, d) };
+    // SAFETY: the IV's last `n` octets into the caller's.
+    unsafe { ptr::copy_nonoverlapping(ivp.wrapping_add(ivlen - n), p, n) };
+    if ivlen >= 8 {
+        // SAFETY: the invocation field, the IV's last 8 octets.
+        unsafe { ctr64_inc(ivp.wrapping_add(ivlen - 8)) };
+    }
+    // SAFETY: the caller's state.
+    unsafe { (*d).iv_set = 1 };
+    1
+}
+
+/// `EVP_CTRL_GCM_SET_IV_INV`: the IV's last `arg` octets from the record, and the IV set.
+///
+/// # Safety
+/// `ctx` is a live cipher context whose state `d` is a `GcmKey`; `p` holds `arg` octets.
+unsafe fn gcm_iv_inv(
+    ctx: *mut EVP_CIPHER_CTX,
+    d: *mut GcmKey,
+    arg: c_int,
+    p: *const u8,
+    encrypt: bool,
+) -> c_int {
+    // SAFETY: the caller's state.
+    let ivlen = unsafe { gcm_ivlen(d) };
+    let n = usize::try_from(arg).unwrap_or(usize::MAX);
+    // SAFETY: as above.
+    if unsafe { (*d).iv_gen } == 0 || unsafe { (*d).key_set } == 0 || encrypt || n > ivlen {
+        return 0;
+    }
+    // SAFETY: as above.
+    let ivp = unsafe { gcm_iv(ctx, d) };
+    // SAFETY: the caller's `n` octets into the IV's end.
+    unsafe { ptr::copy_nonoverlapping(p, ivp.wrapping_add(ivlen - n), n) };
+    // SAFETY: the key is set; the state's IV.
+    unsafe { gcm_setiv(ctx, d, ptr::null()) };
+    // SAFETY: the caller's state.
+    unsafe { (*d).iv_set = 1 };
+    1
+}
+
+/// `aes_gcm_ctrl`.
+///
+/// # Safety
+/// `ctx` is a live cipher context whose state is a `GcmKey`; `p` is what the command takes.
+unsafe fn gcm_ctrl_imp(
+    ctx: *mut EVP_CIPHER_CTX,
+    type_: c_int,
+    arg: c_int,
+    p: *mut c_void,
+) -> c_int {
+    // SAFETY: the caller's guarantee.
+    let Some(d) = (unsafe { state::<GcmKey>(ctx) }) else {
+        return 0;
+    };
+    // SAFETY: as above.
+    let encrypt = unsafe { enc(ctx) } != 0;
+    // SAFETY: the context's buffer (`EVP_MAX_BLOCK_LENGTH` octets).
+    let buf = unsafe { EVP_CIPHER_CTX_buf_noconst(ctx) };
+    let tag_ok = (1..=16).contains(&arg);
+    let n = usize::try_from(arg).unwrap_or(0);
+    let needs_ptr =
+        type_ != EVP_CTRL_INIT && type_ != EVP_CTRL_AEAD_SET_IVLEN && type_ != EVP_CTRL_COPY;
+    if needs_ptr && p.is_null() {
+        return 0;
+    }
+    match type_ {
+        EVP_CTRL_INIT => {
+            // SAFETY: the context's cipher.
+            let cipher = unsafe { EVP_CIPHER_CTX_get0_cipher(ctx) };
+            // The cipher's own IV length (`EVP_CIPHER_get_iv_length(c->cipher)`): the context's
+            // would ask this `ctrl` for it, before the state has one.
+            // SAFETY: the context's cipher, or NULL (0).
+            let ivlen = unsafe { EVP_CIPHER_get_iv_length(cipher) };
+            // SAFETY: the caller's state; no other reference to it is live.
+            let st = unsafe { &mut *d };
+            st.key_set = 0;
+            st.iv_set = 0;
+            st.ivlen = ivlen;
+            st.taglen = -1;
+            st.iv_gen = 0;
+            st.tls_aad_len = -1;
+            1
+        }
+        EVP_CTRL_GET_IVLEN => {
+            // SAFETY: the caller's state.
+            let ivlen = unsafe { (*d).ivlen };
+            // SAFETY: the caller's int.
+            unsafe { p.cast::<c_int>().write_unaligned(ivlen) };
+            1
+        }
+        EVP_CTRL_AEAD_SET_IVLEN => {
+            if arg <= 0 || n > GCM_MAX_IV {
+                return 0;
+            }
+            // SAFETY: the caller's state.
+            unsafe { (*d).ivlen = arg };
+            1
+        }
+        EVP_CTRL_AEAD_SET_TAG => {
+            if !tag_ok || encrypt {
+                return 0;
+            }
+            // SAFETY: the caller's tag of `n` octets into the context's buffer.
+            unsafe { ptr::copy_nonoverlapping(p.cast::<u8>(), buf, n) };
+            // SAFETY: the caller's state.
+            unsafe { (*d).taglen = arg };
+            1
+        }
+        EVP_CTRL_AEAD_GET_TAG => {
+            // SAFETY: the caller's state.
+            if !tag_ok || !encrypt || unsafe { (*d).taglen } < 0 {
+                return 0;
+            }
+            // SAFETY: the tag in the context's buffer into the caller's `n` octets.
+            unsafe { ptr::copy_nonoverlapping(buf, p.cast::<u8>(), n) };
+            1
+        }
+        // SAFETY: the caller's guarantee for each command.
+        EVP_CTRL_GCM_SET_IV_FIXED => unsafe { gcm_iv_fixed(ctx, d, arg, p.cast(), encrypt) },
+        // SAFETY: as above.
+        EVP_CTRL_GCM_IV_GEN => unsafe { gcm_iv_gen(ctx, d, arg, p.cast()) },
+        // SAFETY: as above.
+        EVP_CTRL_GCM_SET_IV_INV => unsafe { gcm_iv_inv(ctx, d, arg, p.cast(), encrypt) },
+        EVP_CTRL_AEAD_TLS1_AAD => {
+            if arg != EVP_AEAD_TLS1_AAD_LEN {
+                return 0;
+            }
+            // SAFETY: as above.
+            unsafe { gcm_tls_aad(ctx, d, p.cast(), encrypt) }
+        }
+        // The state holds no pointers into itself: the copy of its octets is whole.
+        EVP_CTRL_COPY => 1,
+        _ => -1,
+    }
+}
+
+/// `aes_gcm_tls_cipher`'s work on a record in place (explicit IV, payload, tag); its length,
+/// or -1.
+///
+/// # Safety
+/// `ctx` is a live cipher context whose state `d` is a `GcmKey` with its key set; `rec` is the
+/// record.
+unsafe fn gcm_tls_record(ctx: *mut EVP_CIPHER_CTX, d: *mut GcmKey, rec: &mut [u8]) -> c_int {
+    let explicit = usize::try_from(EVP_GCM_TLS_EXPLICIT_IV_LEN).unwrap_or(8);
+    let tag = usize::try_from(EVP_GCM_TLS_TAG_LEN).unwrap_or(16);
+    let Some(plen) = rec.len().checked_sub(explicit + tag) else {
+        return -1;
+    };
+    // SAFETY: the caller's context.
+    let encrypt = unsafe { enc(ctx) } != 0;
+    if encrypt {
+        // SAFETY: the caller's state.
+        let count = unsafe { (*d).tls_enc_records }.wrapping_add(1);
+        // SAFETY: as above.
+        unsafe { (*d).tls_enc_records = count };
+        if count == 0 {
+            err::raise(ERR_LIB_EVP, EVP_R_TOO_MANY_RECORDS, "aes_gcm_tls_cipher");
+            return -1;
+        }
+    }
+    let cmd = if encrypt {
+        EVP_CTRL_GCM_IV_GEN
+    } else {
+        EVP_CTRL_GCM_SET_IV_INV
+    };
+    // SAFETY: the caller's context; the record's explicit IV.
+    if unsafe {
+        EVP_CIPHER_CTX_ctrl(
+            ctx,
+            cmd,
+            EVP_GCM_TLS_EXPLICIT_IV_LEN,
+            rec.as_mut_ptr().cast(),
+        )
+    } <= 0
+    {
+        return -1;
+    }
+    // SAFETY: the context's buffer holds the saved AAD.
+    let buf = unsafe { EVP_CIPHER_CTX_buf_noconst(ctx) };
+    // SAFETY: the caller's state.
+    let aadlen = usize::try_from(unsafe { (*d).tls_aad_len }).unwrap_or(0);
+    // SAFETY: the saved AAD of `aadlen` octets.
+    let aad = unsafe { core::slice::from_raw_parts(buf, aadlen) }.to_vec();
+    // SAFETY: the caller's state.
+    if unsafe { (*d).gcm.aad(&aad) } != 0 {
+        return -1;
+    }
+    let Some(body) = rec.get_mut(explicit..) else {
+        return -1;
+    };
+    let (data, rtag) = body.split_at_mut(plen);
+    let input = data.to_vec();
+    let b = gcm_block(d);
+    if encrypt {
+        // SAFETY: the caller's state.
+        if unsafe { (*d).gcm.encrypt(&input, data, &b) } != 0 {
+            return -1;
+        }
+        // SAFETY: as above.
+        unsafe { (*d).gcm.tag(rtag) };
+        return c_int::try_from(rec.len()).unwrap_or(-1);
+    }
+    // SAFETY: the caller's state.
+    if unsafe { (*d).gcm.decrypt(&input, data, &b) } != 0 {
+        return -1;
+    }
+    let mut want = [0u8; 16];
+    // SAFETY: as above.
+    unsafe { (*d).gcm.tag(&mut want) };
+    // SAFETY: the context's buffer, where OpenSSL leaves the computed tag.
+    unsafe { ptr::copy_nonoverlapping(want.as_ptr(), buf, tag) };
+    let same: bool = want.get(..tag).unwrap_or_default().ct_eq(rtag).into();
+    if !same {
+        data.fill(0);
+        return -1;
+    }
+    c_int::try_from(plen).unwrap_or(-1)
+}
+
+/// `aes_gcm_cipher` (a custom cipher: AAD with no output buffer, data, or with no input the
+/// tag).
+///
+/// # Safety
+/// `ctx` is a live cipher context whose state is a `GcmKey`; the buffers hold `len` octets.
+unsafe fn gcm_do_imp(ctx: *mut EVP_CIPHER_CTX, out: *mut u8, in_: *const u8, len: usize) -> c_int {
+    // SAFETY: the caller's guarantee.
+    let Some(d) = (unsafe { state::<GcmKey>(ctx) }) else {
+        return -1;
+    };
+    // SAFETY: the caller's state.
+    if unsafe { (*d).key_set } == 0 {
+        return -1;
+    }
+    // SAFETY: as above.
+    if unsafe { (*d).tls_aad_len } >= 0 {
+        let rv = if out.is_null() || out.cast_const() != in_ {
+            -1
+        } else {
+            // SAFETY: the record, in place, `len` octets.
+            let rec = unsafe { core::slice::from_raw_parts_mut(out, len) };
+            // SAFETY: the caller's context; the key is set.
+            unsafe { gcm_tls_record(ctx, d, rec) }
+        };
+        // SAFETY: the caller's state.
+        unsafe { (*d).iv_set = 0 };
+        // SAFETY: as above.
+        unsafe { (*d).tls_aad_len = -1 };
+        return rv;
+    }
+    // SAFETY: the caller's context.
+    let encrypt = unsafe { enc(ctx) } != 0;
+    // SAFETY: the caller's state.
+    if unsafe { (*d).iv_set } == 0 {
+        // SAFETY: as above.
+        let ivlen = unsafe { gcm_ivlen(d) };
+        let Ok(n) = c_int::try_from(ivlen) else {
+            return -1;
+        };
+        if !encrypt || ivlen < 12 {
+            return -1;
+        }
+        // SAFETY: the caller's state.
+        let ivp = unsafe { gcm_iv(ctx, d) };
+        // SAFETY: the state's IV of `ivlen` octets.
+        if unsafe { RAND_bytes(ivp, n) } <= 0 {
+            return -1;
+        }
+        // SAFETY: the key is set; the state's IV.
+        unsafe { gcm_setiv(ctx, d, ptr::null()) };
+        // SAFETY: the caller's state.
+        unsafe { (*d).iv_set = 1 };
+    }
+    if !in_.is_null() {
+        // SAFETY: the caller's `len` octets.
+        let input = unsafe { core::slice::from_raw_parts(in_, len) }.to_vec();
+        if out.is_null() {
+            // SAFETY: the caller's state.
+            return if unsafe { (*d).gcm.aad(&input) } == 0 {
+                c_int::try_from(len).unwrap_or(-1)
+            } else {
+                -1
+            };
+        }
+        // SAFETY: the caller's `len` octets of output.
+        let o = unsafe { core::slice::from_raw_parts_mut(out, len) };
+        let b = gcm_block(d);
+        let r = if encrypt {
+            // SAFETY: the caller's state.
+            unsafe { (*d).gcm.encrypt(&input, o, &b) }
+        } else {
+            // SAFETY: as above.
+            unsafe { (*d).gcm.decrypt(&input, o, &b) }
+        };
+        return if r == 0 {
+            c_int::try_from(len).unwrap_or(-1)
+        } else {
+            -1
+        };
+    }
+    // SAFETY: the context's buffer: the tag set, or room for the tag made.
+    let buf = unsafe { EVP_CIPHER_CTX_buf_noconst(ctx) };
+    if !encrypt {
+        // SAFETY: the caller's state.
+        let Ok(taglen) = usize::try_from(unsafe { (*d).taglen }) else {
+            return -1;
+        };
+        // SAFETY: the tag set, `taglen` octets.
+        let tag = unsafe { core::slice::from_raw_parts(buf, taglen) }.to_vec();
+        // SAFETY: the caller's state.
+        if unsafe { (*d).gcm.finish(Some(&tag)) } != 0 {
+            return -1;
+        }
+        // SAFETY: as above.
+        unsafe { (*d).iv_set = 0 };
+        return 0;
+    }
+    let mut tag = [0u8; 16];
+    // SAFETY: the caller's state.
+    unsafe { (*d).gcm.tag(&mut tag) };
+    // SAFETY: the tag into the context's buffer.
+    unsafe { ptr::copy_nonoverlapping(tag.as_ptr(), buf, 16) };
+    // SAFETY: the caller's state.
+    unsafe { (*d).taglen = 16 };
+    // SAFETY: as above.
+    unsafe { (*d).iv_set = 0 };
+    0
+}
+
+ffi_callback! {
+    /// `aes_gcm_init_key`.
+    ///
+    /// # Safety
+    /// `ctx` is a live cipher context whose state is a `GcmKey`; `key` and `iv` are NULL or
+    /// hold the context's key and IV lengths.
+    pub(crate) unsafe extern "C" fn aes_gcm_init(ctx: *mut EVP_CIPHER_CTX, key: *const u8, iv: *const u8, enc: c_int) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        let _ = enc;
+        // SAFETY: the caller's guarantee.
+        unsafe { gcm_init_imp(ctx, key, iv) }
+    }
+}
+
+ffi_callback! {
+    /// `aes_gcm_cleanup`: the GCM context and key wiped.
+    ///
+    /// # Safety
+    /// `ctx` is a live cipher context whose state is NULL or a `GcmKey`.
+    pub(crate) unsafe extern "C" fn aes_gcm_cleanup(ctx: *mut EVP_CIPHER_CTX) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        let d = unsafe { EVP_CIPHER_CTX_get_cipher_data(ctx) }.cast::<u8>();
+        if d.is_null() {
+            return 0;
+        }
+        // SAFETY: the state's `size_of::<GcmKey>()` octets, zeroed (plain data).
+        unsafe { ptr::write_bytes(d, 0, size_of::<GcmKey>()) };
+        1
+    }
+}
+
+do_fn!(aes_gcm_do, gcm_do_imp, "`aes_gcm_cipher`.");
+ctrl_fn!(aes_gcm_ctrl, gcm_ctrl_imp, "`aes_gcm_ctrl`.");
+
 // ---- The ciphers whose state OpenSSL doesn't publish: they fail ----
 
 /// Raises the error of the failing functions; `ret` is what they return.
@@ -1690,6 +2337,11 @@ pub(crate) fn for_static(nid: c_int, flags: c_ulong) -> Legacy {
         NID_aes_128_cfb1 | NID_aes_192_cfb1 | NID_aes_256_cfb1 => table(a, aes_init, aes_cfb1),
         NID_aes_128_ofb128 | NID_aes_192_ofb128 | NID_aes_256_ofb128 => table(a, aes_init, aes_ofb),
         NID_aes_128_ctr | NID_aes_192_ctr | NID_aes_256_ctr => table(a, aes_init, aes_ctr),
+        NID_aes_128_gcm | NID_aes_192_gcm | NID_aes_256_gcm => Legacy {
+            ctrl: Some(aes_gcm_ctrl),
+            cleanup: Some(aes_gcm_cleanup),
+            ..table(size::<GcmKey>(), aes_gcm_init, aes_gcm_do)
+        },
         NID_camellia_128_ecb | NID_camellia_192_ecb | NID_camellia_256_ecb => {
             table(c, cmll_init, cmll_ecb)
         }
@@ -1796,4 +2448,38 @@ fn unsupported(nid: c_int, flags: c_ulong) -> Legacy {
         l = with_iv_asn1(l);
     }
     l
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::evp::cipher_ctx::{
+        EVP_CIPHER_CTX_free, EVP_CIPHER_CTX_new, EVP_CIPHER_CTX_set_cipher_data,
+    };
+
+    /// docs/DEVIATIONS.md: the static AES-GCM's own `ctrl` keeps its IV in the state, which has
+    /// room for `GCM_MAX_IV` octets; a longer IV is refused, where OpenSSL allocates one.
+    #[test]
+    fn gcm_ivs_longer_than_the_state_are_refused() {
+        let mut state = vec![0u8; size_of::<GcmKey>()];
+        // SAFETY: no preconditions.
+        let ctx = unsafe { EVP_CIPHER_CTX_new() };
+        assert!(!ctx.is_null());
+        // SAFETY: the context; a zeroed state of the GCM functions' size, alive below.
+        unsafe { EVP_CIPHER_CTX_set_cipher_data(ctx, state.as_mut_ptr().cast()) };
+        let max = c_int::try_from(GCM_MAX_IV).unwrap_or(c_int::MAX);
+        // SAFETY: the context with its GCM state; the command takes no pointer.
+        assert_eq!(unsafe { aes_gcm_ctrl(ctx, EVP_CTRL_AEAD_SET_IVLEN, max, ptr::null_mut()) }, 1);
+        // SAFETY: as above.
+        assert_eq!(
+            unsafe { aes_gcm_ctrl(ctx, EVP_CTRL_AEAD_SET_IVLEN, max + 1, ptr::null_mut()) },
+            0
+        );
+        // SAFETY: as above.
+        assert_eq!(unsafe { aes_gcm_ctrl(ctx, EVP_CTRL_AEAD_SET_IVLEN, 0, ptr::null_mut()) }, 0);
+        // SAFETY: the state is the test's own; the context no longer refers to it.
+        unsafe { EVP_CIPHER_CTX_set_cipher_data(ctx, ptr::null_mut()) };
+        // SAFETY: made above.
+        unsafe { EVP_CIPHER_CTX_free(ctx) };
+    }
 }
