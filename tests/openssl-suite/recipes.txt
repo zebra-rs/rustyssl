@@ -12,5 +12,8 @@ internal test_sslbuffers #1 sslbuffertest's test_func reads the private SSL_CONN
 internal test_dtls_mtu #1 dtls_mtu_test's run_mtu_tests reads the private SSL_CONNECTION's DTLS state
 skip test_tls13secrets tls13secretstest compiles its own copy of ssl/tls13_enc.c over libssl's private SSL_CONNECTION
 
+# Programs that read libcrypto's private structures.
+internal test_rand #3 drbgtest's prov_rand reads the private EVP_RAND_CTX's algctx as the default provider's PROV_DRBG (reseed counters and times, its parent), and crashes on another layout
+
 # QUIC (Phase 10): programs that need the QUIC API, which rustyssl doesn't implement yet.
 skip test_ssl_ctx ssl_ctx_test runs as one subtest and its QUIC iterations need OSSL_QUIC_client_method (Phase 10); its others pass under test-openssl-suite --ssl
