@@ -33,7 +33,7 @@ debian|ubuntu)
 fedora|el)
     dnf install -y -q curl wget git-core openssh-server openssh-clients nginx httpd mod_ssl \
         python3 python3-pip postgresql-server postgresql openssl crypto-policies-scripts \
-        procps-ng findutils tar gzip shadow-utils util-linux > /dev/null || exit 1
+        procps-ng findutils tar gzip shadow-utils util-linux perl-Net-SSLeay > /dev/null || exit 1
     ;;
 alpine)
     # llvm-libunwind is the package's own dependency (Rust's unwinder on musl).
@@ -267,7 +267,7 @@ scenarios() { # $1 phase
     quiet openssl s_client -connect 127.0.0.1:8443 -servername localhost -CAfile $W/pki/ca.pem \
         -verify_return_error -brief < /dev/null
     result openssl-tool-s_client $p $?
-    case $DISTRO in fedora|el) crypto_policies $p ;; esac
+    case $DISTRO in fedora|el) fedora_profile $p; crypto_policies $p ;; esac
     stop_servers
 }
 
@@ -285,6 +285,16 @@ loaded() {
     *) where=system ;;
     esac
     [ "$where" = "$1" ]; result sshd-loads-$1-libcrypto $1 $?
+}
+
+# The Fedora profile's MD2, through a Fedora binary that imports MD2 (perl-Net-SSLeay) and
+# through the openssl tool. They must give the system's results ("agree-").
+fedora_profile() {
+    md2=da853b0d3f88d99b30283a69e6ded6bb
+    [ "$(perl -MNet::SSLeay -e 'print unpack("H*", Net::SSLeay::MD2("abc"))' 2> $W/last.log)" = $md2 ]
+    result agree-perl-net-ssleay-md2 $1 $?
+    [ "$(printf abc | openssl dgst -md2 -provider legacy -provider default -r 2> $W/last.log | cut -d' ' -f1)" = $md2 ]
+    result agree-openssl-tool-md2 $1 $?
 }
 
 # Fedora's crypto policies: what curl (on the libraries under test, reading the policy through

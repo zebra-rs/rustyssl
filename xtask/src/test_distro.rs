@@ -247,7 +247,8 @@ fn homebrew(root: &Path, out: &Path) -> Result<String> {
 }
 
 /// The report's table and the problems: a scenario must pass in both phases, except the
-/// crypto-policy probes, which must give the system's result; the run must reach its end.
+/// crypto-policy probes and the `agree-` scenarios, which must give the system's result; the
+/// run must reach its end.
 fn judge(log: &str) -> (String, Vec<String>) {
     let mut results: BTreeMap<String, [Option<bool>; 2]> = BTreeMap::new();
     for line in log.lines() {
@@ -273,7 +274,7 @@ fn judge(log: &str) -> (String, Vec<String>) {
     };
     let mut table = String::from("| Scenario | System | rustyssl | |\n|---|---|---|---|\n");
     for (name, [system, ours]) in &results {
-        let policy = name.starts_with("policy-");
+        let policy = name.starts_with("policy-") || name.starts_with("agree-");
         // A scenario of one phase only (which libraries were loaded) must pass there.
         let ok = match (system, ours) {
             (Some(s), Some(o)) if policy => s == o,
