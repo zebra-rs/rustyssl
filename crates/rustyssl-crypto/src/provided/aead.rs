@@ -639,6 +639,33 @@ impl Gcm {
         ))
     }
 
+    /// Whether [`Self::update_in_place`] does what `update` would with data and an output:
+    /// not the TLS record mode, a key, and an IV in the buffer or the mode.
+    pub fn in_place_ok(&self) -> bool {
+        self.tls_aad_len.is_none()
+            && self.key_set
+            && matches!(self.iv_state, IvState::Buffered | IvState::Copied)
+    }
+
+    /// `update` with data and an output, for a context [`Self::in_place_ok`] accepts, on
+    /// `data` where the input already is and the output goes: the same octets, the same
+    /// failure, without a copy.
+    pub fn update_in_place(&mut self, data: &mut [u8]) -> Result<(), Raised> {
+        crate::dit::with(|| {
+            let mut run = |s: &mut Self| -> Result<(), Error> {
+                if s.iv_state == IvState::Buffered {
+                    s.hw_setiv()?;
+                    s.iv_state = IvState::Copied;
+                }
+                let (Some(k), Some(g)) = (s.key.as_ref(), s.gcm.as_mut()) else {
+                    return Err(Error::Silent);
+                };
+                g.crypt(k, data, s.enc).map_err(|_| Error::Silent)
+            };
+            run(self).map_err(|e| wrap(e, Error::CipherOperationFailed))
+        })
+    }
+
     /// `ossl_gcm_stream_update`.
     pub fn update(&mut self, io: Io<'_>) -> Result<Output, Raised> {
         crate::dit::with(|| self.update_dit(io))
