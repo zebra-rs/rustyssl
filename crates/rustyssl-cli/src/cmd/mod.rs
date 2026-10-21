@@ -34,7 +34,7 @@ pub mod version;
 // pub mod nseq;
 // pub mod ocsp;
 // pub mod passwd;
-// pub mod pkcs12;
+pub mod pkcs12;
 pub mod pkcs7;
 // pub mod pkcs8;
 // pub mod pkey;
@@ -93,7 +93,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "nseq" => nseq::main,
         // "ocsp" => ocsp::main,
         // "passwd" => passwd::main,
-        // "pkcs12" => pkcs12::main,
+        "pkcs12" => pkcs12::main,
         "pkcs7" => pkcs7::main,
         // "pkcs8" => pkcs8::main,
         // "pkey" => pkey::main,

@@ -1,0 +1,140 @@
+# `openssl pkcs12` (apps/pkcs12.c): run with upstream's tool on the reference, then ours on
+# rustyssl and on the reference (cargo xtask test-apps); output and exit codes must match.
+# Exported files are random (salts, IVs), so each export is read back by the following lines,
+# whose output is byte-compared; every run reads the file the last run wrote.
+#
+# Reading.
+pkcs12 -in {src}/test/certs/v3-certs-TDES.p12 -passin pass:v3-certs -nokeys
+pkcs12 -in {src}/test/certs/v3-certs-TDES.p12 -passin pass:v3-certs -nokeys -info
+pkcs12 -in {src}/test/certs/v3-certs-TDES.p12 -passin pass:v3-certs -nokeys -clcerts
+pkcs12 -in {src}/test/certs/v3-certs-TDES.p12 -passin pass:v3-certs -nokeys -cacerts
+pkcs12 -in {src}/test/certs/v3-certs-TDES.p12 -passin pass:v3-certs -nocerts
+pkcs12 -in {src}/test/certs/v3-certs-TDES.p12 -passin pass:v3-certs -noout -info
+pkcs12 -in {src}/test/certs/v3-certs-TDES.p12 -password pass:v3-certs -noout
+pkcs12 -in {src}/test/certs/v3-certs-TDES.p12 -passin pass:wrong -noout
+pkcs12 -in {src}/test/certs/v3-certs-TDES.p12 -passin pass:wrong -noout -nomacver
+pkcs12 -in {src}/test/certs/v3-certs-TDES.p12 -passin pass:v3-certs -nomacver -nokeys
+pkcs12 -in {src}/test/certs/v3-certs-RC2.p12 -passin pass:v3-certs -nokeys -info
+pkcs12 -in {src}/test/certs/v3-certs-RC2.p12 -passin pass:v3-certs -nokeys -legacy
+pkcs12 -in {src}/test/certs/v3-certs-RC2.p12 -passin pass:v3-certs -nokeys -provider default -provider legacy
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/pbmac1_256_256.good.p12 -password pass:1234 -noenc
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/pbmac1_256_256.good.p12 -password pass:1234 -nodes -info
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/pbmac1_512_256.good.p12 -password pass:1234 -noenc
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/pbmac1_512_512.good.p12 -password pass:1234 -noenc -info
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/pbmac1_256_256.good-shorter-key-len.p12 -password pass:1234 -noenc
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/pbmac1_sha1_hmac_and_prf.p12 -password pass:1234 -noenc
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/pbmac1_256_256.bad-iter.p12 -password pass:1234 -noenc
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/pbmac1_256_256.bad-salt.p12 -password pass:1234 -noenc
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/pbmac1_256_256.no-len.p12 -password pass:1234 -noenc
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/pbmac1_256_256.bad-len.p12 -password pass:1234 -noenc
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/pbmac1_256_256.bad-salt-type.p12 -password pass:1234 -noenc -info
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/pbmac1_256_256.negative-len.p12 -password pass:1234 -noenc
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/pbmac1_256_256.no-salt.p12 -password pass:1234 -noenc
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/pbmac1_256_256.very-big-len.p12 -password pass:1234 -noenc
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/pbmac1_256_256.zero-len.p12 -password pass:1234 -noenc
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/pbmac1_256_256.bad-key-len.p12 -password pass:1234 -noenc
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/bad1.p12 -password pass:
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/bad1.p12 -password pass: -nomacver
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/bad1.p12 -password pass: -info
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/bad2.p12 -password pass:
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/bad2.p12 -password pass: -info
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/bad3.p12 -password pass:
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/bad3.p12 -password pass: -info
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/nomac_parse.p12 -passin pass:testpassword
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/nomac_parse.p12 -passin pass:testpassword -info -noenc
+pkcs12 -in {src}/test/certs/ee-cert.pem -passin pass:
+pkcs12 -in {dir}/nonexistent.p12 -passin pass:
+pkcs12 -passin pass:v3-certs -nokeys < {src}/test/certs/v3-certs-TDES.p12
+#
+# Writing keys: the output cipher, and the PEM password.
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/pbmac1_256_256.good.p12 -passin pass:1234 -nocerts -passout pass:pw -out {dir}/key.pem
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/pbmac1_256_256.good.p12 -passin pass:1234 -nocerts -passout pass:pw -aes128 -out {dir}/key.pem
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/pbmac1_256_256.good.p12 -passin pass:1234 -nocerts -passout pass:pw -nosuchcipher
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/pbmac1_256_256.good.p12 -passin pass:1234 -nocerts -passout pass:pw -des3 -des3
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/pbmac1_256_256.good.p12 -passin pass:1234 -nocerts -passout pass:pw -aes128 -camellia256
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/pbmac1_256_256.good.p12 -passin pass:1234 -nocerts -passout bad:x
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/pbmac1_256_256.good.p12 -passin pass:1234 -nocerts -nodes -out {dir}/key.pem
+pkcs12 -in {src}/test/recipes/80-test_pkcs12_data/pbmac1_256_256.good.p12 -passin pass:1234 -nocerts -nodes -out {dir}/nonexistent/key.pem
+#
+# Warnings for options of the other mode.
+pkcs12 -in {src}/test/certs/v3-certs-TDES.p12 -passin pass:v3-certs -noout -inkey x -certfile x -passcerts pass:x -chain -untrusted x -CAfile x -CApath x -CAstore x -no-CAfile -no-CApath -no-CAstore -name x -caname x -CSP x -LMK -keyex
+pkcs12 -in {src}/test/certs/v3-certs-TDES.p12 -passin pass:v3-certs -noout -keysig -keypbe AES-128-CBC -certpbe AES-128-CBC -macalg sha1 -iter 10 -nomaciter -macsaltlen 8
+pkcs12 -in {src}/test/certs/v3-certs-TDES.p12 -passin pass:v3-certs -noout -descert -noiter -maciter
+pkcs12 -in {src}/test/certs/v3-certs-TDES.p12 -passin pass:v3-certs -noout -nomac
+pkcs12 -in {src}/test/certs/v3-certs-TDES.p12 -passin pass:v3-certs -noout -certpbe nosuchpbe
+pkcs12 -in {src}/test/certs/v3-certs-TDES.p12 -passin pass:v3-certs -noout -keypbe NONE
+pkcs12 -in {src}/test/certs/v3-certs-TDES.p12 -passin pass:v3-certs -noout -twopass
+pkcs12 -in {src}/test/certs/v3-certs-TDES.p12 -noout -twopass
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -nokeys -passout pass: -info -nomacver -clcerts -cacerts -aes128 -out {dir}/out.p12
+#
+# Exporting, and reading back.
+pkcs12 -export -chain -CAfile {src}/test/certs/sroot-cert.pem -untrusted {src}/test/certs/ca-cert.pem -in {src}/test/certs/ee-cert.pem -nokeys -passout pass: -out {dir}/out1.p12
+pkcs12 -in {dir}/out1.p12 -passin pass: -info
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -certfile {src}/test/certs/v3-certs-TDES.p12 -passcerts pass:v3-certs -nokeys -passout pass:v3-certs -descert -out {dir}/out2.p12
+pkcs12 -in {dir}/out2.p12 -passin pass:v3-certs -info -nokeys
+pkcs12 -export -in {src}/test/certs/v3-certs-RC2.p12 -passin pass:v3-certs -provider default -provider legacy -nokeys -passout pass:v3-certs -descert -out {dir}/out3.p12
+pkcs12 -in {dir}/out3.p12 -passin pass:v3-certs -info -nokeys -provider default -provider legacy
+pkcs12 -export -inkey {src}/test/certs/cert-key-cert.pem -in {src}/test/certs/cert-key-cert.pem -passout pass:v3-certs -nomac -out {dir}/out4.p12
+pkcs12 -in {dir}/out4.p12 -passin pass:v3-certs -nomacver -nodes
+pkcs12 -in {dir}/out4.p12 -passin pass:v3-certs -nodes
+pkcs12 -in {dir}/out4.p12 -passin pass:v3-certs -nodes -info
+pkcs12 -export -out {dir}/out5.p12 -in {src}/test/certs/ee-cert.pem -caname testname -nokeys -passout pass: -certpbe NONE
+pkcs12 -info -in {dir}/out5.p12 -passin pass:
+pkcs12 -export -inkey {src}/test/certs/cert-key-cert.pem -in {src}/test/certs/cert-key-cert.pem -passout pass: -nomac -out {dir}/out6.p12
+pkcs12 -in {dir}/out6.p12 -passin pass: -nodes -info
+pkcs12 -export -pbmac1_pbkdf2 -inkey {src}/test/certs/cert-key-cert.pem -in {src}/test/certs/cert-key-cert.pem -passout pass:1234 -out {dir}/pbmac1.p12
+pkcs12 -in {dir}/pbmac1.p12 -info -noout -passin pass:1234
+pkcs12 -export -pbmac1_pbkdf2 -inkey {src}/test/certs/cert-key-cert.pem -in {src}/test/certs/cert-key-cert.pem -passout pass:1234 -pbmac1_pbkdf2_md sha512 -macalg sha384 -out {dir}/pbmac1.p12
+pkcs12 -in {dir}/pbmac1.p12 -info -noout -passin pass:1234
+pkcs12 -export -out {dir}/out7.p12 -jdktrust anyExtendedKeyUsage -in {src}/test/certs/ee-cert.pem -nokeys -passout pass: -certpbe NONE
+pkcs12 -info -in {dir}/out7.p12 -passin pass:
+pkcs12 -export -out {dir}/out7.p12 -jdktrust nosuchobject -in {src}/test/certs/ee-cert.pem -nokeys -passout pass: -certpbe NONE
+pkcs12 -info -in {dir}/out7.p12 -passin pass:
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -inkey {src}/test/certs/ee-key.pem -certfile {src}/test/certs/ca-cert.pem -name myname -caname caname1 -caname caname2 -CSP mycsp -LMK -keyex -passout pass:pw -out {dir}/out8.p12
+pkcs12 -in {dir}/out8.p12 -passin pass:pw -info -nodes
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -inkey {src}/test/certs/ee-key.pem -keysig -keypbe AES-128-CBC -certpbe AES-192-CBC -iter 1000 -macalg sha512 -macsaltlen 20 -passout pass:pw -out {dir}/out9.p12
+pkcs12 -in {dir}/out9.p12 -passin pass:pw -info -nodes
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -inkey {src}/test/certs/ee-key.pem -noiter -nomaciter -keypbe NONE -password pass:pw -out {dir}/out10.p12
+pkcs12 -in {dir}/out10.p12 -password pass:pw -info -nodes
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -inkey {src}/test/certs/ee-key.pem -legacy -passout pass:pw -out {dir}/out11.p12
+pkcs12 -in {dir}/out11.p12 -passin pass:pw -info -nodes -legacy
+pkcs12 -in {dir}/out11.p12 -passin pass:pw -info -nodes
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -inkey {src}/test/certs/ee-key.pem -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-RC2-40 -legacy -passout pass:pw -out {dir}/out12.p12
+pkcs12 -in {dir}/out12.p12 -passin pass:pw -info -nokeys -legacy
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -inkey {src}/test/certs/ee-key.pem -keypbe id-scrypt -passout pass:pw -out {dir}/out13.p12
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -inkey {src}/test/certs/ee-key.pem -nocerts -passout pass:pw -out {dir}/out14.p12
+pkcs12 -in {dir}/out14.p12 -passin pass:pw -info -nodes
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -nokeys -chain -passout pass: -out {dir}/x.p12
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -nokeys -chain -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -passout pass: -out {dir}/x.p12
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -nokeys -chain -no-CAfile -no-CApath -no-CAstore -CApath {dir} -passout pass: -out {dir}/x.p12
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -nokeys -chain -CAfile {dir}/nonexistent.pem -passout pass: -out {dir}/x.p12
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -nocerts -nokeys -passout pass: -out {dir}/x.p12
+pkcs12 -export -noout -in {src}/test/certs/ee-cert.pem -passout pass: -out {dir}/x.p12
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -nocerts -chain -inkey {src}/test/certs/ee-key.pem -passout pass: -out {dir}/x.p12
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -passout pass:
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -inkey {src}/test/certs/ca-key.pem -passout pass: -out {dir}/x.p12
+pkcs12 -export -in {src}/test/certs/ee-key.pem -inkey {src}/test/certs/ee-key.pem -passout pass: -out {dir}/x.p12
+pkcs12 -export -inkey {src}/test/certs/ee-key.pem -passout pass: -out {dir}/x.p12 < {src}/test/certs/ee-cert.pem
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -nokeys -untrusted {dir}/nonexistent.pem -passout pass: -out {dir}/x.p12
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -nokeys -certfile {dir}/nonexistent.pem -passout pass: -out {dir}/x.p12
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -nokeys -passout pass: -macalg nosuchmd -out {dir}/x.p12
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -nokeys -passout pass: -out {dir}/nonexistent/x.p12
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -nokeys -passout pass: -passcerts bad:x -out {dir}/x.p12
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -nokeys -passout pass: -twopass -out {dir}/x.p12
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -nokeys -twopass -out {dir}/x.p12
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -nokeys -out {dir}/x.p12
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -nokeys -nodes -nomac -out {dir}/x.p12
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -nokeys -passout pass: -rand {bin} -writerand {dir}/rand.out -out {dir}/x.p12
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -nokeys -passout pass: -rand {dir}/nonexistent -out {dir}/x.p12
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -nokeys -passout pass: -engine /nonexistent/engine.so -out {dir}/x.p12
+pkcs12 -export -in {src}/test/certs/ee-cert.pem -nokeys -passout pass: -propquery provider=default -out {dir}/x.p12
+pkcs12 -in {dir}/x.p12 -passin pass: -nokeys
+#
+# Options.
+pkcs12 -help
+pkcs12 extra
+pkcs12 -nosuchoption -alsounknown
+pkcs12 -iter x
+pkcs12 -macsaltlen
+pkcs12 -in {src}/test/certs/v3-certs-TDES.p12 -passin pass:v3-certs -nokeys -provider-path {dir} -provider default
+pkcs12 -in {src}/test/certs/v3-certs-TDES.p12 -passin pass:v3-certs -nokeys -provparam default:x=1

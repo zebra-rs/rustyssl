@@ -34,9 +34,9 @@ unsafe fn magnitude<'a>(a: &ASN1_STRING) -> Option<&'a [u8]> {
 }
 
 /// `asn1_get_uint64`: a magnitude of at most 8 octets as a number.
-fn get_u64(magnitude: Option<&[u8]>, length: c_int) -> Result<u64, Option<c_int>> {
+fn get_u64(magnitude: Option<&[u8]>, length: c_int) -> Result<u64, Reason> {
     if usize::try_from(length).is_ok_and(|l| l > 8) {
-        return Err(Some(ASN1_R_TOO_LARGE));
+        return Err(Some((ASN1_R_TOO_LARGE, "asn1_get_uint64")));
     }
     let bytes = magnitude.ok_or(None)?;
     Ok(bytes.iter().fold(0u64, |r, &b| (r << 8) | u64::from(b)))
@@ -47,22 +47,23 @@ fn get_u64(magnitude: Option<&[u8]>, length: c_int) -> Result<u64, Option<c_int>
 ///
 /// # Safety
 /// `a` is NULL or a live string whose data holds its length.
-unsafe fn get(
-    a: *const ASN1_STRING,
-    kind: c_int,
-    unsigned: bool,
-) -> Result<(u64, bool), Option<c_int>> {
+unsafe fn get(a: *const ASN1_STRING, kind: c_int, unsigned: bool) -> Result<(u64, bool), Reason> {
+    let f = if unsigned {
+        "asn1_string_get_uint64"
+    } else {
+        "asn1_string_get_int64"
+    };
     if a.is_null() {
-        return Err(Some(ERR_R_PASSED_NULL_PARAMETER));
+        return Err(Some((ERR_R_PASSED_NULL_PARAMETER, f)));
     }
     // SAFETY: the caller's guarantee.
     let a = unsafe { &*a };
     if a.type_ & !V_ASN1_NEG != kind {
-        return Err(Some(ASN1_R_WRONG_INTEGER_TYPE));
+        return Err(Some((ASN1_R_WRONG_INTEGER_TYPE, f)));
     }
     // The unsigned getter refuses a negative value before looking at its size.
     if unsigned && a.type_ & V_ASN1_NEG != 0 {
-        return Err(Some(ASN1_R_ILLEGAL_NEGATIVE_VALUE));
+        return Err(Some((ASN1_R_ILLEGAL_NEGATIVE_VALUE, f)));
     }
     // SAFETY: as above.
     let value = get_u64(unsafe { magnitude(a) }, a.length)?;
@@ -70,23 +71,27 @@ unsafe fn get(
 }
 
 /// The signed value of [`get`]'s result, as `asn1_get_int64` limits it.
-fn signed((value, negative): (u64, bool)) -> Result<i64, Option<c_int>> {
+fn signed((value, negative): (u64, bool)) -> Result<i64, Reason> {
     if negative {
         if let Ok(v) = i64::try_from(value) {
             Ok(-v)
         } else if value == i64::MIN.unsigned_abs() {
             Ok(i64::MIN)
         } else {
-            Err(Some(ASN1_R_TOO_SMALL))
+            Err(Some((ASN1_R_TOO_SMALL, "asn1_get_int64")))
         }
     } else {
-        i64::try_from(value).map_err(|_| Some(ASN1_R_TOO_LARGE))
+        i64::try_from(value).map_err(|_| Some((ASN1_R_TOO_LARGE, "asn1_get_int64")))
     }
 }
 
-/// Raises `reason` (if any) as `function`.
-fn fail(reason: Option<c_int>, function: &str) -> c_int {
-    if let Some(reason) = reason {
+/// A failure's reason and the (static) function upstream raises it in; `None` raises nothing.
+type Reason = Option<(c_int, &'static str)>;
+
+/// Raises `reason` (if any), in the function upstream raises it in (the exported function
+/// named only says which caller failed).
+fn fail(reason: Reason, _function: &str) -> c_int {
+    if let Some((reason, function)) = reason {
         err::raise(ERR_LIB_ASN1, reason, function);
     }
     0

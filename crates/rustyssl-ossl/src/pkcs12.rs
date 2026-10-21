@@ -253,10 +253,10 @@ impl Pkcs12 {
             None
         };
         let len = |s: *const crate::abi::ASN1_OCTET_STRING| {
-            // SAFETY: the strings are NULL or live (borrowed from the object).
             if s.is_null() {
                 0
             } else {
+                // SAFETY: the string is live (borrowed from the object).
                 unsafe { ffi::ASN1_STRING_length(s) }
             }
         };
