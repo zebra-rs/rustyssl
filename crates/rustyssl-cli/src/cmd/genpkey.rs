@@ -111,7 +111,7 @@ pub fn mem_bio_to_file(input: &Bio, filename: Option<&str>, fmt: i32, private: b
         if usize::try_from(rv).ok() != Some(data.len()) {
             eprintf!(
                 "Error writing to output file: '{}'\n",
-                filename.unwrap_or("(null)")
+                filename.unwrap_or("<NULL>")
             );
         } else {
             ret = true;
@@ -388,14 +388,14 @@ pub fn main(argv: &[String]) -> i32 {
     {
         eprintf!(
             "Error writing to outpubkey: '{}'. Error: {}\n",
-            outpubkeyfile.as_deref().unwrap_or("(null)"),
+            outpubkeyfile.as_deref().unwrap_or("<NULL>"),
             errno_text()
         );
     }
     if !mem_bio_to_file(&mem_out, outfile.as_deref(), outformat, private) {
         eprintf!(
             "Error writing to outfile: '{}'. Error: {}\n",
-            outfile.as_deref().unwrap_or("(null)"),
+            outfile.as_deref().unwrap_or("<NULL>"),
             errno_text()
         );
     }

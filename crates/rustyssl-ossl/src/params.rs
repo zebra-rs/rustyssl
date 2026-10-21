@@ -183,3 +183,47 @@ impl Drop for TextParams {
         }
     }
 }
+
+/// An `OSSL_PARAM` array made by an `OSSL_PARAM_BLD` (`OSSL_PARAM_BLD_to_param`), freed with
+/// `OSSL_PARAM_free`.
+pub struct BuiltParams(core::ptr::NonNull<OSSL_PARAM>);
+
+impl BuiltParams {
+    /// The array, for the C API.
+    pub fn as_mut_ptr(&mut self) -> *mut OSSL_PARAM {
+        self.0.as_ptr()
+    }
+}
+
+impl Drop for BuiltParams {
+    fn drop(&mut self) {
+        // SAFETY: the array is owned by self and freed once.
+        unsafe { ffi::OSSL_PARAM_free(self.0.as_ptr()) };
+    }
+}
+
+crate::handle!(
+    /// An owned `OSSL_PARAM_BLD`.
+    ParamBld, OSSL_PARAM_BLD, OSSL_PARAM_BLD_free
+);
+
+impl ParamBld {
+    /// `OSSL_PARAM_BLD_new()`.
+    pub fn new() -> Option<Self> {
+        // SAFETY: no arguments.
+        Self::from_ptr(unsafe { ffi::OSSL_PARAM_BLD_new() })
+    }
+
+    /// `OSSL_PARAM_BLD_push_BN` (the number is copied when the array is made).
+    pub fn push_bn(&self, key: &'static CStr, bn: &crate::bn::Bn) -> bool {
+        // SAFETY: the builder and number are live; key is static.
+        unsafe { ffi::OSSL_PARAM_BLD_push_BN(self.as_ptr(), key.as_ptr(), bn.as_ptr()) == 1 }
+    }
+
+    /// `OSSL_PARAM_BLD_to_param`.
+    pub fn to_param(&self) -> Option<BuiltParams> {
+        // SAFETY: the builder is live; the array is ours.
+        core::ptr::NonNull::new(unsafe { ffi::OSSL_PARAM_BLD_to_param(self.as_ptr()) })
+            .map(BuiltParams)
+    }
+}

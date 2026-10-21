@@ -1,0 +1,62 @@
+# `openssl ecparam`. Named curves' parameters are deterministic; generated keys go through
+# `| check` (re-parsed by upstream's tool on the reference).
+ecparam -help
+ecparam -list_curves
+ecparam -list_curves -out {dir}/ecparam-curves.txt | ecparam -list_curves
+ecparam -name prime256v1
+ecparam -name prime256v1 -text
+ecparam -name prime256v1 -text -noout
+ecparam -name prime256v1 -outform DER
+ecparam -name prime256v1 -param_enc explicit
+ecparam -name prime256v1 -param_enc explicit -text -noout
+ecparam -name prime256v1 -param_enc explicit -no_seed -text -noout
+ecparam -name prime256v1 -param_enc explicit -conv_form compressed
+ecparam -name prime256v1 -param_enc explicit -conv_form hybrid -text -noout
+ecparam -name prime256v1 -conv_form bad
+ecparam -name prime256v1 -param_enc bad
+ecparam -name prime256v1 -check
+ecparam -name prime256v1 -check_named -noout
+ecparam -name prime256v1 -param_enc explicit -check_named -noout
+ecparam -name secp256r1
+ecparam -name secp192r1 -text -noout
+ecparam -name secp384r1 -text
+ecparam -name secp521r1 -param_enc explicit -outform DER
+ecparam -name brainpoolP256r1 -text -check
+ecparam -name sect163k1 -text -noout
+ecparam -name SM2 -text
+ecparam -name nosuchcurve
+ecparam -name prime256v1 -out {dir}/ecparam-p256.pem
+ecparam -in {dir}/ecparam-p256.pem -text
+ecparam -in {dir}/ecparam-p256.pem -param_enc explicit -out {dir}/ecparam-p256x.pem
+ecparam -in {dir}/ecparam-p256x.pem -text -noout -check
+ecparam -in {dir}/ecparam-p256x.pem -check_named -noout
+ecparam -in {dir}/ecparam-p256x.pem -no_seed
+ecparam -in {dir}/ecparam-p256x.pem -conv_form compressed -text -noout
+ecparam -in {dir}/ecparam-p256x.pem -param_enc named_curve
+ecparam -name prime256v1 -outform DER -out {dir}/ecparam-p256.der
+ecparam -in {dir}/ecparam-p256.der -inform DER -text
+ecparam -in {dir}/ecparam-p256.der -inform PEM
+ecparam -noout -text < {dir}/ecparam-p256.pem
+ecparam -in {src}/test/testrsa.pem
+ecparam -in {src}/test/testec-p256.pem -text -noout
+ecparam -in /nonexistent/params.pem
+ecparam -in {src}/test/recipes/15-test_ecparam_data/invalid/sm2-bad-r.pem -check -noout
+ecparam
+ecparam -name prime256v1 -genkey | ec -noout -text
+ecparam -name prime256v1 -genkey -noout | ec -noout -check
+ecparam -name prime256v1 -genkey -outform DER | ec -inform DER -noout -check
+ecparam -name prime256v1 -genkey -param_enc explicit | pkey -noout -text_pub
+ecparam -name prime256v1 -genkey -conv_form compressed -noout | ec -noout -text
+ecparam -name SM2 -genkey -noout | pkey -noout -check
+ecparam -in {dir}/ecparam-p256.pem -genkey -noout | ec -noout -check
+ecparam -name prime256v1 -genkey -out {dir}/ecparam-key.pem | ec -in {dir}/ecparam-key.pem -noout -check
+ecparam -name prime256v1 -out /nonexistent/dir/out.pem
+ecparam -name prime256v1 -outform XYZ
+ecparam -name prime256v1 -engine /nonexistent/eng.so -noout
+ecparam -name prime256v1 -provider default -noout -check
+ecparam -name prime256v1 -provider /nonexistent/prov.so
+ecparam -name prime256v1 -propquery provider=nosuch
+ecparam -name prime256v1 -rand {bin} -writerand {dir}/ecparam.rnd -genkey -noout | ec -noout -check
+ecparam -name prime256v1 extra
+ecparam -nosuchoption
+ecparam -name

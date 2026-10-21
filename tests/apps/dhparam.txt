@@ -1,0 +1,51 @@
+# `openssl dhparam`. Parameters from the reference's test/ tree; generated ones go through
+# `| check` (re-parsed by upstream's tool on the reference).
+dhparam -help
+dhparam -in {src}/test/certs/dhp2048.pem
+dhparam -in {src}/test/certs/dhp2048.pem -text
+dhparam -in {src}/test/certs/dhp2048.pem -text -noout
+dhparam -in {src}/test/certs/dhp2048.pem -check -noout
+dhparam -in {src}/test/certs/dhp2048.pem -outform DER
+dhparam -in {src}/test/certs/dhp2048.pem -outform DER -out {dir}/dhparam.der
+dhparam -in {dir}/dhparam.der -inform DER -text -noout
+dhparam -inform DER -noout < {dir}/dhparam.der
+dhparam -in {dir}/dhparam.der -inform PEM
+dhparam -noout -check < {src}/test/certs/dhp2048.pem
+dhparam -in {src}/test/certs/dhk2048.pem -noout
+dhparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -text -noout
+dhparam -dsaparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem
+dhparam -dsaparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -text -noout
+dhparam -dsaparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -outform DER -out {dir}/dhparam-x942.der
+dhparam -in {dir}/dhparam-x942.der -inform DER -text -noout
+dhparam -dsaparam -in {src}/test/certs/dhp2048.pem
+dhparam -in {src}/test/testrsa.pem
+dhparam -in {txt}
+dhparam -in /nonexistent/params.pem
+genpkey -genparam -algorithm DHX -pkeyopt dh_rfc5114:2 -out {dir}/dhparam-dhx.pem
+dhparam -in {dir}/dhparam-dhx.pem -text -check
+genpkey -genparam -algorithm DH -pkeyopt group:ffdhe2048 -out {dir}/dhparam-ffdhe.pem
+dhparam -in {dir}/dhparam-ffdhe.pem -text -check
+dhparam 512 | pkeyparam -noout -text
+dhparam -quiet 512 | pkeyparam -noout -text
+dhparam -verbose -check 512 | pkeyparam -noout
+dhparam -2 512 | pkeyparam -noout -text
+dhparam -5 512 | pkeyparam -noout -text
+dhparam -3 -quiet 512 | pkeyparam -noout -text
+dhparam -dsaparam 1024 | pkeyparam -noout -text
+dhparam -dsaparam -quiet -outform DER 1024 | pkeyparam -noout
+dhparam -dsaparam -2 512
+dhparam -in {src}/test/certs/dhp2048.pem -quiet 512 | pkeyparam -noout -text
+dhparam 0
+dhparam -5x
+dhparam abc
+dhparam 512 1024
+dhparam 100
+dhparam -in {src}/test/certs/dhp2048.pem -out /nonexistent/dir/out.pem
+dhparam -in {src}/test/certs/dhp2048.pem -outform XYZ
+dhparam -in {src}/test/certs/dhp2048.pem -engine /nonexistent/eng.so -noout
+dhparam -in {src}/test/certs/dhp2048.pem -provider default -noout -check
+dhparam -in {src}/test/certs/dhp2048.pem -provider /nonexistent/prov.so
+dhparam -propquery provider=nosuch 512
+dhparam -rand {bin} -writerand {dir}/dhparam.rnd 512 | pkeyparam -noout
+dhparam -nosuchoption
+dhparam -in

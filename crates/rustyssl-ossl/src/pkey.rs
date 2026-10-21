@@ -486,6 +486,20 @@ impl PkeyCtx {
         (r, Pkey::from_raw(k))
     }
 
+    /// `EVP_PKEY_fromdata` with an array a builder made.
+    pub fn fromdata_built(
+        &self,
+        selection: c_int,
+        params: &mut crate::params::BuiltParams,
+    ) -> (c_int, Option<Pkey>) {
+        let mut k: *mut EVP_PKEY = core::ptr::null_mut();
+        // SAFETY: the context is live; params is an ended array; k is a valid out-pointer.
+        let r = unsafe {
+            ffi::EVP_PKEY_fromdata(self.as_ptr(), &mut k, selection, params.as_mut_ptr())
+        };
+        (r, Pkey::from_raw(k))
+    }
+
     /// `EVP_PKEY_CTX_set_app_data(ctx, bio)`: the `BIO` [`PkeyCtx::set_progress_cb`]'s
     /// callback writes to; it must live as long as the program (standard error).
     pub fn set_app_bio(&self, bio: &'static Bio) {

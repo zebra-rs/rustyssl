@@ -15,11 +15,11 @@ pub mod version;
 // pub mod crl;
 // pub mod crl2pkcs7;
 // pub mod dgst;
-// pub mod dhparam;
+pub mod dhparam;
 pub mod dsa;
-// pub mod dsaparam;
+pub mod dsaparam;
 pub mod ec;
-// pub mod ecparam;
+pub mod ecparam;
 // pub mod enc;
 // pub mod engine;
 // pub mod errstr;
@@ -74,11 +74,11 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "crl" => crl::main,
         // "crl2pkcs7" => crl2pkcs7::main,
         // "dgst" => dgst::main,
-        // "dhparam" => dhparam::main,
+        "dhparam" => dhparam::main,
         "dsa" => dsa::main,
-        // "dsaparam" => dsaparam::main,
+        "dsaparam" => dsaparam::main,
         "ec" => ec::main,
-        // "ecparam" => ecparam::main,
+        "ecparam" => ecparam::main,
         // "enc" => enc::main,
         // "engine" => engine::main,
         // "errstr" => errstr::main,

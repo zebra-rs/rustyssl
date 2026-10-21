@@ -202,3 +202,10 @@ impl Bio {
         unsafe { ffi::ASN1_parse_dump(self.as_ptr(), data.as_ptr(), n, indent, dump) }
     }
 }
+
+impl Bio {
+    /// `BIO_reset`: what it returns (0 on success for file BIOs).
+    pub fn reset_ret(&self) -> core::ffi::c_long {
+        self.ctrl(BIO_CTRL_RESET)
+    }
+}

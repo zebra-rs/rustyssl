@@ -1,0 +1,43 @@
+# `openssl dsaparam`. Parameters from the reference's test/ tree; generated ones and keys go
+# through `| check` (re-parsed by upstream's tool on the reference).
+dsaparam -help
+dsaparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem
+dsaparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -text
+dsaparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -text -noout
+dsaparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -outform DER
+dsaparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -outform DER -out {dir}/dsaparam.der
+dsaparam -in {dir}/dsaparam.der -inform DER -text -noout
+dsaparam -in {dir}/dsaparam.der -inform PEM
+dsaparam -in {src}/test/recipes/15-test_dsaparam_data/invalid/p1024_q160_t1862.pem -text -noout
+dsaparam -noout -text < {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem
+dsaparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -genkey | pkey -noout -text
+dsaparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -genkey -noout | pkey -noout -check
+dsaparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -genkey -outform DER | pkey -inform DER -noout -check
+dsaparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -genkey -verbose -text | pkey -noout -check
+dsaparam 1024 | pkeyparam -noout -text
+dsaparam -verbose 1024 | pkeyparam -noout -check
+dsaparam -quiet 1024 | pkeyparam -noout -check
+dsaparam 1024 160 | pkeyparam -noout -text
+dsaparam 2048 224 -genkey
+dsaparam -genkey 1024 | pkey -noout -check
+dsaparam -outform DER 1024 | pkeyparam -noout
+dsaparam 0 -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem
+dsaparam -5
+dsaparam abc
+dsaparam 1024 abc
+dsaparam 1024 -5
+dsaparam 1024 160 extra
+dsaparam 1024 100
+dsaparam 20000 -out /nonexistent/dir/out.pem
+dsaparam -in {src}/test/testrsa.pem
+dsaparam -in {src}/test/certs/dhp2048.pem
+dsaparam -in /nonexistent/params.pem
+dsaparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -out /nonexistent/dir/out.pem
+dsaparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -outform XYZ
+dsaparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -engine /nonexistent/eng.so -noout
+dsaparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -provider default -noout -text
+dsaparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -provider /nonexistent/prov.so
+dsaparam -propquery provider=nosuch 512
+dsaparam -rand {bin} -writerand {dir}/dsaparam.rnd 1024 | pkeyparam -noout
+dsaparam -nosuchoption
+dsaparam -in
