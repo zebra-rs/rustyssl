@@ -138,6 +138,9 @@ static SSL_CTX *client_ctx(void)
 }
 
 /* Runs a client and a server from the contexts over a BIO pair: 0 when both finish. */
+/* Called with both connections after a handshake, when set. */
+static void (*after_handshake)(SSL *c, SSL *s) = NULL;
+
 /* With debug_exts, the tlsext debug callback reports each extension received. */
 static int debug_exts = 0;
 
@@ -189,6 +192,8 @@ static int handshake(SSL_CTX *cctx, SSL_CTX *sctx, int version)
         }
     }
     ret = cdone && sdone ? 0 : -1;
+    if (ret == 0 && after_handshake != NULL)
+        after_handshake(c, s);
 end:
     SSL_free(c);
     SSL_free(s);
@@ -558,6 +563,54 @@ static void test_debug_callback(void)
     SSL_CTX_free(cctx);
 }
 
+/* SSL_CTX_set_not_resumable_session_callback: a TLS 1.2 server's verdict on its session. */
+static int not_resumable_ret = 0;
+static int not_resumable_calls = 0;
+
+static int not_resumable_cb(SSL *s, int is_forward_secure)
+{
+    not_resumable_calls++;
+    printf("  not resumable callback: forward secure %d, server %d\n", is_forward_secure,
+           SSL_is_server(s));
+    return not_resumable_ret;
+}
+
+static void report_sessions(SSL *c, SSL *s)
+{
+    SSL_SESSION *cs = SSL_get_session(c), *ss = SSL_get_session(s);
+    unsigned int clen = 0, slen = 0;
+
+    SSL_SESSION_get_id(cs, &clen);
+    SSL_SESSION_get_id(ss, &slen);
+    printf("  client: resumable %d, ID %u octets, ticket %d; server: resumable %d, ID %u octets\n",
+           SSL_SESSION_is_resumable(cs), clen, SSL_SESSION_has_ticket(cs),
+           SSL_SESSION_is_resumable(ss), slen);
+}
+
+static void test_not_resumable(void)
+{
+    SSL_CTX *sctx = server_ctx(), *cctx = client_ctx();
+    int i;
+
+    after_handshake = report_sessions;
+    SSL_CTX_set_not_resumable_session_callback(sctx, not_resumable_cb);
+    for (i = 0; i < 2; i++) {
+        not_resumable_ret = i;
+        not_resumable_calls = 0;
+        printf("# not resumable: %d\n", not_resumable_ret);
+        check(handshake(cctx, sctx, TLS1_2_VERSION) == 0 && not_resumable_calls == 1,
+              "a TLS 1.2 handshake asks once");
+    }
+    not_resumable_ret = 1;
+    not_resumable_calls = 0;
+    printf("# not resumable: 1, TLS 1.3\n");
+    check(handshake(cctx, sctx, TLS1_3_VERSION) == 0 && not_resumable_calls == 1,
+          "TLS 1.3 asks too (and sends no ticket)");
+    after_handshake = NULL;
+    SSL_CTX_free(sctx);
+    SSL_CTX_free(cctx);
+}
+
 int main(void)
 {
     test_registration();
@@ -566,6 +619,7 @@ int main(void)
     test_unsolicited();
     test_serverinfo();
     test_debug_callback();
+    test_not_resumable();
     printf("1..%d\n", number);
     return failures == 0 ? 0 : 1;
 }

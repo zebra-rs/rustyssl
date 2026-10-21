@@ -897,6 +897,8 @@ pub(crate) fn to_core(d: &SessData) -> Session {
     }
     Session {
         version: u16::try_from(d.ssl_version).unwrap_or(0),
+        // The core sets it only on a new session (capi keeps the C session's own).
+        not_resumable: false,
         cipher_id: d.cipher_id(),
         session_id: d.id().to_vec(),
         sid_ctx: d.sid_ctx().to_vec(),
@@ -952,6 +954,7 @@ fn from_core(st: &SslState, c: &Session, group: Option<u16>, timeout: c_long) ->
     if c.ems {
         d.flags |= SESS_FLAG_EXTMS;
     }
+    d.not_resumable = c.not_resumable;
     d.tick = c.ticket.as_ref().map(|t| t.clone().into_boxed_slice());
     d.tick_age_add = c.ticket_age_add;
     d.tick_lifetime_hint = c.ticket_lifetime_hint;

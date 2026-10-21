@@ -157,6 +157,20 @@ pub(super) fn post_process_server_certificate(
     _wst: Work,
 ) -> Result<Work> {
     let rpk = c.neg.server_cert_type == cert_type(abi::TLSEXT_cert_type_rpk);
+    let r = post_process_server_cert_or_rpk(c, p, rpk);
+    // A raw public key's failures are tls_post_process_server_rpk's.
+    if rpk {
+        r.in_func("tls_post_process_server_rpk")
+    } else {
+        r
+    }
+}
+
+fn post_process_server_cert_or_rpk(
+    c: &mut Connection,
+    p: &dyn Provider,
+    rpk: bool,
+) -> Result<Work> {
     if rpk && c.neg.peer_rpk.is_none() {
         return Err(Error::alert(
             abi::SSL_AD_ILLEGAL_PARAMETER,

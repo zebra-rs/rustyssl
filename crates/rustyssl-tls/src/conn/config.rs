@@ -54,6 +54,8 @@ pub struct CertKey {
 pub struct Session {
     /// The protocol version (`SSL3_VERSION` ... `TLS1_3_VERSION`).
     pub version: u16,
+    /// `not_resumable`: the not-resumable callback's verdict on a server's new session.
+    pub not_resumable: bool,
     /// The cipher's id (`SSL_CIPHER_get_id`).
     pub cipher_id: u32,
     /// The session ID (TLS 1.2), up to 32 octets.

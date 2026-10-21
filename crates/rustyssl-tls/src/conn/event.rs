@@ -16,6 +16,8 @@ pub struct Callbacks {
     pub keylog: bool,
     /// `SSL_set_tlsext_debug_callback`.
     pub tlsext_debug: bool,
+    /// `SSL_CTX_set_not_resumable_session_callback` / `SSL_set_...`.
+    pub not_resumable: bool,
     /// `SSL_CTX_set_tlsext_servername_callback`.
     pub servername: bool,
     /// `SSL_CTX_set_client_hello_cb`.
@@ -132,6 +134,13 @@ pub enum Request {
         content_type: u8,
         /// Its length before padding.
         len: usize,
+    },
+    /// A TLS 1.2 server's new session (`not_resumable_session_cb`), with whether its key
+    /// exchange is ephemeral: answered [`Answer::Allowed`], `true` making it not resumable (no
+    /// session ID, ticket or cache entry).
+    NotResumable {
+        /// Whether the suite's key exchange is (EC)DHE.
+        forward_secure: bool,
     },
     /// A server-side session lookup (`get_session_cb`) by session ID.
     GetSession {

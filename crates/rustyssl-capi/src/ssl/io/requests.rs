@@ -229,6 +229,16 @@ pub(crate) unsafe fn handle(
                 cb(s, c_int::from(content_type), len, arg)
             }))
         }
+        Request::NotResumable { forward_secure } => {
+            let cb = x.state().not_resumable_session_cb;
+            let Some(cb) = cb else {
+                return Some(Answer::Allowed(false));
+            };
+            // SAFETY: the application's callback; no lock is held.
+            Some(Answer::Allowed(
+                unsafe { cb(s, c_int::from(forward_secure)) } != 0,
+            ))
+        }
         Request::AllowEarlyData => {
             let (cb, arg) = {
                 let st = x.state();
