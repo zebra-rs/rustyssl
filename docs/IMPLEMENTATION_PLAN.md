@@ -6023,6 +6023,35 @@ database and serial-file helpers of `apps.c` (G3, `ca`), its HTTP and TLS-for-HT
 (G4, `ocsp`/`cmp`), `http_server.c`, `cmp_mock_srv.c`, `app_params.c`, `names.c`, `log.c`, and
 `s_cb.c`/`s_socket.c` (G5).
 
+G1 (2026-10-21, branch `cli-g1`): `dgst`, `enc`, `rand`, `mac`, `kdf`, `passwd`, `prime`, `errstr`,
+`asn1parse`, `list`, `rehash`, `info` and `nseq` are ported (with digest names as `dgst` and cipher
+names and `base64` as `enc`), each with its corpus `tests/apps/<command>.txt` (every option, the
+error paths, `-help`; fixtures `tests/apps/*.dat`, `*.cnf`), byte-exact in all three `test-apps`
+runs with the same exit codes. Lines marked `~` only have to succeed: random output (`rand`,
+generated salts and primes), `-debug`'s BIO addresses, `-engine`'s and `info`'s build directories,
+`info -cpusettings`, `list -verbose -random-instances` (reseed times), and `enc -p`/`-P` with `-K`
+but no `-nosalt` (upstream prints an uninitialized salt buffer). TTY prompts aren't in the corpora
+(decision 4).
+- **Shared code added:** `src/lib/app_params.rs` (`app_params.c`, plus `app_params_new_from_opts`
+  of `apps.c`), with `live_` tests. In command files, to move to `src/lib/` later: `init_gen_str`
+  (`genpkey.c`) and `app_keygen` (`apps.c`) in `cmd/dgst.rs`. `list` uses `main.rs`'s
+  `calculate_columns` and `sorted_functions`.
+- **`rustyssl-ossl`:** new modules `algorithm` (every provided algorithm type, the legacy name
+  tables, objects, engines, TLS groups and signature algorithms, and sorting through the library's
+  own `OPENSSL_sk_sort`, as `sk_*_sort` does), `asn1`, `bn`, `params` (`OSSL_PARAM` tables, text
+  parameters, query arrays), `sys` (`access`); additions to `bio`, `evp`, `pkey`, `x509`,
+  `provider`, `rand`, `err`, `crypto`.
+- **Codegen:** `options.rs` also gets `option_entries` (`list -options`) and `DISABLED` (`list
+  -disabled`, from `list.c`'s `list_disabled` preprocessed with each target's configuration).
+- **Library fixes found by the corpora:** PEM's no-start-line and bad-end-line errors and the hex
+  string errors name the functions OpenSSL raises them in; the parameter descriptors of SHAKE,
+  KMAC, BLAKE2, MDC2, RSA's key manager and the variable-key-length ciphers have upstream's types
+  and sizes (`list -verbose`).
+- **Upstream's quirks kept:** `list -objects` truncates an OID exactly as long as its reused
+  buffer; `rehash` exits with its error count (0 for a usage error); `passwd` prints `<NULL>` for
+  a hash that can't be made (an empty password or salt with `-5`/`-6`); `enc -kfile` rejects a
+  one-character password.
+
 ## Phase 12: Hardening, performance, release 1.0 → M7
 
 - [ ] **12.1 Performance:** benchmark against the reference (per TEST_PLAN L10). Close the gaps

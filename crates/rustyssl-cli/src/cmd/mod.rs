@@ -29,7 +29,7 @@ pub mod errstr;
 // pub mod genrsa;
 pub mod info;
 pub mod kdf;
-// pub mod list;
+pub mod list;
 pub mod mac;
 pub mod nseq;
 // pub mod ocsp;
@@ -42,7 +42,7 @@ pub mod passwd;
 // pub mod pkeyutl;
 pub mod prime;
 pub mod rand;
-// pub mod rehash;
+pub mod rehash;
 // pub mod req;
 // pub mod rsa;
 // pub mod rsautl;
@@ -88,7 +88,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "genrsa" => genrsa::main,
         "info" => info::main,
         "kdf" => kdf::main,
-        // "list" => list::main,
+        "list" => list::main,
         "mac" => mac::main,
         "nseq" => nseq::main,
         // "ocsp" => ocsp::main,
@@ -101,7 +101,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "pkeyutl" => pkeyutl::main,
         "prime" => prime::main,
         "rand" => rand::main,
-        // "rehash" => rehash::main,
+        "rehash" => rehash::main,
         // "req" => req::main,
         // "rsa" => rsa::main,
         // "rsautl" => rsautl::main,

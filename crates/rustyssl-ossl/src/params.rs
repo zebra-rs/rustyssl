@@ -113,6 +113,11 @@ impl ParamRef<'_> {
         self.get().return_size
     }
 
+    /// The C string at `data` (a UTF-8 string parameter's value, as `%s` prints it).
+    pub fn data_string(&self) -> Option<String> {
+        string_at(self.get().data.cast_const().cast())
+    }
+
     /// The value (of a parameter the library filled in).
     pub fn value(&self) -> Value {
         let p = self.get();
@@ -243,8 +248,8 @@ enum Slot {
     Ptr(Box<*mut c_char>),
     /// An `int` (`OSSL_PARAM_construct_int`).
     Int(Box<c_int>),
-    /// A buffer (kept for the array's `data` pointer into it).
-    Buf(#[allow(dead_code)] Box<[u8]>),
+    /// A buffer, aligned for any integer (kept for the array's `data` pointer into it).
+    Buf(#[allow(dead_code)] Box<[u64]>),
 }
 
 /// A parameter array to be filled in by a `*_get_params` call, with its own storage.
@@ -305,7 +310,7 @@ impl Query {
         let Some(k) = cstring(key) else {
             return self;
         };
-        let mut buf = vec![0u8; size].into_boxed_slice();
+        let mut buf = vec![0u64; size.div_ceil(8)].into_boxed_slice();
         let p = OSSL_PARAM {
             key: k.as_ptr(),
             data_type,

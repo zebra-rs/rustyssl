@@ -148,3 +148,59 @@ pub fn app_params_new_from_opts(opts: &[String], paramdefs: ParamsRef<'_>) -> Op
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use rustyssl_ossl::evp::Mac;
+
+    use super::super::io;
+    use super::*;
+
+    /// On a real library only (see `live_tests.rs`).
+    fn live() -> bool {
+        std::env::var_os("RUSTYSSL_CLI_LIVE").is_some()
+    }
+
+    #[test]
+    fn live_params_from_opts() {
+        if !live() {
+            return;
+        }
+        let mac = Mac::fetch(None, "HMAC", None).unwrap();
+        let defs = mac.settable_ctx_params();
+        let opts = ["digest:SHA256".to_owned(), "key:secret".to_owned()];
+        assert!(app_params_new_from_opts(&opts, defs).is_some());
+        // An unknown key, and an option without a value: upstream's messages.
+        for (opt, what) in [("nosuch:1", "unknown"), ("digest", "error")] {
+            let (p, text) =
+                io::capture_err(|| app_params_new_from_opts(&[opt.to_owned()], defs).is_some());
+            assert!(!p);
+            let text = String::from_utf8_lossy(&text);
+            assert!(
+                text.starts_with(&format!("Parameter {what} '{opt}'\n")),
+                "{text}"
+            );
+        }
+    }
+
+    #[test]
+    fn live_param_descriptions() {
+        if !live() {
+            return;
+        }
+        let mac = Mac::fetch(None, "HMAC", None).unwrap();
+        let described: Vec<String> = mac
+            .settable_ctx_params()
+            .iter()
+            .map(|p| describe_param_type(&p))
+            .collect();
+        assert!(
+            described.contains(&"digest: UTF8 encoded string (arbitrary size)".to_owned()),
+            "{described:?}"
+        );
+        assert!(described.contains(&"key: octet string (arbitrary size)".to_owned()));
+        assert!(
+            described.contains(&"tls-data-size: unsigned integer (max 8 bytes large)".to_owned())
+        );
+    }
+}

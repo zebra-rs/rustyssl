@@ -701,3 +701,17 @@ impl MdCtxRef<'_> {
         buf.get(..usize::try_from(len).ok()?).map(<[u8]>::to_vec)
     }
 }
+
+impl Md {
+    /// `EVP_sha1()` (static).
+    pub fn sha1() -> Option<Self> {
+        // SAFETY: as in md5.
+        Self::from_ptr(unsafe { ffi::EVP_sha1() }.cast_mut())
+    }
+
+    /// `EVP_MD_get_size`.
+    pub fn size(&self) -> c_int {
+        // SAFETY: the digest is live.
+        unsafe { ffi::EVP_MD_get_size(self.as_ptr()) }
+    }
+}

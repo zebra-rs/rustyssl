@@ -19725,6 +19725,78 @@ pub fn help_only(module: &str, argv: &[String]) -> Option<bool> {
     }
 }
 
+/// Each entry of table `module` as (name, marker, value type), in order (`list -options`);
+/// `None` for no such table.
+pub fn option_entries(module: &str) -> Option<Vec<(&'static str, Option<Marker>, u8)>> {
+    fn entries<O>(list: &[OptDef<O>]) -> Vec<(&'static str, Option<Marker>, u8)> {
+        list.iter().map(|o| (o.name, o.marker, o.valtype)).collect()
+    }
+    match module {
+        "asn1parse" => Some(entries(asn1parse::OPTIONS)),
+        "ca" => Some(entries(ca::OPTIONS)),
+        "ciphers" => Some(entries(ciphers::OPTIONS)),
+        "cmp" => Some(entries(cmp::OPTIONS)),
+        "cms" => Some(entries(cms::OPTIONS)),
+        "configutl" => Some(entries(configutl::OPTIONS)),
+        "crl2pkcs7" => Some(entries(crl2pkcs7::OPTIONS)),
+        "crl" => Some(entries(crl::OPTIONS)),
+        "dgst" => Some(entries(dgst::OPTIONS)),
+        "dhparam" => Some(entries(dhparam::OPTIONS)),
+        "dsa" => Some(entries(dsa::OPTIONS)),
+        "dsaparam" => Some(entries(dsaparam::OPTIONS)),
+        "ec" => Some(entries(ec::OPTIONS)),
+        "ecparam" => Some(entries(ecparam::OPTIONS)),
+        "enc" => Some(entries(enc::OPTIONS)),
+        "engine" => Some(entries(engine::OPTIONS)),
+        "errstr" => Some(entries(errstr::OPTIONS)),
+        "fipsinstall" => Some(entries(fipsinstall::OPTIONS)),
+        "gendsa" => Some(entries(gendsa::OPTIONS)),
+        "genpkey" => Some(entries(genpkey::OPTIONS)),
+        "genrsa" => Some(entries(genrsa::OPTIONS)),
+        "help" => Some(entries(help::OPTIONS)),
+        "info" => Some(entries(info::OPTIONS)),
+        "kdf" => Some(entries(kdf::OPTIONS)),
+        "list" => Some(entries(list::OPTIONS)),
+        "mac" => Some(entries(mac::OPTIONS)),
+        "nseq" => Some(entries(nseq::OPTIONS)),
+        "ocsp" => Some(entries(ocsp::OPTIONS)),
+        "passwd" => Some(entries(passwd::OPTIONS)),
+        "pkcs12" => Some(entries(pkcs12::OPTIONS)),
+        "pkcs7" => Some(entries(pkcs7::OPTIONS)),
+        "pkcs8" => Some(entries(pkcs8::OPTIONS)),
+        "pkey" => Some(entries(pkey::OPTIONS)),
+        "pkeyparam" => Some(entries(pkeyparam::OPTIONS)),
+        "pkeyutl" => Some(entries(pkeyutl::OPTIONS)),
+        "prime" => Some(entries(prime::OPTIONS)),
+        "rand" => Some(entries(rand::OPTIONS)),
+        "rehash" => Some(entries(rehash::OPTIONS)),
+        "req" => Some(entries(req::OPTIONS)),
+        "rsa" => Some(entries(rsa::OPTIONS)),
+        "rsautl" => Some(entries(rsautl::OPTIONS)),
+        "s_client" => Some(entries(s_client::OPTIONS)),
+        "s_server" => Some(entries(s_server::OPTIONS)),
+        "s_time" => Some(entries(s_time::OPTIONS)),
+        "sess_id" => Some(entries(sess_id::OPTIONS)),
+        "skeyutl" => Some(entries(skeyutl::OPTIONS)),
+        "smime" => Some(entries(smime::OPTIONS)),
+        "speed" => Some(entries(speed::OPTIONS)),
+        "spkac" => Some(entries(spkac::OPTIONS)),
+        "srp" => Some(entries(srp::OPTIONS)),
+        "storeutl" => Some(entries(storeutl::OPTIONS)),
+        "ts" => Some(entries(ts::OPTIONS)),
+        "verify" => Some(entries(verify::OPTIONS)),
+        "version" => Some(entries(version::OPTIONS)),
+        "x509" => Some(entries(x509::OPTIONS)),
+        _ => None,
+    }
+}
+
+/// What `list -disabled` prints after its title (`list_disabled` of `apps/list.c`, as the
+/// target's configuration builds it).
+pub static DISABLED: &[&str] = &[
+    "MD2\n", "RC5\n", "SCTP\n", "SSL3\n", "ZLIB\n", "BROTLI\n", "ZSTD\n",
+];
+
 /// A command of `progs.c`, in its order.
 pub struct Function {
     pub kind: FuncType,

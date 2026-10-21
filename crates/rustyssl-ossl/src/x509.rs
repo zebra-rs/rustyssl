@@ -639,3 +639,156 @@ impl CertSeq {
         (unsafe { ffi::X509_up_ref(c.as_ptr()) } == 1).then_some(Cert(c))
     }
 }
+
+// Certificate and CRL files as X509_INFO stacks (`rehash`).
+
+unsafe extern "C" fn free_info(p: *mut c_void) {
+    // SAFETY: called by sk_pop_free with each member, an X509_INFO.
+    unsafe { ffi::X509_INFO_free(p.cast()) };
+}
+
+/// What one `X509_INFO` holds.
+pub enum InfoKind {
+    Cert,
+    Crl,
+    /// Neither (a key on its own, ...).
+    Other,
+}
+
+/// An owned `STACK_OF(X509_INFO)`, freed with `sk_X509_INFO_pop_free(sk, X509_INFO_free)`.
+pub struct InfoStack(core::ptr::NonNull<crate::abi::stack_st_X509_INFO>);
+
+impl InfoStack {
+    /// `PEM_X509_INFO_read_bio(bio, NULL, NULL, NULL)`.
+    pub fn read_pem(bio: &Bio) -> Option<Self> {
+        // SAFETY: the BIO is live; NULL makes a new stack; NULL callback and data use the
+        // library's defaults.
+        let p = unsafe {
+            ffi::PEM_X509_INFO_read_bio(
+                bio.as_ptr(),
+                core::ptr::null_mut(),
+                None,
+                core::ptr::null_mut(),
+            )
+        };
+        core::ptr::NonNull::new(p).map(Self)
+    }
+
+    fn sk(&self) -> *mut OPENSSL_STACK {
+        self.0.as_ptr().cast()
+    }
+
+    /// `sk_X509_INFO_num`.
+    pub fn len(&self) -> usize {
+        // SAFETY: the stack is live.
+        usize::try_from(unsafe { ffi::OPENSSL_sk_num(self.sk()) }).unwrap_or(0)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    fn info(&self, i: usize) -> Option<&crate::abi::X509_INFO> {
+        let i = c_int::try_from(i).ok()?;
+        // SAFETY: the stack is live; sk_value checks the index.
+        let p = unsafe { ffi::OPENSSL_sk_value(self.sk(), i) }.cast::<crate::abi::X509_INFO>();
+        // SAFETY: p is NULL or a live X509_INFO the stack owns, borrowed with self.
+        unsafe { p.as_ref() }
+    }
+
+    /// What entry `i` holds.
+    pub fn kind(&self, i: usize) -> InfoKind {
+        match self.info(i) {
+            Some(x) if !x.x509.is_null() => InfoKind::Cert,
+            Some(x) if !x.crl.is_null() => InfoKind::Crl,
+            _ => InfoKind::Other,
+        }
+    }
+
+    /// `X509_digest` or `X509_CRL_digest` of entry `i` with `md`.
+    pub fn digest(&self, i: usize, md: &crate::evp::Md) -> Option<Vec<u8>> {
+        let x = self.info(i)?;
+        let mut buf = [0u8; 64];
+        let mut len: core::ffi::c_uint = 0;
+        let ok = if !x.x509.is_null() {
+            // SAFETY: the certificate and digest are live; buf holds EVP_MAX_MD_SIZE bytes.
+            unsafe { ffi::X509_digest(x.x509, md.as_ptr(), buf.as_mut_ptr(), &mut len) }
+        } else if !x.crl.is_null() {
+            // SAFETY: as above, for the CRL.
+            unsafe { ffi::X509_CRL_digest(x.crl, md.as_ptr(), buf.as_mut_ptr(), &mut len) }
+        } else {
+            0
+        };
+        if ok != 1 {
+            return None;
+        }
+        buf.get(..usize::try_from(len).ok()?).map(<[u8]>::to_vec)
+    }
+
+    /// The name entry `i` is filed under: a certificate's subject, a CRL's issuer.
+    fn name(&self, i: usize) -> *const X509_NAME {
+        match self.info(i) {
+            // SAFETY: the certificate is live; the name is owned by it.
+            Some(x) if !x.x509.is_null() => unsafe { ffi::X509_get_subject_name(x.x509) },
+            // SAFETY: as above, for the CRL.
+            Some(x) if !x.crl.is_null() => unsafe { ffi::X509_CRL_get_issuer(x.crl) },
+            _ => core::ptr::null_mut(),
+        }
+    }
+
+    /// `X509_NAME_hash_ex(name, libctx, propq, &ok)` of entry `i`'s name: `None` for no name,
+    /// `Some(None)` when it failed.
+    pub fn name_hash(
+        &self,
+        i: usize,
+        libctx: Option<&LibCtx>,
+        propq: Option<&str>,
+    ) -> Option<Option<c_ulong>> {
+        let n = self.name(i);
+        if n.is_null() {
+            return None;
+        }
+        let pq = match propq {
+            Some(p) => Some(cstring(p)?),
+            None => None,
+        };
+        let ctx = libctx.map_or(core::ptr::null_mut(), LibCtx::as_ptr);
+        let mut ok: c_int = 0;
+        // SAFETY: the name is live; ctx and pq are NULL or valid; ok is a valid out-pointer.
+        let h = unsafe {
+            ffi::X509_NAME_hash_ex(
+                n,
+                ctx,
+                pq.as_ref().map_or(core::ptr::null(), |p| p.as_ptr()),
+                &mut ok,
+            )
+        };
+        Some((ok != 0).then_some(h))
+    }
+
+    /// `X509_NAME_hash_old` of entry `i`'s name (`None` for no name).
+    pub fn name_hash_old(&self, i: usize) -> Option<c_ulong> {
+        let n = self.name(i);
+        // SAFETY: the name is live.
+        (!n.is_null()).then(|| unsafe { ffi::X509_NAME_hash_old(n) })
+    }
+}
+
+impl Drop for InfoStack {
+    fn drop(&mut self) {
+        // SAFETY: the stack and its entries are owned here and freed once.
+        unsafe { ffi::OPENSSL_sk_pop_free(self.sk(), Some(free_info)) };
+    }
+}
+
+/// `X509_get_default_cert_dir_env()`.
+pub fn default_cert_dir_env() -> String {
+    // SAFETY: no arguments; the result is a static string.
+    string_at(unsafe { ffi::X509_get_default_cert_dir_env() }).unwrap_or_default()
+}
+
+/// `X509_get_default_cert_dir()`.
+pub fn default_cert_dir() -> String {
+    // SAFETY: no arguments; the result is a static string.
+    string_at(unsafe { ffi::X509_get_default_cert_dir() }).unwrap_or_default()
+}
