@@ -18,7 +18,7 @@ use crate::abi::{
     ASN1_INTEGER, ASN1_OCTET_STRING, ASN1_TIME, BIO, EVP_PKEY, GENERAL_NAME, OSSL_CMP_ATAV,
     OSSL_CMP_ATAVS, OSSL_CMP_CRLSTATUS, OSSL_CMP_CTX, OSSL_CMP_ITAV, OSSL_CMP_MSG,
     OSSL_CMP_PKIFREETEXT, OSSL_CMP_PKISI, OSSL_CMP_SRV_CTX, OSSL_CRMF_CERTTEMPLATE, OSSL_CRMF_MSG,
-    X509, X509_ALGOR, X509_EXTENSION, X509_NAME, X509_REQ, X509_STORE_CTX,
+    X509, X509_ALGOR, X509_EXTENSION, X509_NAME, X509_REQ, X509_STORE, X509_STORE_CTX,
     stack_st_ASN1_UTF8STRING, stack_st_OSSL_CMP_CRLSTATUS, stack_st_OSSL_CMP_ITAV, stack_st_X509,
     stack_st_X509_EXTENSION,
 };
@@ -330,6 +330,12 @@ unsafe extern "C" fn print_to_bio_err(
     }
 }
 
+/// `OSSL_CMP_CTX_print_errors(ctx)` (NULL for `None`).
+pub fn print_errors(ctx: Option<&Ctx>) {
+    // SAFETY: ctx is NULL or live.
+    unsafe { ffi::OSSL_CMP_CTX_print_errors(ctx.map_or(ptr::null(), |c| c.as_ptr().cast_const())) };
+}
+
 /// `OSSL_CMP_log_close()`.
 pub fn log_close() {
     // SAFETY: no arguments.
@@ -347,6 +353,14 @@ impl Store {
     pub fn set_print_verify_cb(&self) {
         // SAFETY: the store is live; the callback is a static function.
         unsafe { ffi::X509_STORE_set_verify_cb(self.as_ptr(), Some(print_verify_cb)) };
+    }
+
+    /// `X509_VERIFY_PARAM_clear_flags(X509_STORE_get0_param(store), flags)`.
+    pub fn clear_param_flags(&self, flags: core::ffi::c_ulong) {
+        // SAFETY: the store is live; the param stays owned by it.
+        let vpm = unsafe { ffi::X509_STORE_get0_param(self.as_ptr()) };
+        // SAFETY: vpm is live.
+        unsafe { ffi::X509_VERIFY_PARAM_clear_flags(vpm, flags) };
     }
 
     /// `X509_STORE_add_cert(store, cert)`.
@@ -519,8 +533,7 @@ impl Ctx {
 
     /// `OSSL_CMP_CTX_print_errors(ctx)`.
     pub fn print_errors(&self) {
-        // SAFETY: the context is live.
-        unsafe { ffi::OSSL_CMP_CTX_print_errors(self.as_ptr()) };
+        print_errors(Some(self));
     }
 
     /// `OSSL_CMP_CTX_set_option(ctx, opt, val)`.
@@ -701,7 +714,7 @@ impl Ctx {
     /// `OSSL_CMP_CTX_push1_subjectAltName(ctx, name)`.
     pub fn push1_subject_alt_name(&self, name: &GeneralName) -> bool {
         // SAFETY: both are live; the context copies the name.
-        unsafe { ffi::OSSL_CMP_CTX_push1_subjectAltName(self.as_ptr(), name.as_ptr()) == 1 }
+        unsafe { ffi::OSSL_CMP_CTX_push1_subjectAltName(self.as_ptr(), name.as_ptr()) != 0 }
     }
 
     /// A `POLICYINFO` for `policy` pushed with `OSSL_CMP_CTX_push0_policy`.
@@ -714,7 +727,7 @@ impl Ctx {
         // SAFETY: pinfo is a live POLICYINFO (a public struct); it takes the object.
         unsafe { (*pinfo).policyid = policy.into_ptr() };
         // SAFETY: both are live; on success the context owns pinfo.
-        if unsafe { ffi::OSSL_CMP_CTX_push0_policy(self.as_ptr(), pinfo) } == 1 {
+        if unsafe { ffi::OSSL_CMP_CTX_push0_policy(self.as_ptr(), pinfo) } != 0 {
             true
         } else {
             // SAFETY: pinfo is still owned here.
@@ -726,7 +739,7 @@ impl Ctx {
     /// `OSSL_CMP_CTX_push0_geninfo_ITAV(ctx, itav)`.
     pub fn push0_geninfo_itav(&self, itav: Itav) -> bool {
         // SAFETY: both are live; on success the context owns the ITAV.
-        if unsafe { ffi::OSSL_CMP_CTX_push0_geninfo_ITAV(self.as_ptr(), itav.as_ptr()) } == 1 {
+        if unsafe { ffi::OSSL_CMP_CTX_push0_geninfo_ITAV(self.as_ptr(), itav.as_ptr()) } != 0 {
             let _ = itav.into_ptr();
             true
         } else {
@@ -737,7 +750,7 @@ impl Ctx {
     /// `OSSL_CMP_CTX_push0_genm_ITAV(ctx, itav)`.
     pub fn push0_genm_itav(&self, itav: Itav) -> bool {
         // SAFETY: both are live; on success the context owns the ITAV.
-        if unsafe { ffi::OSSL_CMP_CTX_push0_genm_ITAV(self.as_ptr(), itav.as_ptr()) } == 1 {
+        if unsafe { ffi::OSSL_CMP_CTX_push0_genm_ITAV(self.as_ptr(), itav.as_ptr()) } != 0 {
             let _ = itav.into_ptr();
             true
         } else {
@@ -877,9 +890,9 @@ impl Ctx {
     /// the body type): the new certificate.
     pub fn exec_certreq(&self, body_type: c_int) -> Option<Cert> {
         let t = body_type;
-        // SAFETY: the context is live; the certificate is a new reference for the caller
-        // (the macros wrap OSSL_CMP_exec_certreq, whose result is the caller's).
-        Cert::from_raw(unsafe { ffi::OSSL_CMP_exec_certreq(self.as_ptr(), t, ptr::null()) })
+        // SAFETY: the context is live; the certificate stays owned by it (a new reference
+        // is taken for the caller).
+        Cert::from_borrowed(unsafe { ffi::OSSL_CMP_exec_certreq(self.as_ptr(), t, ptr::null()) })
     }
 
     /// `OSSL_CMP_exec_RR_ses(ctx)`.
@@ -1026,7 +1039,24 @@ impl Msg {
     }
 }
 
+impl Msg {
+    /// `ASN1_item_d2i_bio(ASN1_ITEM_rptr(OSSL_CMP_MSG), bio, NULL)`.
+    pub fn read_der(bio: &Bio) -> Option<Self> {
+        Self::from_ptr(crate::ocsp::Item::CmpMsg.d2i_bio(bio.as_ptr()).cast())
+    }
+}
+
 impl MsgRef {
+    /// `ASN1_item_i2d(msg, NULL, ASN1_ITEM_rptr(OSSL_CMP_MSG))`: the encoding's length.
+    pub fn der_len(&self) -> c_int {
+        crate::ocsp::Item::CmpMsg.i2d_len(self.as_ptr().cast_const().cast())
+    }
+
+    /// `ASN1_item_i2d_bio(ASN1_ITEM_rptr(OSSL_CMP_MSG), out, msg)`.
+    pub fn write_der(&self, out: &Bio) -> c_int {
+        crate::ocsp::Item::CmpMsg.i2d_bio(out, self.as_ptr().cast_const().cast())
+    }
+
     /// `OSSL_CMP_MSG_write(file, msg)`.
     pub fn write(&self, file: &str) -> c_int {
         let Some(f) = cstring(file) else {
@@ -1161,15 +1191,20 @@ impl ExtStack {
     }
 
     /// `X509V3_EXT_add_nconf_sk(conf, ctx, section, &sk)`.
-    pub fn add_nconf(&mut self, conf: &Conf, ctx: &mut V3Ctx<'_>, section: &str) -> bool {
+    pub fn add_nconf(&mut self, conf: Option<&Conf>, ctx: &mut V3Ctx<'_>, section: &str) -> bool {
         let Some(s) = cstring(section) else {
             return false;
         };
         let mut sk = self.0.as_ptr();
-        // SAFETY: all are live; the function adds to the stack in place (it is non-NULL, so
+        // SAFETY: conf is NULL or live, the others live; the function adds to the stack in place (it is non-NULL, so
         // the pointer stays the same).
         let ok = unsafe {
-            ffi::X509V3_EXT_add_nconf_sk(conf.as_ptr(), ctx.as_ptr(), s.as_ptr(), &mut sk)
+            ffi::X509V3_EXT_add_nconf_sk(
+                conf.map_or(ptr::null_mut(), Conf::as_ptr),
+                ctx.as_ptr(),
+                s.as_ptr(),
+                &mut sk,
+            )
         } == 1;
         if let Some(p) = ptr::NonNull::new(sk) {
             self.0 = p;
@@ -1411,8 +1446,8 @@ impl Itav {
                 // SAFETY: no arguments.
                 let u = unsafe { ffi::ASN1_UTF8STRING_new() };
                 let ok = match (&text, u.is_null()) {
-                    // SAFETY: u is live; t is a valid C string (-1: its length).
                     (Some(t), false) => {
+                        // SAFETY: u is live; t is a valid C string (-1: its length).
                         (unsafe { ffi::ASN1_STRING_set(u.cast(), t.as_ptr().cast(), -1) }) == 1
                     }
                     _ => false,
@@ -2261,6 +2296,13 @@ impl SslCtx {
         }
     }
 
+    /// [`truststore_set_host_etc`] on the `SSL_CTX`'s trust store (`false` if it has none).
+    pub fn store_set_host_etc(&self, host: Option<&str>) -> bool {
+        // SAFETY: the SSL_CTX is live; the store stays owned by it.
+        let st = unsafe { ffi::SSL_CTX_get_cert_store(self.as_ptr()) };
+        !st.is_null() && set_host_etc(st, host)
+    }
+
     /// `SSL_CTX_use_certificate(ctx, cert) > 0`.
     pub fn use_certificate(&self, cert: &Cert) -> bool {
         // SAFETY: both are live; the SSL_CTX takes its own reference.
@@ -2358,8 +2400,12 @@ pub fn check_private_key(cert: Option<&Cert>, pkey: &Pkey) -> bool {
 /// host flags, then `X509_VERIFY_PARAM_set1_ip_asc(vpm, host) ||
 /// X509_VERIFY_PARAM_set1_host(vpm, host, 0)`: `truststore_set_host_etc` of `cmp.c`.
 pub fn truststore_set_host_etc(store: &Store, host: Option<&str>) -> bool {
-    // SAFETY: the store is live; the param stays owned by it.
-    let vpm = unsafe { ffi::X509_STORE_get0_param(store.as_ptr()) };
+    set_host_etc(store.as_ptr(), host)
+}
+
+fn set_host_etc(store: *mut X509_STORE, host: Option<&str>) -> bool {
+    // SAFETY: the store is live (the callers' objects); the param stays owned by it.
+    let vpm = unsafe { ffi::X509_STORE_get0_param(store) };
     // SAFETY: vpm is live; NULL clears.
     if unsafe { ffi::X509_VERIFY_PARAM_set1_host(vpm, ptr::null(), 0) } != 1 {
         return false;

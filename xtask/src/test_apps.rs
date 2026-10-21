@@ -12,7 +12,7 @@
 //!
 //! Every run must print the same and exit the same as (1), after masking what differs by
 //! design: the library's version metadata (`+rustyssl...`), the directories it was built with,
-//! and errors' thread id and file and line. A line starting with `~` (timings) must only
+//! errors' thread id and file and line, and our tool's name (`openssl-rs`). A line starting with `~` (timings) must only
 //! succeed on every run.
 //!
 //! In a line, `{bin}` is 100,000 octets of fixed data, `{txt}` a line of text, `{dir}` the work
@@ -93,7 +93,8 @@ fn run_tool(
 fn masked(text: &str) -> String {
     text.lines()
         .map(|line| {
-            let mut l = mask_pid(line);
+            // Our tool's own name, which commands show through `opt_appname` ("openssl cmp").
+            let mut l = mask_pid(line).replace(&format!("{CLI_NAME} "), "openssl ");
             if let Some(at) = l.find("+rustyssl") {
                 let end = l[at..].find(' ').map_or(l.len(), |e| at + e);
                 l.replace_range(at..end, "");

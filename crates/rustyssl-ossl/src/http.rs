@@ -429,6 +429,23 @@ pub fn adapt_proxy(
         .is_null()
 }
 
+/// `OSSL_HTTP_adapt_proxy(proxy, no_proxy, server, use_ssl)`: the proxy to use, if any.
+pub fn adapt_proxy_host(
+    proxy: Option<&str>,
+    no_proxy: Option<&str>,
+    server: &str,
+    use_ssl: bool,
+) -> Option<String> {
+    let (Ok(p), Ok(n), Some(s)) = (opt_c(proxy), opt_c(no_proxy), cstring(server)) else {
+        return None;
+    };
+    // SAFETY: the strings are NULL or valid; the result is NULL or a string borrowed from
+    // the arguments or the environment, copied before they go.
+    crate::util::string_at(unsafe {
+        ffi::OSSL_HTTP_adapt_proxy(ptr_of(&p), ptr_of(&n), s.as_ptr(), c_int::from(use_ssl))
+    })
+}
+
 /// The arguments of an HTTP POST (`app_http_post_asn1`'s transfer).
 pub struct Post<'a> {
     pub host: &'a str,

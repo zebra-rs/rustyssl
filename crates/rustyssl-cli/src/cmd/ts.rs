@@ -585,20 +585,21 @@ fn warn_cert(uri: &str, cert: &Cert, warn_ee: bool, vpm: Option<&VerifyParam>) {
     }
 }
 
-/// `load_cert_certs` of `apps.c`: a certificate (`want_cert`) or all of them, with the
-/// validity warnings.
+/// `load_cert_certs` of `apps.c`: the first certificate (`want_cert`) and the others (all
+/// of them without `want_cert`) when `want_certs`, with the validity warnings.
 pub(crate) fn load_cert_certs(
     uri: &str,
     want_cert: bool,
+    want_certs: bool,
     exclude_http: bool,
     pass: Option<&str>,
     desc: Option<&str>,
     vpm: Option<&VerifyParam>,
 ) -> Option<(Option<Cert>, Option<CertStack>)> {
-    let desc = desc.unwrap_or(if want_cert {
-        "certificate"
-    } else {
+    let desc = desc.unwrap_or(if want_certs {
         "certificates"
+    } else {
+        "certificate"
     });
     let lower = uri.to_ascii_lowercase();
     if exclude_http && (lower.starts_with("http://") || lower.starts_with("https://")) {
@@ -608,10 +609,10 @@ pub(crate) fn load_cert_certs(
     let pass_string = get_passwd(pass, Some(desc));
     let wanted = Wanted {
         cert: want_cert,
-        certs: if want_cert {
-            None
-        } else {
+        certs: if want_certs {
             Some(CertStack::new()?)
+        } else {
+            None
         },
         ..Wanted::default()
     };
@@ -679,7 +680,7 @@ pub(crate) fn load_certs_multifile(
         return None;
     };
     for f in items(files) {
-        let (_, certs) = load_cert_certs(&f, false, false, pass, desc, vpm)?;
+        let (_, certs) = load_cert_certs(&f, false, true, false, pass, desc, vpm)?;
         let certs = certs?;
         if !result.add_certs(&certs, X509_ADD_FLAG_UP_REF | X509_ADD_FLAG_NO_DUP) {
             eprintf!("out of memory\n");

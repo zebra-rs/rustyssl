@@ -1,0 +1,100 @@
+# Configuration for `openssl cmp`'s corpus (tests/apps/cmp.txt). Paths are relative to
+# test-apps' work directory (target/xtask/test-apps), which reaches the reference's source
+# tree as ../../ref/openssl-<version>/src.
+M = ../../ref/openssl-3.6.5/src/test/recipes/80-test_cmp_http_data/Mock
+
+[default]
+batch = 1
+srv_ref = mock
+srv_secret = pass:test
+ref = mock
+secret = pass:test
+no_check_time = 1
+
+[cmp]
+cmd = genm
+verbosity = 6
+
+[ir]
+cmd = ir
+subject = /CN=test
+newkey = $M/new.key
+rsp_cert = $M/signer_only.crt
+certout = test.cert.pem
+
+[refcert]
+ref_cert = $M/signer_only.crt
+rsp_cert = $M/signer_only.crt
+oldcert = $M/signer_only.crt
+newkey = $M/new.key
+certout = test.kur.pem
+
+[wrongref]
+ref_cert = $M/server.crt
+rsp_cert = $M/signer_only.crt
+oldcert = $M/signer_only.crt
+newkey = $M/new.key
+certout = test.kur.pem
+
+[empty]
+subject =
+days = 0
+
+[numbers]
+days = 30
+popo = 1
+keep_alive = 2
+msg_timeout = 10
+total_timeout = 20
+use_mock_srv = 1
+max_msgs = 0
+
+[negative]
+days = -1
+
+[nonpositive]
+repeat = 0
+
+[toolarge]
+days = 2147483648
+
+[badverbosity]
+verbosity = 9
+
+[verify]
+verify_depth = 5
+attime = 1700000000
+ignore_critical = 1
+partial_chain = 0
+
+[badverify]
+purpose = nonsense
+
+[badverifyflag]
+verify_depth = x
+
+[provider]
+provider = default
+propquery = provider=default
+
+[badprovider]
+provider-path = .
+provider = nonexistent
+
+[reqexts]
+basicConstraints = CA:FALSE
+keyUsage = critical, digitalSignature
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.0 = localhost
+IP.0 = 127.0.0.1
+
+[badexts]
+basicConstraints = nonsense
+
+[certificatePolicies]
+certificatePolicies = "critical, @pkiPolicy"
+
+[pkiPolicy]
+policyIdentifier = 1.2.3.4
