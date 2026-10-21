@@ -316,6 +316,10 @@ pub enum Request {
 
 /// The application's answer to a [`Request`].
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "answers are made once per callback; a session is the largest"
+)]
 pub enum Answer {
     /// Carry on (a callback that returned success and set its results through the API or
     /// [`super::Connection::config_mut`]).

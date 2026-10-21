@@ -1038,6 +1038,8 @@ pub(crate) fn decode_session(b: &[u8]) -> Option<Session> {
     Some(Session {
         version,
         not_resumable: false,
+        psk_identity: None,
+        psk_identity_hint: None,
         cipher_id,
         session_id,
         sid_ctx,

@@ -345,6 +345,8 @@ pub(super) fn process_key_exchange(
     state(c)?.kx12 = None;
     if mkey & SSL_PSK != 0 {
         let hint = ske::psk_hint(&mut rd)?;
+        c.neg.session.psk_identity_hint =
+            (!hint.is_empty()).then(|| crate::conn::common::until_nul(&hint).to_vec());
         state(c)?.psk_hint = (!hint.is_empty()).then_some(hint);
     }
     let mut signer = None;

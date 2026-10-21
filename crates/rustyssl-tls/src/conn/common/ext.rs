@@ -1250,14 +1250,10 @@ pub fn psk_do_binder(
     let schedule = Schedule13::new(p, hash, Some(psk))?;
     let mut data = Vec::new();
     if c.hs.sh.hrr == Hrr::Pending {
-        let buf =
-            c.hs.transcript
-                .buffered()
-                .filter(|b| !b.is_empty())
-                .ok_or(Error::alert(
-                    abi::SSL_AD_INTERNAL_ERROR,
-                    abi::SSL_R_BAD_HANDSHAKE_LENGTH,
-                ))?;
+        let buf = c.hs.transcript.buffered().filter(|b| !b.is_empty()).ok_or(
+            Error::alert(abi::SSL_AD_INTERNAL_ERROR, abi::SSL_R_BAD_HANDSHAKE_LENGTH)
+                .in_func("tls_psk_do_binder"),
+        )?;
         let keep = if c.cfg.server {
             two_messages(buf).ok_or_else(Error::internal)?
         } else {
@@ -1271,10 +1267,10 @@ pub fn psk_do_binder(
     if let Some(b) = binder_in
         && !bool::from(binder.as_slice().ct_eq(b))
     {
-        return Err(Error::alert(
-            abi::SSL_AD_DECRYPT_ERROR,
-            abi::SSL_R_BINDER_DOES_NOT_VERIFY,
-        ));
+        return Err(
+            Error::alert(abi::SSL_AD_DECRYPT_ERROR, abi::SSL_R_BINDER_DOES_NOT_VERIFY)
+                .in_func("tls_psk_do_binder"),
+        );
     }
     Ok((schedule, binder))
 }

@@ -1252,7 +1252,14 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
         }
         // A handshake's start (`tls_setup_handshake`) and a TLS 1.3 server's end, which the
         // session cache counts.
-        let started = if was_before && !conn.before() {
+        // A set-up that failed (no protocols or ciphers) counted nothing.
+        let setup_failed = r
+            .as_ref()
+            .err()
+            .is_some_and(|e| e.func == Some("tls_setup_handshake"));
+        let started = if setup_failed {
+            None
+        } else if was_before && !conn.before() {
             Some(true)
         } else {
             (!was_in_init && conn.in_init() && !conn.is_tls13()).then_some(false)
@@ -1322,6 +1329,10 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                 if removes_session {
                     // SAFETY: as above.
                     unsafe { super::sess_cache::on_fatal(x) };
+                }
+                if !server {
+                    // SAFETY: as above.
+                    unsafe { super::sess_cache::on_failed_client(x) };
                 }
                 // The alert goes out if the BIO takes it.
                 // SAFETY: the caller's guarantee.
