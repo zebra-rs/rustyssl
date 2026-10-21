@@ -894,7 +894,12 @@ int main(void)
         errors();
         BIO_free(in);
         cms = CMS_ContentInfo_new();
-        printf("# SignedData_init: %d %d\n", CMS_SignedData_init(cms), CMS_SignedData_init(cms));
+        {
+            int first = CMS_SignedData_init(cms);
+            int second = CMS_SignedData_init(cms);
+
+            printf("# SignedData_init: %d %d\n", first, second);
+        }
         CMS_ContentInfo_free(cms);
         cms = CMS_data_create(NULL, CMS_STREAM);
         printf("  on Data: %d, add1_signer %s\n", CMS_SignedData_init(cms),
@@ -938,7 +943,13 @@ int main(void)
         cms = CMS_sign(NULL, NULL, NULL, NULL, CMS_PARTIAL);
         si = CMS_add1_signer(cms, rsa, rsa_key, NULL, 0);
         rr = CMS_ReceiptRequest_create0(id, 8, 0, NULL, to);
-        printf("# receipt request: add1 %d, final %d\n", CMS_add1_ReceiptRequest(si, rr), CMS_final(cms, in, NULL, 0));
+        {
+            /* In this order: the request is a signed attribute, so it must precede the signing. */
+            int added = CMS_add1_ReceiptRequest(si, rr);
+            int final = CMS_final(cms, in, NULL, 0);
+
+            printf("# receipt request: add1 %d, final %d\n", added, final);
+        }
         CMS_ReceiptRequest_free(rr);
         errors();
         rcms = CMS_sign_receipt(si, ec, ec_key, NULL, 0);
@@ -997,7 +1008,12 @@ int main(void)
         cms = CMS_sign_ex(NULL, NULL, NULL, NULL, CMS_PARTIAL, lc, NULL);
         si = CMS_add1_signer(cms, rsa, k, NULL, 0);
         rr = CMS_ReceiptRequest_create0_ex(NULL, -1, 1, NULL, to, lc);
-        printf("# receipt request in a context: add1 %d, final %d\n", CMS_add1_ReceiptRequest(si, rr), CMS_final(cms, in, NULL, 0));
+        {
+            int added = CMS_add1_ReceiptRequest(si, rr);
+            int final = CMS_final(cms, in, NULL, 0);
+
+            printf("# receipt request in a context: add1 %d, final %d\n", added, final);
+        }
         CMS_ReceiptRequest_free(rr);
         errors();
         rcms = si == NULL ? NULL : CMS_sign_receipt(si, ec, k2, NULL, 0);
@@ -1041,7 +1057,12 @@ int main(void)
         CMS_ContentInfo_free(cms);
 
         printf("# standard capabilities: %d\n", CMS_add_standard_smimecap(&caps));
-        printf("  simple: %d %d\n", CMS_add_simple_smimecap(&caps, NID_aes_128_gcm, 0), CMS_add_simple_smimecap(&caps, NID_rc2_cbc, 40));
+        {
+            int gcm = CMS_add_simple_smimecap(&caps, NID_aes_128_gcm, 0);
+            int rc2 = CMS_add_simple_smimecap(&caps, NID_rc2_cbc, 40);
+
+            printf("  simple: %d %d\n", gcm, rc2);
+        }
         for (i = 0; i < sk_X509_ALGOR_num(caps); i++) {
             X509_ALGOR *a = sk_X509_ALGOR_value(caps, i);
 
@@ -1056,7 +1077,9 @@ int main(void)
             CMS_SignerInfo *si = CMS_add1_signer(cms, rsa, rsa_key, NULL, CMS_NOSMIMECAP);
 
             printf("  add_smimecap: %d\n", CMS_add_smimecap(si, caps));
-            printf("  final %d, signed attributes %d\n", CMS_final(cms, in, NULL, 0), CMS_signed_get_attr_count(si));
+            int final = CMS_final(cms, in, NULL, 0);
+
+            printf("  final %d, signed attributes %d\n", final, CMS_signed_get_attr_count(si));
             printf("  SignerInfo_sign again: %d\n", CMS_SignerInfo_sign(si));
         }
         check(verify("with capabilities added", cms, NULL, st, NULL, 0) == 1, "CMS_add_smimecap");

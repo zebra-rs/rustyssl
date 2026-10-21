@@ -128,6 +128,21 @@ static void cipher_fails(const char *name, int enc, size_t inl, const char *want
     EVP_CIPHER_CTX_free(ctx);
 }
 
+/* update_fails for an ETM cipher's decryption of 32 octets, skipped if the CPU lacks it. */
+static void etm_update_fails(const char *name, const char *want)
+{
+    EVP_CIPHER *c = EVP_CIPHER_fetch(NULL, name, NULL);
+
+    if (c == NULL) {
+        ERR_clear_error();
+        number++;
+        printf("ok %d # skip %s isn't offered on this CPU\n", number, name);
+        return;
+    }
+    EVP_CIPHER_free(c);
+    update_fails(name, 0, 32, want);
+}
+
 int main(void)
 {
     /* The AES key wraps: input checks and the unwrap's integrity check fail inside
@@ -153,13 +168,14 @@ int main(void)
     update_fails("SM4-XTS", 1, 8, "sm4_xts_stream_update");
 
     /* ETM: decrypting without the expected tag fails in the hardware-specific function, then
-     * in the generic update. */
-    update_fails("AES-128-CBC-HMAC-SHA1-ETM", 0, 32,
-                 "hwaes_cbc_hmac_sha1_etm ossl_cipher_generic_stream_update");
-    update_fails("AES-256-CBC-HMAC-SHA256-ETM", 0, 32,
-                 "hwaes_cbc_hmac_sha256_etm ossl_cipher_generic_stream_update");
-    update_fails("AES-192-CBC-HMAC-SHA512-ETM", 0, 32,
-                 "hwaes_cbc_hmac_sha512_etm ossl_cipher_generic_stream_update");
+     * in the generic update. The default provider offers these ciphers only on aarch64 CPUs
+     * with the AES and SHA instructions; elsewhere the checks are skipped. */
+    etm_update_fails("AES-128-CBC-HMAC-SHA1-ETM",
+                     "hwaes_cbc_hmac_sha1_etm ossl_cipher_generic_stream_update");
+    etm_update_fails("AES-256-CBC-HMAC-SHA256-ETM",
+                     "hwaes_cbc_hmac_sha256_etm ossl_cipher_generic_stream_update");
+    etm_update_fails("AES-192-CBC-HMAC-SHA512-ETM",
+                     "hwaes_cbc_hmac_sha512_etm ossl_cipher_generic_stream_update");
 
     printf("1..%d\n", number);
     return failures == 0 ? 0 : 1;
