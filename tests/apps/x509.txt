@@ -155,7 +155,7 @@ x509 -in {src}/test/certs/ee-cert.pem -CAkey k -CAkeyform PEM -CAform PEM -CAser
 x509 -in {src}/test/certs/ee-cert.pem -x509toreq -key {src}/test/certs/ee-key.pem
 x509 -in {src}/test/certs/ee-cert.pem -x509toreq -key {src}/test/certs/ee-key.pem -copy_extensions copy -ext subjectAltName,subjectKeyIdentifier
 x509 -in {src}/test/certs/ee-cert.pem -x509toreq -key {src}/test/certs/ee-key.pem -copy_extensions copy -clrext
-x509 -in {src}/test/certs/ee-cert.pem -x509toreq -key {src}/test/certs/ee-key.pem -extfile {tests}/pki/x509.cnf -outform DER
+x509 -in {src}/test/certs/ee-cert.pem -x509toreq -key {src}/test/certs/ee-key.pem -extfile {tests}/pki/x509.cnf -not_before 20250101000000Z -not_after 20350101000000Z -outform DER
 x509 -in {src}/test/certs/ee-cert.pem -x509toreq -key {src}/test/certs/ee-key.pem -noout -subject
 x509 -in {src}/test/certs/ee-cert.pem -x509toreq
 x509 -in {src}/test/certs/ee-cert.pem -copy_extensions copy -noout
