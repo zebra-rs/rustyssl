@@ -12,8 +12,11 @@
 //! `ossl-modules/legacy.so` (MODULESDIR), `engines-3/` (ENGINESDIR), `bin/openssl`, `include/`,
 //! and `pkgconfig/`. OPENSSLDIR is the system's, so rustyssl reads the distribution's own
 //! `openssl.cnf` (and Fedora's crypto policies). Nothing the system's packages own is
-//! touched: `sbin/rustyssl-select` switches between the system's OpenSSL and rustyssl (the
-//! alternatives mechanism, docs/MIGRATION.md).
+//! touched: `<libdir>/rustyssl/bin/rustyssl-select` switches between the system's OpenSSL and
+//! rustyssl (the alternatives mechanism, docs/MIGRATION.md). The tree has no file in the
+//! system's own directories (`/usr/sbin` is a symlink on Fedora 42 and later, and extracting a
+//! directory over it would replace it): extract the tarball with GNU tar's
+//! `--keep-directory-symlink`.
 //!
 //! | Layout | libdir | OPENSSLDIR | Profile |
 //! |---|---|---|---|
@@ -281,9 +284,7 @@ fn stage_tree(root: &Path, dist: &Path, stage: &Path, layout: &Layout, apple: bo
     if apple {
         install_names(&lib, &modules, crypto, ssl, legacy, layout)?;
     } else {
-        let sbin = under(stage, &format!("{}/sbin", layout.prefix));
-        fs::create_dir_all(&sbin)?;
-        let select = sbin.join("rustyssl-select");
+        let select = bin.join("rustyssl-select");
         fs::write(&select, select_script(layout))?;
         let mut permissions = fs::metadata(&select)?.permissions();
         std::os::unix::fs::PermissionsExt::set_mode(&mut permissions, 0o755);

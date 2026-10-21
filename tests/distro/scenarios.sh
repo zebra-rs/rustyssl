@@ -40,8 +40,9 @@ alpine)
         postgresql-client openssl procps tar shadow > /dev/null || exit 1
     ;;
 esac
-tar -xzf "$PACKAGE" -C / || exit 1
-HOME_DIR=$(sed -n "s/^HOME_DIR='\(.*\)'$/\1/p" /usr/sbin/rustyssl-select)
+tar --keep-directory-symlink -xzf "$PACKAGE" -C / || exit 1
+SELECT=$(ls /usr/lib*/rustyssl/bin/rustyssl-select /usr/lib/*/rustyssl/bin/rustyssl-select 2> /dev/null | head -1)
+HOME_DIR=$(sed -n "s/^HOME_DIR='\(.*\)'$/\1/p" "$SELECT")
 log "rustyssl is in $HOME_DIR"
 
 # --- Keys and certificates (the system's openssl, once) -----------------------------------
@@ -70,9 +71,10 @@ openssl req -x509 -newkey rsa:3072 -nodes -keyout pki/ca.key -subj /CN=L11-CA -d
 mkcert server 2048 sha256 || exit 1
 mkcert rsa3072 3072 sha256 || exit 1
 case $DISTRO in fedora|el)
-    # Fedora's DEFAULT policy refuses SHA-1 signatures, so this one is made with the openssl
-    # tool told to allow them.
-    OPENSSL_CONF=/dev/null mkcert sha1 3072 sha1 || log "no SHA-1 certificate" ;;
+    # Fedora's OpenSSL refuses SHA-1 signatures unless its configuration allows them.
+    printf 'openssl_conf = init\n[init]\nalg_section = evp\n[evp]\nrh-allow-sha1-signatures = yes\n' \
+        > pki/sha1.cnf
+    OPENSSL_CONF=$W/pki/sha1.cnf mkcert sha1 3072 sha1 || { log "no SHA-1 certificate"; rm -f pki/sha1.pem; } ;;
 esac
 cat pki/server.pem pki/ca.pem > pki/chain.pem
 echo hello > www/hello.txt
@@ -161,7 +163,8 @@ for m in mpm_event unixd authz_core; do
     [ -f "$MODS/mod_$m.so" ] || sed -i "/mod_$m.so/d" $W/httpd.conf
 done
 
-# sshd: host keys, root logins by key only.
+# sshd (an absolute path, which it needs to re-execute itself): host keys, root logins by key.
+SSHD=$(command -v sshd || echo /usr/sbin/sshd)
 mkdir -p /run/sshd /root/.ssh
 chmod 700 /root/.ssh
 sed -i -E 's/^root:[^:]*:/root:*:/' /etc/shadow
@@ -173,7 +176,8 @@ done
 chmod 600 /root/.ssh/authorized_keys
 
 # PostgreSQL: one cluster, TLS only.
-INITDB=$(find / -name initdb -type f -not -path '/proc/*' 2> /dev/null | head -1)
+INITDB=$(command -v initdb || ls /usr/lib/postgresql/*/bin/initdb /usr/libexec/postgresql*/initdb \
+    2> /dev/null | head -1)
 PGBIN=$(dirname "$INITDB")
 PGDATA=$W/pgdata
 mkdir -p $PGDATA && chown postgres $PGDATA
@@ -194,8 +198,8 @@ chown postgres $PGDATA/postgresql.conf $PGDATA/pg_hba.conf
 start_servers() {
     nginx -c $NGINX_CONF || log "nginx failed to start"
     $HTTPD -f $W/httpd.conf -k start || log "httpd failed to start"
-    /usr/sbin/sshd -p 2222 -o PidFile=$W/sshd.pid -o PermitRootLogin=prohibit-password \
-        -o PasswordAuthentication=no || log "sshd failed to start"
+    $SSHD -p 2222 -o PidFile=$W/sshd.pid -o PermitRootLogin=prohibit-password \
+        -o PasswordAuthentication=no 2> $W/sshd.err || { log "sshd failed to start"; cat $W/sshd.err; }
     su postgres -s /bin/sh -c "$PGBIN/pg_ctl -D $PGDATA -l $PGDATA/pg.log -w start" > /dev/null ||
         { log "postgres failed to start"; tail -5 $PGDATA/pg.log; }
     sleep 1
@@ -250,10 +254,11 @@ scenarios() { # $1 phase
         'host=localhost port=5433 user=postgres dbname=postgres sslmode=verify-full' 2> $W/last.log)" = t ]
     result postgresql-verify-full $p $?
     loaded $p
-    case "$(command -v openssl)" in
-    /usr/local/bin/openssl) where=rustyssl ;;
-    *) where=system ;;
-    esac
+    if [ "$(readlink -f "$(command -v openssl)")" = "$HOME_DIR/bin/openssl" ]; then
+        where=rustyssl
+    else
+        where=system
+    fi
     [ "$where" = "$p" ]; result openssl-tool-is-$p $p $?
     case $DISTRO in fedora|el) crypto_policies $p ;; esac
     stop_servers
@@ -299,7 +304,7 @@ crypto_policies() {
         probe rsa3072-tls1.3 rsa3072
         probe rsa3072-tls1.2 rsa3072 -tls1_2
         probe rsa3072-tls1.1 rsa3072 -tls1_1
-        [ -f $W/pki/sha1.pem ] && probe sha1-signed sha1
+        [ -s $W/pki/sha1.pem ] && probe sha1-signed sha1
         probe rsa-kx-tls1.2 rsa3072 -tls1_2 -cipher 'AES256-SHA:@SECLEVEL=0'
         probe cbc-sha1-tls1.2 rsa3072 -tls1_2 -cipher 'ECDHE-RSA-AES128-SHA:@SECLEVEL=0'
     done
@@ -309,12 +314,12 @@ crypto_policies() {
 log "system phase"
 scenarios system
 log "switching to rustyssl"
-rustyssl-select rustyssl || exit 1
+"$SELECT" rustyssl || exit 1
 hash -r
-[ "$(rustyssl-select status)" = rustyssl ] || exit 1
+[ "$("$SELECT" status)" = rustyssl ] || exit 1
 log "openssl is now: $(openssl version)"
 scenarios rustyssl
-rustyssl-select system > /dev/null
+"$SELECT" system > /dev/null
 hash -r
-[ "$(rustyssl-select status)" = system ]; result select-back-to-system rustyssl $?
+[ "$("$SELECT" status)" = system ]; result select-back-to-system rustyssl $?
 echo "== done"
