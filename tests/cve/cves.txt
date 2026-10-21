@@ -264,9 +264,9 @@ CVE-2025-69421 test cve_pkcs encrypted PKCS#12 data without encryptedContent fai
 CVE-2026-2673 test cve_tls DEFAULT in a server's group list keeps its tuple structure
 CVE-2026-7383 test cve_asn1 multibyte conversions size their output exactly
 CVE-2026-9076 test cve_pkcs a 2-octet PWRI encryptedKey fails without reading past it
-CVE-2026-14456 gap quic QUIC: no crafted-packet harness yet (fuzz target quic_port covers packet parsing)
+CVE-2026-14456 test cve_quic Initials for 5000 unknown connection IDs: the listener queues fewer, and memory stays bounded
 CVE-2026-14457 test cve_tls an RPK server with only a private key selects its signature safely
-CVE-2026-18798 gap quic QUIC: no crafted-packet harness yet (fuzz target quic_port covers packet parsing)
+CVE-2026-18798 test cve_quic the same flood: Initials whose channel isn't created are handled without a double free
 CVE-2026-22795 test cve_pkcs PKCS#12 bag attributes of the wrong type are handled
 CVE-2026-22796 test cve_pkcs a messageDigest attribute of the wrong type fails verification
 CVE-2026-28386 test cve_cipher AES-CFB-128 in odd pieces reads only its input
@@ -279,11 +279,11 @@ CVE-2026-31790 test cve_pkey RSASVE encapsulation reports success only with a se
 CVE-2026-34180 test cve_asn1 a primitive whose content runs past the input is rejected
 CVE-2026-34181 test cve_pkcs a PBMAC1 file with a short HMAC key is rejected
 CVE-2026-34182 test cve_pkcs AuthEnvelopedData with tampered authAttrs is rejected, releasing nothing
-CVE-2026-34183 gap quic QUIC: no crafted-packet harness yet (fuzz target quic_port covers packet parsing)
+CVE-2026-34183 test cve_quic 800000 PATH_CHALLENGE frames, never acknowledged: memory stays bounded
 CVE-2026-35188 test cve_tls malformed stapled OCSP responses are checked without a double free
 CVE-2026-35189 test cve_x509 3000 nameRelativeToCRLIssuer distribution points are processed quickly
-CVE-2026-35191 gap quic QUIC: no crafted-packet harness yet (fuzz target quic_port covers packet parsing)
-CVE-2026-42764 gap quic QUIC: no crafted-packet harness yet (fuzz target quic_port covers packet parsing)
+CVE-2026-35191 test cve_quic coalesced copies of an Initial in one datagram: the server sends at most 3x what it received
+CVE-2026-42764 test cve_quic an Initial with a token the server never issued, without address validation
 CVE-2026-42765 test cve_x509 a partial chain with OCSP checking and no issuer is verified safely
 CVE-2026-42766 test cve_pkcs a PWRI key-encryption cipher without an IV fails
 CVE-2026-42767 test cve_pkcs decrypting a CRMF EncryptedValue without symmAlg parameters fails
@@ -291,26 +291,26 @@ CVE-2026-42768 test cve_pkcs CMS decryption across two RecipientInfos with an un
 CVE-2026-42769 gap cmp CMP rootCaKeyUpdate verification: needs a crafted CMP genp exchange
 CVE-2026-42770 test cve_pkey a DHX peer whose q differs from ours is refused as a peer
 CVE-2026-42771 n/a 4.0 OpenSSL 4.0 only (rustyssl targets the 3.x ABI)
-CVE-2026-42772 gap quic QUIC: no crafted-packet harness yet (fuzz target quic_port covers packet parsing)
+CVE-2026-42772 test cve_quic 20000 reversed one-octet STREAM frames reassemble quickly (found rustyssl closing with INTERNAL_ERROR)
 CVE-2026-45445 test cve_cipher AES-OCB through EVP_Cipher uses the IV, as EVP_EncryptUpdate does
 CVE-2026-45446 test cve_cipher AES-SIV and AES-GCM-SIV check the tag of an empty message
 CVE-2026-45447 test cve_pkcs PKCS#7 verification of a message with repeated certificates
 CVE-2026-54872 gap timing non-NIST curve scalar multiplication timing: ecdsa-sign measures P-256 only
-CVE-2026-54873 gap quic QUIC: no crafted-packet harness yet (fuzz target quic_port covers packet parsing)
+CVE-2026-54873 test cve_quic 200000 one-octet STREAM fragments around gaps never filled: memory stays bounded, the connection stays open
 CVE-2026-54874 test cve_tls DTLS records for a future epoch are buffered in bounds
 CVE-2026-54875 gap timing SM2 scalar multiplication timing: not measured by test-timing yet
 CVE-2026-54876 test cve_tls checking stapled OCSP responses releases what it parsed
 CVE-2026-63072 test cve_pkcs KARI with a key-wrap-pad OID fails without writing past its buffer
 CVE-2026-63073 covered test-openssl-suite a CMP sender DN as a format string: upstream's cmp_vfy_test, run by test-openssl-suite --all
 CVE-2026-63074 gap cmp CMP extraCerts cache growth: memory use isn't observable here
-CVE-2026-63075 gap quic QUIC: no crafted-packet harness yet (fuzz target quic_port covers packet parsing)
+CVE-2026-63075 test cve_quic 20000 ack-eliciting packets whose ACK-only replies are never acknowledged: memory stays bounded
 CVE-2026-63076 test cve_pkcs a CMP request whose PBM protectionAlg parameter has the wrong type is refused
 CVE-2026-72897 test cve_tls switching SSL_CTX in the servername callback stays in bounds
 CVE-2026-75803 test cve_cipher an empty ciphertext with a forged tag fails through EVP_Cipher
-CVE-2026-75804 gap quic QUIC: no crafted-packet harness yet (fuzz target quic_port covers packet parsing)
+CVE-2026-75804 test cve_quic STREAM data over the connection window, each stream within its own: FLOW_CONTROL_ERROR
 CVE-2026-75805 gap cmp a crafted CMP revocation response: needs a crafted CMP rp exchange
 CVE-2026-75806 gap dtls an undersized DTLS 1.2 AEAD record: no in-memory DTLS handshake harness yet
 CVE-2026-77696 gap timing SM2 signing timing: not measured by test-timing yet
 CVE-2026-84782 gap dtls DTLS retransmission from a stale offset: no in-memory DTLS handshake harness yet
 CVE-2026-84783 n/a 4.0 OpenSSL 4.0 only (rustyssl targets the 3.x ABI)
-CVE-2026-84784 gap quic QUIC: no crafted-packet harness yet (fuzz target quic_port covers packet parsing)
+CVE-2026-84784 test cve_quic 20000 NEW_CONNECTION_ID frames each retiring the earlier IDs: memory stays bounded
