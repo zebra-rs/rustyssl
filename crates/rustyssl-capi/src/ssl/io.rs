@@ -978,7 +978,9 @@ pub(crate) unsafe fn provider(x: &Ssl, snap: &config::CtxSnapshot) -> Arc<EvpPro
         None => {
             // SAFETY: the context's library context (it outlives the connection) and property
             // query.
-            let p = Arc::new(unsafe { EvpProvider::new(snap.libctx, snap.propq()) });
+            let p = Arc::new(unsafe {
+                EvpProvider::sharing(snap.libctx, snap.propq(), Arc::clone(&snap.tls_found))
+            });
             st.drv.provider = Some(Arc::clone(&p));
             p
         }

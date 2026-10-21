@@ -14,7 +14,7 @@
 use core::ffi::{CStr, c_char, c_int, c_uint, c_ulong, c_void};
 use core::ptr;
 use std::ffi::CString;
-use std::sync::{Mutex, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError};
 
 use rustyssl_abi::{
     EVP_CIPHER, EVP_CIPHER_CTX, EVP_CTRL_AEAD_GET_TAG, EVP_CTRL_AEAD_SET_IVLEN,
@@ -414,11 +414,20 @@ pub(crate) struct EvpProvider {
     env: Env,
     /// The keys the core refers to by [`KeyId`] (each holding a reference).
     keys: Mutex<Vec<Owned<EVP_PKEY>>>,
-    /// The groups, discovered on first use (`ssl_load_groups`).
+    /// What the providers offered, discovered once: shared by the connections of one
+    /// `SSL_CTX` (which OpenSSL loads when the context is made, `ssl_load_groups`).
+    found: Arc<Discovered>,
+}
+
+/// The providers' TLS offerings, found on first use and kept: by a provider, or by an
+/// `SSL_CTX` for all its connections' providers.
+#[derive(Default)]
+pub(crate) struct Discovered {
+    /// The groups (`ssl_load_groups`).
     groups: Mutex<Option<Vec<Group>>>,
-    /// The providers' signature algorithms, discovered on first use (`ssl_load_sigalgs`), each
-    /// with its IANA name as `SSL_get0_peer_signature_name` hands it out. Set once and never
-    /// replaced, so the names stay where they are while the provider lives.
+    /// The providers' signature algorithms (`ssl_load_sigalgs`), each with its IANA name as
+    /// `SSL_get0_peer_signature_name` hands it out. Set once and never replaced, so the names
+    /// stay where they are while this lives.
     sigalgs: Mutex<Option<Vec<(SigalgInfo, CString)>>>,
     /// Which digests (by NID) and key types (by name) could be fetched, each asked once, as
     /// OpenSSL loads `ssl_digest_methods` once per context.
@@ -439,6 +448,20 @@ impl EvpProvider {
     /// `libctx` is NULL or a library context that outlives the provider; `propq` NULL or a
     /// NUL-terminated string.
     pub(crate) unsafe fn new(libctx: *mut OSSL_LIB_CTX, propq: *const c_char) -> Self {
+        // SAFETY: the caller's guarantee.
+        unsafe { Self::sharing(libctx, propq, Arc::default()) }
+    }
+
+    /// As [`EvpProvider::new`], keeping what it discovers in `found`, which other providers of
+    /// the same library context and property query share (an `SSL_CTX`'s connections).
+    ///
+    /// # Safety
+    /// As for [`EvpProvider::new`].
+    pub(crate) unsafe fn sharing(
+        libctx: *mut OSSL_LIB_CTX,
+        propq: *const c_char,
+        found: Arc<Discovered>,
+    ) -> Self {
         let propq = if propq.is_null() {
             None
         } else {
@@ -451,9 +474,7 @@ impl EvpProvider {
                 propq,
             },
             keys: Mutex::new(Vec::new()),
-            groups: Mutex::new(None),
-            sigalgs: Mutex::new(None),
-            available: Mutex::new(Vec::new()),
+            found,
         }
     }
 
@@ -461,6 +482,7 @@ impl EvpProvider {
     /// fetch's errors don't stay).
     fn fetchable(&self, what: Fetchable) -> bool {
         let known = self
+            .found
             .available
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
@@ -494,7 +516,8 @@ impl EvpProvider {
         };
         // SAFETY: no preconditions.
         unsafe { ERR_pop_to_mark() };
-        self.available
+        self.found
+            .available
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .push((what, ok));
@@ -505,6 +528,7 @@ impl EvpProvider {
     /// the providers' callbacks, so no lock is held during it.
     fn provider_sigalgs(&self) -> Vec<SigalgInfo> {
         let known = self
+            .found
             .sigalgs
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
@@ -535,7 +559,11 @@ impl EvpProvider {
                 (i, name)
             })
             .collect();
-        let mut slot = self.sigalgs.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut slot = self
+            .found
+            .sigalgs
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         slot.get_or_insert(named)
             .iter()
             .map(|(i, _)| i.clone())
@@ -546,7 +574,11 @@ impl EvpProvider {
     /// NID, by code point (`tls1_lookup_sigalg` over the providers' part of the cache).
     pub(crate) fn provider_sigalg(&self, id: u16) -> Option<(*const c_char, c_int)> {
         self.provider_sigalgs();
-        let slot = self.sigalgs.lock().unwrap_or_else(PoisonError::into_inner);
+        let slot = self
+            .found
+            .sigalgs
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         slot.as_ref()?
             .iter()
             .find(|(i, _)| i.id == id)
@@ -609,12 +641,24 @@ impl EvpProvider {
 
     /// The groups, discovering them on first use.
     fn group_list(&self) -> Vec<Group> {
-        let mut g = self.groups.lock().unwrap_or_else(PoisonError::into_inner);
-        if g.is_none() {
-            // Discovery calls into the providers, which don't call back into this SSL.
-            *g = Some(self.discover_groups());
+        let known = self
+            .found
+            .groups
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone();
+        if let Some(list) = known {
+            return list;
         }
-        g.clone().unwrap_or_default()
+        // Discovery calls into the providers, so no lock is held during it (AGENTS.md rule 7);
+        // the first list kept is the one every later call sees.
+        let found = self.discover_groups();
+        self.found
+            .groups
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get_or_insert(found)
+            .clone()
     }
 
     /// `ssl_load_groups`: every provider's TLS-GROUP sets whose key management can be fetched
