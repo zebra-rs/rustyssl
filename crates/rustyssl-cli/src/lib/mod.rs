@@ -13,6 +13,7 @@ pub mod apps;
 pub mod apps_http;
 pub mod ca_db;
 pub mod cmp_mock_srv;
+pub mod ec_common;
 pub mod engine;
 pub mod http_server;
 pub mod io;

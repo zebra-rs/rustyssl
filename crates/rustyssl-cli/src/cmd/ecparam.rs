@@ -11,9 +11,9 @@ use rustyssl_ossl::params::ParamList;
 use rustyssl_ossl::pkey::{self, PkeyCtx};
 use rustyssl_ossl::{Bio, obj};
 
-use super::pkey::{ASN1_ENCODING_OPTIONS, POINT_FORMAT_OPTIONS};
 use crate::generated::options::ecparam::{OPTIONS, Opt};
 use crate::lib::apps::{bio_open_owner, load_keyparams_suppress};
+use crate::lib::ec_common::{ASN1_ENCODING_OPTIONS, POINT_FORMAT_OPTIONS};
 use crate::lib::opt::{self, Parser, eprintf, fmt_flags, format};
 use crate::lib::{app_libctx, app_rand, engine, io};
 

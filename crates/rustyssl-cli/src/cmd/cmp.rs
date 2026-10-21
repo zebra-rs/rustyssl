@@ -43,12 +43,12 @@ use rustyssl_ossl::verify::VerifyParam;
 use rustyssl_ossl::x509::{Cert, CertStack, Crl, Store, V3Ctx};
 use rustyssl_ossl::{Bio, err, pkcs12, ui};
 
-use crate::cmd::ts::{items, load_cert_certs, load_certs_multifile};
 use crate::generated::options::cmp::{OPTIONS, Opt};
 use crate::lib::apps::{
     app_conf_try_string, app_load_config, atoi, bio_open_owner, default_config_file, get_passwd,
     load_cert_pass, load_crl, load_csr_autofmt, load_key, load_pubkey, parse_name,
 };
+use crate::lib::apps::{items, load_cert_certs, load_certs_multifile};
 use crate::lib::cmp_mock_srv::{MockSrv, mock_srv_new};
 use crate::lib::engine::{Engine, setup_engine_methods};
 use crate::lib::http_server::{

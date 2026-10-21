@@ -1,32 +1,15 @@
 //! `openssl pkey` (`apps/pkey.c`).
-//!
-//! Also the key commands' shared helpers (fork G2): [`opt_cipher`], and
-//! `ec_common.h`'s [`POINT_FORMAT_OPTIONS`] and [`ASN1_ENCODING_OPTIONS`].
 
 use rustyssl_ossl::abi::{OSSL_PKEY_PARAM_EC_ENCODING, OSSL_PKEY_PARAM_EC_POINT_CONVERSION_FORMAT};
-use rustyssl_ossl::evp::Cipher;
 use rustyssl_ossl::params::ParamList;
 use rustyssl_ossl::pkey::PkeyCtx;
 
 use crate::generated::options::pkey::{OPTIONS, Opt};
 use crate::lib::apps::{app_passwd, bio_open_owner, load_key, load_pubkey};
+use crate::lib::ec_common::{ASN1_ENCODING_OPTIONS, POINT_FORMAT_OPTIONS};
+use crate::lib::opt::opt_cipher;
 use crate::lib::opt::{self, Parser, eprintf, fmt_flags, format};
 use crate::lib::{app_libctx, engine, io};
-
-/// `point_format_options` of `ec_common.h`.
-pub const POINT_FORMAT_OPTIONS: &[&str] = &["uncompressed", "compressed", "hybrid"];
-
-/// `asn1_encoding_options` of `ec_common.h`.
-pub const ASN1_ENCODING_OPTIONS: &[&str] = &["named_curve", "explicit"];
-
-/// `opt_cipher(name, &cipher)`: no name is no cipher; `Err` (the message printed) when the
-/// name isn't a cipher the key encryption can use.
-pub fn opt_cipher(name: Option<&str>) -> Result<Option<Cipher>, ()> {
-    match name {
-        None => Ok(None),
-        Some(n) => opt::cipher(n).map(Some).ok_or(()),
-    }
-}
 
 pub fn main(argv: &[String]) -> i32 {
     let ret = run(argv);

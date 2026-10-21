@@ -1,8 +1,8 @@
 //! `openssl ocsp` (`apps/ocsp.c`).
 //!
-//! The responder reads the CA's index file (`load_index`, `index_index` of `apps.c`, and
-//! `unpack_revinfo` of `ca.c`) through private copies here; fork G3 owns the shared CA
-//! database helpers (`src/lib/ca_db.rs`).
+//! The responder reads the CA's index file with `lib::ca_db` (`load_index` and `index_index`
+//! of `apps.c`). Its `unpack_revinfo` keeps what it parsed when it fails, as `ca.c`'s does
+//! for `ocsp` (which ignores the failure); `ca`'s own copy returns nothing then.
 
 use rustyssl_ossl::abi::{
     OCSP_NOCERTS, OCSP_NOCHAIN, OCSP_NOCHECKS, OCSP_NOEXPLICIT, OCSP_NOINTERN, OCSP_NOSIGS,
@@ -16,20 +16,19 @@ use rustyssl_ossl::abi::{
 use rustyssl_ossl::evp::Md;
 use rustyssl_ossl::http::{self, Headers, Post, SslCtx};
 use rustyssl_ossl::object::Object;
-use rustyssl_ossl::ocsp::{
-    self, BasicResp, CertId, DB_REV_DATE, DB_TYPE, OcspRequest, OcspResponse, Time, TxtDb,
-};
+use rustyssl_ossl::ocsp::{self, BasicResp, CertId, OcspRequest, OcspResponse, Time};
 use rustyssl_ossl::pkey::{MdCtx, Pkey};
+use rustyssl_ossl::txt_db::TxtDb;
 use rustyssl_ossl::verify::VerifyParam;
 use rustyssl_ossl::x509::{Cert, CertStack};
 use rustyssl_ossl::{Bio, err};
 
 use crate::generated::options::ocsp::{OPTIONS, Opt};
 use crate::lib::apps::{
-    app_conf_try_string, app_load_config_quiet, app_passwd, atoi, bio_open_default, load_cert,
-    load_certs, load_key, parse_yesno, setup_verify,
+    app_passwd, atoi, bio_open_default, load_cert, load_certs, load_key, setup_verify,
 };
 use crate::lib::apps_http::app_http_post_asn1;
+use crate::lib::ca_db::{self, field};
 use crate::lib::http_server::{
     http_server_get_asn1_req, http_server_init, http_server_send_asn1_resp, level,
     trace_log_message,
@@ -449,7 +448,7 @@ fn run(argv: &[String]) -> i32 {
     }
     let mut rdb = None;
     if let Some(f) = &ridx_filename {
-        match load_index(f).filter(index_index) {
+        match ca_db::load_index(f, true).filter(ca_db::index_index) {
             Some(db) => rdb = Some(db.db),
             None => {
                 eprintf!("Problem with index file: {f} (could not load/parse file)\n");
@@ -873,18 +872,18 @@ fn make_ocsp_response(r: &Responder<'_>, req: &OcspRequest) -> Option<OcspRespon
                 }
             }
         }
-        let inf = cid.serial_hex().and_then(|h| r.db.get_by_serial(&h));
+        let inf = cid.serial_hex().and_then(|h| row_by_serial(r.db, &h));
         let id = cid_resp_md.as_ref().unwrap_or(&cid);
         let (this, next) = (thisupd.as_ref(), nextupd.as_ref());
         let Some(inf) = inf.filter(|_| found) else {
             bs.add_status(id, V_OCSP_CERTSTATUS_UNKNOWN, 0, None, this, next);
             continue;
         };
-        let t = inf.get(DB_TYPE).and_then(|t| t.bytes().next());
+        let t = inf.get(field::TYPE).and_then(|t| t.bytes().next());
         if t == Some(b'V') {
             bs.add_status(id, V_OCSP_CERTSTATUS_GOOD, 0, None, this, next);
         } else if t == Some(b'R') {
-            let rev = unpack_revinfo(inf.get(DB_REV_DATE).map_or("", String::as_str));
+            let rev = unpack_revinfo(inf.get(field::REV_DATE).map_or("", String::as_str));
             let Some(single) = bs.add_status(
                 id,
                 V_OCSP_CERTSTATUS_REVOKED,
@@ -964,7 +963,7 @@ fn unpack_revinfo(s: &str) -> RevInfo {
         },
         None => (None, None),
     };
-    match Time::utc_from_string(rtime) {
+    match Time::utc_from_string_kept(rtime) {
         Ok(t) => r.revtm = Some(t),
         Err(None) => {
             eprintf!("memory allocation failure\n");
@@ -1029,43 +1028,16 @@ fn unpack_revinfo(s: &str) -> RevInfo {
     r
 }
 
-/// `CA_DB`: the index and whether subjects must be unique.
-struct CaDb {
-    db: TxtDb,
-    unique_subject: bool,
-}
-
-/// `load_index(dbfile, NULL)` of `apps.c`.
-fn load_index(dbfile: &str) -> Option<CaDb> {
-    let r = (|| {
-        let input = Bio::new_file(dbfile, "r")?;
-        let db = TxtDb::read(&input)?;
-        let attr = app_load_config_quiet(Some(&format!("{dbfile}.attr")));
-        let mut unique_subject = true;
-        if let Some(c) = &attr
-            && let Some(p) = app_conf_try_string(c, None, "unique_subject")
-        {
-            unique_subject = parse_yesno(Some(&p), true);
-        }
-        Some(CaDb { db, unique_subject })
-    })();
-    io::print_errors();
-    r
-}
-
-/// `index_index` of `apps.c`.
-fn index_index(db: &CaDb) -> bool {
-    if let Err((e, a1, a2)) = db.db.index_serial() {
-        eprintf!("Error creating serial number index:({e},{a1},{a2})\n");
-        io::print_errors();
-        return false;
+/// `TXT_DB_get_by_index(db, DB_serial, row)` with the serial `hex`: the row's fields.
+fn row_by_serial(db: &TxtDb, hex: &str) -> Option<Vec<String>> {
+    let mut key = [None; field::NUMBER];
+    if let Some(k) = key.get_mut(field::SERIAL) {
+        *k = Some(hex);
     }
-    if db.unique_subject
-        && let Err((e, a1, a2)) = db.db.index_name()
-    {
-        eprintf!("Error creating name index:({e},{a1},{a2})\n");
-        io::print_errors();
-        return false;
-    }
-    true
+    let r = db.get_by_index(field::SERIAL, &key)?;
+    Some(
+        (0..field::NUMBER)
+            .map(|f| db.field_str(r, f).unwrap_or_default())
+            .collect(),
+    )
 }

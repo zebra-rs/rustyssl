@@ -10,9 +10,8 @@ use rustyssl_ossl::x509::{Cert, CertStack, CrlStack, Store};
 
 use crate::generated::options::verify::{OPTIONS, Opt};
 use crate::lib::app_libctx::opt_provider;
-use crate::lib::apps::{
-    get_nameopt, load_cert, load_certs, load_crl, load_crls, set_nameopt, setup_verify,
-};
+use crate::lib::apps::{get_nameopt, load_cert, load_certs, load_crls, set_nameopt, setup_verify};
+use crate::lib::apps::{policies_print, store_setup_crl_download};
 use crate::lib::engine::setup_engine;
 use crate::lib::io;
 use crate::lib::opt::{self, Parser, eprintf, format};
@@ -305,52 +304,6 @@ fn cb(ok: core::ffi::c_int, ctx: StoreCtxRef<'_>) -> core::ffi::c_int {
         rustyssl_ossl::err::clear();
     }
     ok
-}
-
-/// `policies_print` of `apps.c`, to standard error.
-pub fn policies_print(ctx: StoreCtxRef<'_>) {
-    let explicit = if ctx.explicit_policy() {
-        "True"
-    } else {
-        "False"
-    };
-    eprintf!("Require explicit Policy: {explicit}\n");
-    for (name, user) in [("Authority", false), ("User", true)] {
-        eprintf!("{name} Policies:");
-        let printed = io::bio_err().and_then(|b| ctx.print_policy_nodes(user, b, 2));
-        if printed.is_none() {
-            eprintf!(" <empty>\n");
-        }
-    }
-}
-
-/// `store_setup_crl_download` of `apps.c`: CRLs fetched from the certificates' distribution
-/// points (`http://` only).
-pub fn store_setup_crl_download(store: &Store) {
-    store.set_lookup_crls_cb(crls_http_cb);
-}
-
-/// `load_crl_crldp`: the CRL at the first distribution point with an HTTP URL.
-fn load_crl_crldp(urls: &[Option<String>]) -> Option<rustyssl_ossl::x509::Crl> {
-    let url = urls.iter().flatten().next()?;
-    load_crl(Some(url), format::UNDEF, false, Some("CRL via CDP"))
-}
-
-/// `crls_http_cb`.
-fn crls_http_cb(ctx: StoreCtxRef<'_>) -> Option<CrlStack> {
-    let crls = CrlStack::new()?;
-    let x = ctx.current_cert()?;
-    let crl = load_crl_crldp(&x.dp_http_urls(a::NID_crl_distribution_points))?;
-    if !crls.push(crl) {
-        return None;
-    }
-    // A delta CRL, if there is one.
-    if let Some(crl) = load_crl_crldp(&x.dp_http_urls(a::NID_freshest_crl))
-        && !crls.push(crl)
-    {
-        return None;
-    }
-    Some(crls)
 }
 
 /// `x509_ctrl_string` of `app_x509.c`: `distid:` or `hexdistid:` for the certificate.

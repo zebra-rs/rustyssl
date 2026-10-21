@@ -24,6 +24,7 @@ use crate::lib::apps::{
     get_nameopt, load_cert_pass, load_certs, load_csr_autofmt, load_key, load_pubkey, parse_name,
     print_name, set_cert_ex, set_dateopt, set_ext_copy, set_nameopt,
 };
+use crate::lib::apps::{check_cert_attributes, set_cert_times};
 use crate::lib::ca_db::{load_serial, rand_serial, save_serial};
 use crate::lib::engine::setup_engine;
 use crate::lib::io;
@@ -52,101 +53,6 @@ pub fn main(argv: &[String]) -> i32 {
             1
         }
     }
-}
-
-/// `check_cert_time_string`.
-pub fn check_cert_time_string(time: Option<&str>, desc: &str) -> bool {
-    match time {
-        None => true,
-        Some("today") => true,
-        Some(t) if x509::time_string_ok(t) => true,
-        Some(_) => {
-            eprintf!(
-                "{desc} is invalid, it should be \"today\" or have format [CC]YYMMDDHHMMSSZ\n"
-            );
-            false
-        }
-    }
-}
-
-/// `set_cert_times(x, startdate, enddate, days, strict_compare_times)`.
-pub fn set_cert_times(
-    x: &Cert,
-    startdate: Option<&str>,
-    enddate: Option<&str>,
-    days: i32,
-    strict_compare_times: bool,
-) -> bool {
-    if !check_cert_time_string(startdate, "start date")
-        || !check_cert_time_string(enddate, "end date")
-    {
-        return false;
-    }
-    let start = startdate.filter(|s| *s != "today");
-    if !x.set_not_before(start) {
-        eprintf!("Error setting notBefore certificate field\n");
-        return false;
-    }
-    let (enddate, days) = match enddate {
-        Some("today") => (None, 0),
-        e => (e, days),
-    };
-    if !x.set_not_after(enddate, days) {
-        eprintf!("Error setting notAfter certificate field\n");
-        return false;
-    }
-    if let (Some(a), Some(b)) = (x.not_after(), x.not_before())
-        && x509::time_compare(a, b) < 0
-    {
-        let what = if strict_compare_times {
-            "Error"
-        } else {
-            "Warning"
-        };
-        eprintf!("{what}: end date before start date\n");
-        if strict_compare_times {
-            return false;
-        }
-    }
-    true
-}
-
-/// `check_cert_attributes(bio, x, checkhost, checkemail, checkip, print)`.
-pub fn check_cert_attributes(
-    bio: &Bio,
-    x: &Cert,
-    checkhost: Option<&str>,
-    checkemail: Option<&str>,
-    checkip: Option<&str>,
-    print: bool,
-) -> bool {
-    let mut ret = true;
-    let mut out = bio;
-    if let Some(h) = checkhost {
-        let valid = x.check_host(h);
-        if print {
-            let not = if valid == 1 { "" } else { " NOT" };
-            let _ = writeln!(out, "Hostname {h} does{not} match certificate");
-        }
-        ret = ret && valid > 0;
-    }
-    if let Some(e) = checkemail {
-        let valid = x.check_email(e);
-        if print {
-            let not = if valid != 0 { "" } else { " NOT" };
-            let _ = writeln!(out, "Email {e} does{not} match certificate");
-        }
-        ret = ret && valid > 0;
-    }
-    if let Some(ip) = checkip {
-        let valid = x.check_ip_asc(ip);
-        if print {
-            let not = if valid != 0 { "" } else { " NOT" };
-            let _ = writeln!(out, "IP {ip} does{not} match certificate");
-        }
-        ret = ret && valid > 0;
-    }
-    ret
 }
 
 /// `-fingerprint`'s line.

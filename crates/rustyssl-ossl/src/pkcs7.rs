@@ -93,18 +93,6 @@ impl Pkcs7 {
         unsafe { ffi::PKCS7_print_ctx(out.as_ptr(), self.as_ptr(), indent, core::ptr::null()) }
     }
 
-    /// `i2d_PKCS7_bio`.
-    pub fn write_der(&self, out: &Bio) -> c_int {
-        // SAFETY: both are live.
-        unsafe { ffi::i2d_PKCS7_bio(out.as_ptr(), self.as_ptr()) }
-    }
-
-    /// `PEM_write_bio_PKCS7`.
-    pub fn write_pem(&self, out: &Bio) -> c_int {
-        // SAFETY: both are live.
-        unsafe { ffi::PEM_write_bio_PKCS7(out.as_ptr(), self.as_ptr()) }
-    }
-
     /// `OBJ_obj2nid(p7->type)`.
     pub fn type_nid(&self) -> c_int {
         // SAFETY: the object is live; its public layout has the type field.

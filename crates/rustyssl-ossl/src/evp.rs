@@ -337,6 +337,8 @@ pub fn names_sorted(kind: c_int) -> Vec<ObjName> {
 
 use crate::abi::EVP_CIPHER_CTX;
 use crate::params::{Params, ParamsRef};
+pub use crate::skey::Skey;
+pub use crate::skey::SkeyMgmt;
 
 impl Cipher {
     /// `EVP_CIPHER_get0_name`.
@@ -502,25 +504,7 @@ impl CipherCtxRef<'_> {
     }
 }
 
-crate::handle!(
-    /// An owned `EVP_SKEYMGMT`.
-    SkeyMgmt, EVP_SKEYMGMT, EVP_SKEYMGMT_free
-);
-crate::handle!(
-    /// An owned `EVP_SKEY`.
-    Skey, EVP_SKEY, EVP_SKEY_free
-);
-
 impl SkeyMgmt {
-    /// `EVP_SKEYMGMT_fetch(libctx, name, propq)`.
-    pub fn fetch(libctx: Option<&LibCtx>, name: &str, propq: Option<&str>) -> Option<Self> {
-        let n = cstring(name)?;
-        let pq = propq_c(propq)?;
-        let ctx = libctx.map_or(core::ptr::null_mut(), LibCtx::as_ptr);
-        // SAFETY: ctx is NULL or live; the strings are valid or NULL.
-        Self::from_ptr(unsafe { ffi::EVP_SKEYMGMT_fetch(ctx, n.as_ptr(), ptr_of(&pq)) })
-    }
-
     /// `EVP_SKEYMGMT_get0_imp_settable_params`.
     pub fn imp_settable_params(&self) -> ParamsRef<'_> {
         // SAFETY: the manager is live; the table is owned by it.

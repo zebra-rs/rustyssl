@@ -6,9 +6,9 @@ use rustyssl_ossl::obj;
 use rustyssl_ossl::pkcs8::{self, Algor, EncryptedKey, P8Info};
 use rustyssl_ossl::ui;
 
-use super::pkey::opt_cipher;
 use crate::generated::options::pkcs8::{OPTIONS, Opt};
 use crate::lib::apps::{app_passwd, bio_open_default, bio_open_owner, load_key};
+use crate::lib::opt::opt_cipher;
 use crate::lib::opt::{self, Parser, eprintf, fmt_flags, format};
 use crate::lib::{app_libctx, app_rand, engine, io};
 

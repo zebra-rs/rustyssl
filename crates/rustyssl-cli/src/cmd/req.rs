@@ -15,10 +15,10 @@ use rustyssl_ossl::pkey::{Pkey, PkeyCtx};
 use rustyssl_ossl::x509::{self, Cert, Integer, Name, Req, V3Ctx};
 use rustyssl_ossl::{Bio, err};
 
-use crate::cmd::x509::set_cert_times;
 use crate::generated::options::req::{OPTIONS, Opt};
 use crate::lib::app_libctx::{libctx, opt_provider, propq};
 use crate::lib::app_rand;
+use crate::lib::apps::set_cert_times;
 use crate::lib::apps::{
     ConfigFile, ExtCopy, add_oid_section, app_conf_try_number, app_conf_try_string,
     app_load_config_bio, app_load_config_verbose, app_load_modules, app_passwd, atoi,

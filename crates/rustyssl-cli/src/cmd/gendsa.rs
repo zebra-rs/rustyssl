@@ -3,10 +3,10 @@
 use rustyssl_ossl::abi::OPENSSL_DSA_MAX_MODULUS_BITS;
 use rustyssl_ossl::pkey::{self, PkeyCtx};
 
-use super::pkey::opt_cipher;
 use crate::generated::options::gendsa::{OPTIONS, Opt};
 use crate::lib::apps::{app_passwd, bio_open_owner, load_keyparams};
 use crate::lib::keygen;
+use crate::lib::opt::opt_cipher;
 use crate::lib::opt::{self, Parser, eprintf, format};
 use crate::lib::{app_libctx, app_rand, engine, io};
 

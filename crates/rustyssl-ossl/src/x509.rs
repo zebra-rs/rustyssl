@@ -9,6 +9,8 @@ use crate::abi::{
 use crate::bio::Bio;
 pub use crate::bn::Bn;
 use crate::ffi;
+pub use crate::object::Object as Obj;
+pub use crate::pkcs7::Pkcs7;
 use crate::pkey::{MdCtx, Pkey};
 use crate::provider::LibCtx;
 use crate::util::{cstring, string_at, take_string};
@@ -876,11 +878,6 @@ asn1_io!(
     i2d_X509_REQ_bio
 );
 
-crate::handle!(
-    /// An owned `PKCS7`.
-    Pkcs7, PKCS7, PKCS7_free
-);
-
 asn1_io!(
     Pkcs7,
     PEM_read_bio_PKCS7,
@@ -1517,20 +1514,6 @@ impl Crl {
     pub fn print(&self, out: &Bio) -> c_int {
         // SAFETY: both are live.
         unsafe { ffi::X509_CRL_print(out.as_ptr(), self.as_ptr()) }
-    }
-}
-
-crate::handle!(
-    /// An owned `ASN1_OBJECT`.
-    Obj, ASN1_OBJECT, ASN1_OBJECT_free
-);
-
-impl Obj {
-    /// `OBJ_txt2obj(s, no_name)`.
-    pub fn from_txt(s: &str, no_name: bool) -> Option<Self> {
-        let c = cstring(s)?;
-        // SAFETY: a valid C string; the object is the caller's.
-        Self::from_ptr(unsafe { ffi::OBJ_txt2obj(c.as_ptr(), c_int::from(no_name)) })
     }
 }
 

@@ -6,8 +6,7 @@
 use std::io::Write;
 
 use rustyssl_ossl::abi::{
-    EXFLAG_CA, EXFLAG_V1, TS_VFY_DATA, TS_VFY_IMPRINT, TS_VFY_SIGNATURE, TS_VFY_SIGNER,
-    TS_VFY_VERSION, X509_ADD_FLAG_NO_DUP, X509_ADD_FLAG_UP_REF,
+    TS_VFY_DATA, TS_VFY_IMPRINT, TS_VFY_SIGNATURE, TS_VFY_SIGNER, TS_VFY_VERSION,
 };
 use rustyssl_ossl::conf::Conf;
 use rustyssl_ossl::evp::Md;
@@ -15,13 +14,14 @@ use rustyssl_ossl::object::Object;
 use rustyssl_ossl::pkcs7::Pkcs7;
 use rustyssl_ossl::ts::{self, ResponseInputs, TsReq, TsResp, TsVerifyCtx};
 use rustyssl_ossl::verify::{FileType, LookupKind, VerifyParam};
-use rustyssl_ossl::x509::{self, Cert, CertStack, Store};
+use rustyssl_ossl::x509::Store;
 use rustyssl_ossl::{Bio, crypto};
 
 use crate::generated::options::ts::{OPTIONS, Opt};
+use crate::lib::apps::load_certs_multifile;
 use crate::lib::apps::{
-    ConfigFile, Wanted, add_oid_section, app_conf_try_string, app_load_config, app_load_modules,
-    app_passwd, bio_open_default, get_passwd, load_key_certs_crls,
+    ConfigFile, add_oid_section, app_conf_try_string, app_load_config, app_load_modules,
+    app_passwd, bio_open_default,
 };
 use crate::lib::opt::{self, Parser, eprintf, format};
 use crate::lib::{app_libctx, app_rand, io};
@@ -559,147 +559,4 @@ fn create_cert_store(
         cert_ctx.set1_param(v);
     }
     Some(cert_ctx)
-}
-
-/// `warn_cert_msg` of `apps.c`.
-fn warn_cert_msg(uri: &str, cert: &Cert, msg: &str) {
-    let subj = x509::name_oneline(cert.subject_name()).unwrap_or_default();
-    eprintf!("Warning: certificate from '{uri}' with subject '{subj}' {msg}\n");
-}
-
-/// `warn_cert` of `apps.c`.
-fn warn_cert(uri: &str, cert: &Cert, warn_ee: bool, vpm: Option<&VerifyParam>) {
-    let ex_flags = cert.extension_flags();
-    let res = cert.cmp_timeframe(vpm);
-    if res != 0 {
-        let msg = if res > 0 {
-            "has expired"
-        } else {
-            "not yet valid"
-        };
-        warn_cert_msg(uri, cert, msg);
-    }
-    let flag = |f: i32| u32::try_from(f).unwrap_or(0);
-    if warn_ee && ex_flags & flag(EXFLAG_V1) == 0 && ex_flags & flag(EXFLAG_CA) == 0 {
-        warn_cert_msg(uri, cert, "is not a CA cert");
-    }
-}
-
-/// `load_cert_certs` of `apps.c`: the first certificate (`want_cert`) and the others (all
-/// of them without `want_cert`) when `want_certs`, with the validity warnings.
-pub(crate) fn load_cert_certs(
-    uri: &str,
-    want_cert: bool,
-    want_certs: bool,
-    exclude_http: bool,
-    pass: Option<&str>,
-    desc: Option<&str>,
-    vpm: Option<&VerifyParam>,
-) -> Option<(Option<Cert>, Option<CertStack>)> {
-    let desc = desc.unwrap_or(if want_certs {
-        "certificates"
-    } else {
-        "certificate"
-    });
-    let lower = uri.to_ascii_lowercase();
-    if exclude_http && (lower.starts_with("http://") || lower.starts_with("https://")) {
-        eprintf!("error: HTTP retrieval not allowed for {desc}\n");
-        return None;
-    }
-    let pass_string = get_passwd(pass, Some(desc));
-    let wanted = Wanted {
-        cert: want_cert,
-        certs: if want_certs {
-            Some(CertStack::new()?)
-        } else {
-            None
-        },
-        ..Wanted::default()
-    };
-    let (ok, got) = load_key_certs_crls(
-        Some(uri),
-        format::UNDEF,
-        false,
-        pass_string.as_ref().map(|p| p.as_str()),
-        Some(desc),
-        false,
-        wanted,
-    );
-    if !ok {
-        return None;
-    }
-    if let Some(c) = &got.cert {
-        warn_cert(uri, c, false, vpm);
-    }
-    if let Some(cs) = &got.certs {
-        for c in cs.to_vec() {
-            warn_cert(uri, &c, true, vpm);
-        }
-    }
-    Some((got.cert, got.certs))
-}
-
-/// `next_item` of `apps.c`: the items of a list separated by commas and/or whitespace.
-pub(crate) fn items(list: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    let b = list.as_bytes();
-    let mut i = 0;
-    loop {
-        let start = i;
-        while i < b.len()
-            && b.get(i) != Some(&b',')
-            && !b.get(i).is_some_and(u8::is_ascii_whitespace)
-        {
-            i += 1;
-        }
-        out.push(String::from_utf8_lossy(b.get(start..i).unwrap_or_default()).into_owned());
-        if i >= b.len() {
-            break;
-        }
-        i += 1;
-        while b.get(i).is_some_and(u8::is_ascii_whitespace) {
-            i += 1;
-        }
-        if i >= b.len() {
-            break;
-        }
-    }
-    out
-}
-
-/// `load_certs_multifile` of `apps.c`: every certificate of each file of the list, without
-/// duplicates.
-pub(crate) fn load_certs_multifile(
-    files: &str,
-    pass: Option<&str>,
-    desc: Option<&str>,
-    vpm: Option<&VerifyParam>,
-) -> Option<CertStack> {
-    let Some(result) = CertStack::new() else {
-        eprintf!("out of memory\n");
-        return None;
-    };
-    for f in items(files) {
-        let (_, certs) = load_cert_certs(&f, false, true, false, pass, desc, vpm)?;
-        let certs = certs?;
-        if !result.add_certs(&certs, X509_ADD_FLAG_UP_REF | X509_ADD_FLAG_NO_DUP) {
-            eprintf!("out of memory\n");
-            return None;
-        }
-    }
-    Some(result)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn next_item_lists() {
-        assert_eq!(items("a,b c"), ["a", "b", "c"]);
-        assert_eq!(items("a, b"), ["a", "b"]);
-        assert_eq!(items("a,"), ["a"]);
-        assert_eq!(items("a"), ["a"]);
-        assert_eq!(items(""), [""]);
-    }
 }

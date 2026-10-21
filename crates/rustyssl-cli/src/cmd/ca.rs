@@ -21,11 +21,11 @@ use rustyssl_ossl::x509::{
 };
 use rustyssl_ossl::{Bio, err};
 
-use crate::cmd::x509::set_cert_times;
 use crate::generated::options::ca::{OPTIONS, Opt};
 use crate::lib::app_libctx::{libctx, opt_provider, propq};
 use crate::lib::app_rand;
 use crate::lib::apps::perror;
+use crate::lib::apps::set_cert_times;
 use crate::lib::apps::{
     ConfigFile, ExtCopy, add_oid_section, app_conf_try_number, app_conf_try_string,
     app_load_config, app_load_config_verbose, app_load_modules, app_passwd, atoi, bio_open_default,
@@ -33,6 +33,7 @@ use crate::lib::apps::{
     do_x509_verify, get_nameopt, load_cert_pass, load_csr_autofmt, load_key, parse_name,
     parse_yesno, set_cert_ex, set_dateopt, set_ext_copy, set_nameopt,
 };
+use crate::lib::apps::{set_crl_lastupdate, set_crl_nextupdate};
 use crate::lib::ca_db::{
     CaDb, db_type, field, index_index, load_index, load_serial, rand_serial, rotate_index,
     rotate_serial, save_index, save_serial,
@@ -134,41 +135,6 @@ fn fgets(size: usize) -> Option<Vec<u8>> {
         }
     }
     if out.is_empty() { None } else { Some(out) }
-}
-
-/// `set_crl_lastupdate`.
-pub fn set_crl_lastupdate(crl: &Crl, lastupdate: Option<&str>) -> bool {
-    let Some(tm) = Time::new() else {
-        return false;
-    };
-    let ok = match lastupdate {
-        None => tm.set_adj(0, 0),
-        Some(s) => tm.set_string_x509(s),
-    };
-    ok && crl.set1_last_update(&tm)
-}
-
-/// `set_crl_nextupdate`.
-pub fn set_crl_nextupdate(
-    crl: &Crl,
-    nextupdate: Option<&str>,
-    days: i64,
-    hours: i64,
-    secs: i64,
-) -> bool {
-    let Some(tm) = Time::new() else {
-        return false;
-    };
-    let ok = match nextupdate {
-        None => {
-            // C passes long days to an int and hours * 3600 + secs as a long.
-            let d = i32::try_from(days).unwrap_or(if days < 0 { i32::MIN } else { i32::MAX });
-            let s = hours.saturating_mul(3600).saturating_add(secs);
-            tm.set_adj(d, s)
-        }
-        Some(s) => tm.set_string_x509(s),
-    };
-    ok && crl.set1_next_update(&tm)
 }
 
 /// What `unpack_revinfo` makes of a database revocation field.

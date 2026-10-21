@@ -9,10 +9,10 @@ use rustyssl_ossl::encoder::Encoder;
 use rustyssl_ossl::params::ParamList;
 use rustyssl_ossl::pkey::{Pkey, PkeyCtx};
 
-use super::pkey::opt_cipher;
 use crate::generated::options::rsa::{OPTIONS, Opt};
 use crate::lib::apps::perror;
 use crate::lib::apps::{app_passwd, bio_open_owner, load_key, load_pubkey};
+use crate::lib::opt::opt_cipher;
 use crate::lib::opt::{self, Parser, eprintf, fmt_flags, format};
 use crate::lib::{app_libctx, engine, io};
 

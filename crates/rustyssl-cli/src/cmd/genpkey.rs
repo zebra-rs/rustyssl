@@ -12,13 +12,13 @@ use rustyssl_ossl::abi::{
 };
 use rustyssl_ossl::pkey::{Pkey, PkeyCtx};
 
-use super::pkey::opt_cipher;
 use crate::generated::options::genpkey::{OPTIONS, Opt};
 use crate::lib::apps::{
     ConfigFile, app_load_config_modules, app_passwd, bio_open_owner, pkey_ctrl_string, strerror,
 };
 use crate::lib::engine::Engine;
 use crate::lib::keygen;
+use crate::lib::opt::opt_cipher;
 use crate::lib::opt::{self, Parser, eprintf, fmt_flags, format};
 use crate::lib::{app_libctx, app_rand, engine, io};
 

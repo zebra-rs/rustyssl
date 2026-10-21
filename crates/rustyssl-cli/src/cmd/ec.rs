@@ -8,9 +8,10 @@ use rustyssl_ossl::abi::{
 use rustyssl_ossl::encoder::Encoder;
 use rustyssl_ossl::pkey::PkeyCtx;
 
-use super::pkey::{ASN1_ENCODING_OPTIONS, POINT_FORMAT_OPTIONS, opt_cipher};
 use crate::generated::options::ec::{OPTIONS, Opt};
 use crate::lib::apps::{app_passwd, bio_open_owner, load_key, load_pubkey};
+use crate::lib::ec_common::{ASN1_ENCODING_OPTIONS, POINT_FORMAT_OPTIONS};
+use crate::lib::opt::opt_cipher;
 use crate::lib::opt::{self, Parser, eprintf, fmt_flags, format};
 use crate::lib::{app_libctx, engine, io};
 
