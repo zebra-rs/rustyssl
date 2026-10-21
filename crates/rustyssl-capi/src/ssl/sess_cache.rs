@@ -610,7 +610,10 @@ ffi_export! {
     where failure = ptr::null_mut(), library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
-        unsafe { ssl(s) }.map_or(ptr::null_mut(), |x| x.state().sess.session)
+        unsafe { ssl(s) }.map_or(ptr::null_mut(), |x| {
+            in_progress_client_session(x);
+            x.state().sess.session
+        })
     }
 }
 
@@ -624,6 +627,7 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return ptr::null_mut() };
+        in_progress_client_session(x);
         // Under the connection's lock, so the session can't go between reading and counting.
         let st = x.state();
         let p = st.sess.session;
@@ -897,6 +901,10 @@ pub(crate) fn to_core(d: &SessData) -> Session {
     }
     Session {
         version: u16::try_from(d.ssl_version).unwrap_or(0),
+        // The core sets it only on a new session (capi keeps the C session's own).
+        not_resumable: false,
+        psk_identity: d.psk_identity.as_ref().map(|c| c.to_bytes().to_vec()),
+        psk_identity_hint: d.psk_identity_hint.as_ref().map(|c| c.to_bytes().to_vec()),
         cipher_id: d.cipher_id(),
         session_id: d.id().to_vec(),
         sid_ctx: d.sid_ctx().to_vec(),
@@ -952,6 +960,15 @@ fn from_core(st: &SslState, c: &Session, group: Option<u16>, timeout: c_long) ->
     if c.ems {
         d.flags |= SESS_FLAG_EXTMS;
     }
+    d.not_resumable = c.not_resumable;
+    d.psk_identity = c
+        .psk_identity
+        .as_ref()
+        .and_then(|v| CString::new(v.clone()).ok());
+    d.psk_identity_hint = c
+        .psk_identity_hint
+        .as_ref()
+        .and_then(|v| CString::new(v.clone()).ok());
     d.tick = c.ticket.as_ref().map(|t| t.clone().into_boxed_slice());
     d.tick_age_add = c.ticket_age_add;
     d.tick_lifetime_hint = c.ticket_lifetime_hint;
@@ -1329,6 +1346,50 @@ pub(crate) fn on_start(st: &mut SslState, first: bool) {
     if let Some(s) = stat {
         count(s);
     }
+}
+
+/// A client's failed handshake: OpenSSL's client has had a session since its ClientHello
+/// (`ssl_get_new_session`, filled in as the handshake went), which `SSL_get_session` returns
+/// after the failure; one is made from what was negotiated, if there is none yet.
+///
+/// # Safety
+/// `x` is a live connection; no lock is held.
+pub(crate) unsafe fn on_failed_client(x: &Ssl) {
+    in_progress_client_session(x);
+}
+
+/// A client's session while its handshake runs (or after it failed), as OpenSSL's: made from
+/// what the core has negotiated so far when the connection has none, and left unsettled, so
+/// the handshake's end replaces it.
+fn in_progress_client_session(x: &Ssl) {
+    let made = {
+        let st = x.state();
+        if st.server || !st.sess.session.is_null() || st.sess.current {
+            return;
+        }
+        let Some(c) = st.drv.tls.as_ref().filter(|c| !c.before()) else {
+            return;
+        };
+        let n = c.negotiated();
+        let (session, group) = (n.session.clone(), n.group);
+        let sctx = st.session_ctx;
+        // SAFETY: the connection's context.
+        let ctx_timeout = unsafe { ctx::ctx(sctx) }.map_or(0, |c| c.state().session_timeout);
+        let timeout = if ctx_timeout == 0 {
+            super::method::DEFAULT_TIMEOUT
+        } else {
+            ctx_timeout
+        };
+        from_core(&st, &session, group, timeout)
+    };
+    // Made with no lock held (the ex_data callbacks run).
+    let s = session::new_session(made);
+    if s.is_null() {
+        return;
+    }
+    let old = core::mem::replace(&mut x.state().sess.session, s);
+    // SAFETY: the connection's old reference (NULL unless another thread set one).
+    unsafe { session::free(old) };
 }
 
 /// A fatal error (an alert sent or received): the session leaves the cache.

@@ -1,0 +1,29 @@
+# `openssl crl2pkcs7` (cargo xtask test-apps: upstream's tool on the reference, then ours on
+# rustyssl and on the reference).
+crl2pkcs7 -help
+crl2pkcs7 -in {src}/test/testcrl.pem
+crl2pkcs7 -in {src}/test/testcrl.pem -certfile {src}/test/certs/ca-cert.pem
+crl2pkcs7 -nocrl -certfile {src}/test/certs/ca-cert.pem -certfile {src}/test/certs/ee-cert.pem
+crl2pkcs7 -nocrl -certfile {src}/test/certs/leaf-chain.pem
+crl2pkcs7 -nocrl
+crl2pkcs7 -nocrl -certfile {src}/test/certs/nonexistent.pem
+crl2pkcs7 -nocrl -certfile {src}/test/testcrl.pem
+crl2pkcs7 -nocrl -certfile {txt}
+crl2pkcs7 -in {src}/test/testcrl.pem -outform DER -out {dir}/crl.p7b
+crl2pkcs7 -in {src}/test/testcrl.pem -outform PEM -out {dir}/crl.p7
+crl2pkcs7 -in {src}/test/testcrl.pem -outform DER
+crl2pkcs7 -in {src}/test/certs/cyrillic_crl.pem -outform PEM
+crl2pkcs7 -in {src}/test/testcrl.pem -inform DER
+crl2pkcs7 -in {src}/test/testcrl.pem -inform PEM
+crl2pkcs7 -in {src}/test/testcrl.pem -inform XYZ
+crl2pkcs7 -in {src}/test/testcrl.pem -outform SMIME
+crl2pkcs7 -in {dir}/nonexistent.pem
+crl2pkcs7 < {src}/test/testcrl.pem
+crl2pkcs7 -in {src}/test/testcrl.pem -provider default
+crl2pkcs7 -in {src}/test/testcrl.pem -propquery provider=default -provider-path {dir}
+crl2pkcs7 -in {src}/test/testcrl.pem extra
+crl2pkcs7 -nosuchoption
+crl2pkcs7 -in {src}/test/testcrl.pem -provparam default:x=1
+# The man page's examples.
+crl2pkcs7 -in {tests}/pki/crl1.pem -certfile {src}/test/certs/ca-cert.pem -out {dir}/man-p7.pem
+crl2pkcs7 -nocrl -certfile {src}/test/certs/ee-cert.pem

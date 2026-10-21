@@ -1,0 +1,208 @@
+# A test CA for the ca corpus: test/certs/ca-cert.pem and its key, the database in ./cadb
+# (paths are relative to the work directory, where the fixture is copied).
+oid_section = oids
+RANDFILE = ./cadb/.rnd
+
+[ oids ]
+testOID = 1.2.3.4.5.6
+
+[ ca ]
+default_ca = CA_default
+
+[ CA_default ]
+dir = ./cadb
+database = $dir/index.txt
+new_certs_dir = $dir/newcerts
+certificate = $dir/ca.pem
+private_key = $dir/ca.key
+serial = $dir/serial
+crlnumber = $dir/crlnumber
+default_md = sha256
+default_days = 365
+default_crl_days = 30
+policy = policy_default
+x509_extensions = usr_cert
+crl_extensions = crl_ext
+copy_extensions = copy
+unique_subject = yes
+
+[ policy_default ]
+countryName = optional
+organizationName = supplied
+organizationalUnitName = optional
+commonName = supplied
+emailAddress = optional
+
+# The CA's subject is CN=CA: requests must have CN=CA.
+[ policy_cn ]
+commonName = match
+organizationName = optional
+
+[ policy_match ]
+countryName = match
+organizationName = supplied
+organizationalUnitName = optional
+commonName = supplied
+emailAddress = optional
+
+[ policy_anything ]
+countryName = optional
+stateOrProvinceName = optional
+localityName = optional
+organizationName = optional
+organizationalUnitName = optional
+commonName = supplied
+emailAddress = optional
+
+[ policy_bad ]
+nosuchfield = supplied
+
+[ policy_badtype ]
+commonName = sometimes
+
+[ usr_cert ]
+basicConstraints = CA:FALSE
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer
+keyUsage = digitalSignature
+
+[ v3_ca ]
+basicConstraints = critical, CA:TRUE
+keyUsage = keyCertSign, cRLSign
+
+[ bad_ext ]
+basicConstraints = nonsense
+
+[ crl_ext ]
+authorityKeyIdentifier = keyid:always
+
+# Like CA_default, signing with the root's key (whose certificate is root.pem).
+[ CA_root ]
+dir = ./cadb
+database = $dir/index.txt
+new_certs_dir = $dir/newcerts
+certificate = $dir/root.pem
+private_key = $dir/root.key
+serial = $dir/serial
+default_md = sha256
+default_days = 30
+policy = policy_anything
+name_opt = ca_default
+cert_opt = ca_default
+email_in_dn = no
+preserve = no
+
+# Random serials, no copying, non-unique subjects, and no extensions.
+[ CA_rand ]
+dir = ./cadb
+database = $dir/index.txt
+new_certs_dir = $dir/newcerts
+certificate = $dir/ca.pem
+private_key = $dir/ca.key
+rand_serial = yes
+default_md = default
+default_startdate = 20250101000000Z
+default_enddate = 20350101000000Z
+policy = policy_anything
+unique_subject = no
+copy_extensions = none
+string_mask = utf8only
+utf8 = yes
+
+# Missing settings, one at a time.
+[ CA_nokey ]
+certificate = ./cadb/ca.pem
+
+[ CA_nocert ]
+private_key = ./cadb/ca.key
+
+[ CA_nodb ]
+private_key = ./cadb/ca.key
+certificate = ./cadb/ca.pem
+
+[ CA_noserial ]
+private_key = ./cadb/ca.key
+certificate = ./cadb/ca.pem
+database = ./cadb/index.txt
+new_certs_dir = ./cadb/newcerts
+policy = policy_anything
+default_md = sha256
+default_days = 1
+
+[ CA_nodays ]
+private_key = ./cadb/ca.key
+certificate = ./cadb/ca.pem
+database = ./cadb/index.txt
+new_certs_dir = ./cadb/newcerts
+serial = ./cadb/serial
+policy = policy_anything
+default_md = sha256
+
+[ CA_badopts ]
+private_key = ./cadb/ca.key
+certificate = ./cadb/ca.pem
+name_opt = nonsense
+
+[ CA_badcertopt ]
+private_key = ./cadb/ca.key
+certificate = ./cadb/ca.pem
+cert_opt = nonsense
+
+[ CA_badcopy ]
+private_key = ./cadb/ca.key
+certificate = ./cadb/ca.pem
+copy_extensions = nonsense
+
+[ CA_badmask ]
+private_key = ./cadb/ca.key
+certificate = ./cadb/ca.pem
+string_mask = nonsense
+
+[ CA_wrongkey ]
+private_key = ./cadb/root.key
+certificate = ./cadb/ca.pem
+
+[ CA_bad_revdate ]
+private_key = ./cadb/ca.key
+certificate = ./cadb/ca.pem
+database = ./cadb/bad-revdate.txt
+
+[ CA_bad_revoked ]
+private_key = ./cadb/ca.key
+certificate = ./cadb/ca.pem
+database = ./cadb/bad-revoked.txt
+
+[ CA_bad_reason ]
+private_key = ./cadb/ca.key
+certificate = ./cadb/ca.pem
+database = ./cadb/bad-reason.txt
+
+[ CA_bad_exp ]
+private_key = ./cadb/ca.key
+certificate = ./cadb/ca.pem
+database = ./cadb/bad-exp.txt
+
+[ CA_bad_serial_len ]
+private_key = ./cadb/ca.key
+certificate = ./cadb/ca.pem
+database = ./cadb/bad-serial-len.txt
+
+[ CA_bad_serial_char ]
+private_key = ./cadb/ca.key
+certificate = ./cadb/ca.pem
+database = ./cadb/bad-serial-char.txt
+
+[ CA_dup_serial ]
+private_key = ./cadb/ca.key
+certificate = ./cadb/ca.pem
+database = ./cadb/dup-serial.txt
+
+[ CA_dup_name ]
+private_key = ./cadb/ca.key
+certificate = ./cadb/ca.pem
+database = ./cadb/dup-name.txt
+
+[ CA_short_row ]
+private_key = ./cadb/ca.key
+certificate = ./cadb/ca.pem
+database = ./cadb/short-row.txt

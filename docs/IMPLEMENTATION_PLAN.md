@@ -6023,6 +6023,214 @@ database and serial-file helpers of `apps.c` (G3, `ca`), its HTTP and TLS-for-HT
 (G4, `ocsp`/`cmp`), `http_server.c`, `cmp_mock_srv.c`, `app_params.c`, `names.c`, `log.c`, and
 `s_cb.c`/`s_socket.c` (G5).
 
+G1 (2026-10-21, branch `cli-g1`): `dgst`, `enc`, `rand`, `mac`, `kdf`, `passwd`, `prime`, `errstr`,
+`asn1parse`, `list`, `rehash`, `info` and `nseq` are ported (with digest names as `dgst` and cipher
+names and `base64` as `enc`), each with its corpus `tests/apps/<command>.txt` (every option, the
+error paths, `-help`; fixtures `tests/apps/*.dat`, `*.cnf`), byte-exact in all three `test-apps`
+runs with the same exit codes. Lines marked `~` only have to succeed: random output (`rand`,
+generated salts and primes), `-debug`'s BIO addresses, `-engine`'s and `info`'s build directories,
+`info -cpusettings`, `list -verbose -random-instances` (reseed times), and `enc -p`/`-P` with `-K`
+but no `-nosalt` (upstream prints an uninitialized salt buffer). TTY prompts aren't in the corpora
+(decision 4).
+- **Shared code added:** `src/lib/app_params.rs` (`app_params.c`, plus `app_params_new_from_opts`
+  of `apps.c`), with `live_` tests. In command files, to move to `src/lib/` later: `init_gen_str`
+  (`genpkey.c`) and `app_keygen` (`apps.c`) in `cmd/dgst.rs`. `list` uses `main.rs`'s
+  `calculate_columns` and `sorted_functions`.
+- **`rustyssl-ossl`:** new modules `algorithm` (every provided algorithm type, the legacy name
+  tables, objects, engines, TLS groups and signature algorithms, and sorting through the library's
+  own `OPENSSL_sk_sort`, as `sk_*_sort` does), `asn1`, `bn`, `params` (`OSSL_PARAM` tables, text
+  parameters, query arrays), `sys` (`access`); additions to `bio`, `evp`, `pkey`, `x509`,
+  `provider`, `rand`, `err`, `crypto`.
+- **Codegen:** `options.rs` also gets `option_entries` (`list -options`) and `DISABLED` (`list
+  -disabled`, from `list.c`'s `list_disabled` preprocessed with each target's configuration).
+- **Library fixes found by the corpora:** PEM's no-start-line and bad-end-line errors and the hex
+  string errors name the functions OpenSSL raises them in; the parameter descriptors of SHAKE,
+  KMAC, BLAKE2, MDC2, RSA's key manager and the variable-key-length ciphers have upstream's types
+  and sizes (`list -verbose`).
+- **Upstream's quirks kept:** `list -objects` truncates an OID exactly as long as its reused
+  buffer; `rehash` exits with its error count (0 for a usage error); `passwd` prints `<NULL>` for
+  a hash that can't be made (an empty password or salt with `-5`/`-6`); `enc -kfile` rejects a
+  one-character password.
+
+G2, the key commands (2026-10-21, branch `cli-g2`), is done: `genpkey`, `pkey`, `pkeyparam`,
+`pkeyutl`, `skeyutl`, `genrsa`, `rsa`, `rsautl`, `dsa`, `dsaparam`, `gendsa`, `ec`, `ecparam`,
+`dhparam`, `pkcs8` (`crates/rustyssl-cli/src/cmd/`).
+- **Corpora:** `tests/apps/<command>.txt`, 750 lines covering every option, the error paths and
+  `-help`, each byte-exact with the same exit code in all three `test-apps` runs. Output that is
+  random by design (generated keys and parameters, encryption, randomized signatures) is
+  compared structurally: `test-apps` gained `command ... | check ...`, which runs the check with
+  upstream's tool on the reference after each run, on the command's standard output, and
+  compares the command's exit status and the check's output (hex dumps collapsed, `asn1parse`'s
+  `[HEX DUMP]` values masked). Deterministic output (named groups' and curves' parameters,
+  PKCS#1 v1.5 and EdDSA signatures, derivations, KDFs) is compared byte for byte.
+- **Shared helpers, in the command files (to move to `src/lib/` later):** `opt_cipher` and
+  `ec_common.h`'s option lists (`cmd/pkey.rs`); `init_gen_str`, `app_keygen`, `app_paramgen`,
+  `mem_bio_to_file` (`cmd/genpkey.rs`); `perror` (`cmd/rsa.rs`); a private copy of
+  `app_params_new_from_opts` (`cmd/skeyutl.rs`).
+- **`rustyssl-ossl`:** key contexts (generation with the apps' progress callback, checks, the
+  one-shot operations, KEM), digest-sign contexts over a caller's key context, keys' parameters,
+  printers and PEM/DER writers, encoders and decoders (`encoder`), `OSSL_PARAM` lists, builders
+  and text parameters (`params`), `bn`, `pkcs8`, `skey`, `obj`.
+- **Library fix found by the corpus:** `PEM_read_bio_ex` raised "no start line" and "bad end
+  line" under its own name; upstream raises them from `get_name` and `get_header_and_data`.
+
+G3, the certificate commands (2026-10-21, branch `cli-g3`), is done: `x509`, `req`, `verify`,
+`crl`, `crl2pkcs7`, `ca`, `spkac`, and `storeutl` are ported (`src/cmd/<command>.rs`), each
+with a corpus `tests/apps/<command>.txt` that covers every option (`-engine` with the built-in
+`dynamic` engine), the error paths, and the man page's examples: 747 lines, byte-exact with
+the same exit codes in all three `test-apps` runs. `verify -help`'s purposes and parameter
+names are in its corpus. Signed output is byte-compared: RSA PKCS#1 v1.5 keys from the
+reference's `test/certs/`, fixed dates and serials, and committed fixtures in
+`tests/apps/pki/` (CRLs, SPKACs, requests, configurations, a CA in `pki/cadb/`); new keys are
+generated with `-quiet` and written to files, and the few lines that print random keys or
+serials must only succeed (`~`). Prompts (`req`'s DN and `ca`'s questions) read standard
+input, as upstream's `fgets` does.
+- **Shared helpers:** `src/lib/ca_db.rs`, apps.c's CA database and serial files
+  (`load_serial`, `save_serial`, `rotate_serial`, `rand_serial`, `load_index`, `index_index`,
+  `save_index`, `rotate_index`), on the library's `TXT_DB`. In command files, for others to
+  use or move: `cmd/x509.rs` has `set_cert_times`, `check_cert_time_string`, and
+  `check_cert_attributes`; `cmd/ca.rs` has `unpack_revinfo` (for `ocsp`) and
+  `set_crl_lastupdate`/`set_crl_nextupdate`; `cmd/verify.rs` has `policies_print` and
+  `store_setup_crl_download` (for `s_client`/`s_server`); `cmd/req.rs` has `progress_cb` and
+  `app_keygen`.
+- **rustyssl-ossl:** wrappers in `x509` (certificates, requests, CRLs, revoked entries, names
+  and entries, extensions, times, integers, BIGNUMs, PKCS#7, SPKI), `verify` (a borrowing
+  verification context, verification and CRL-lookup callbacks behind trampolines that catch
+  panics), `store` (searches), `pkey` (a keygen context with a progress callback), `evp`,
+  `engine` (`get_legacy_pkey_id`), and a new module `txt_db`. Two F0 fixes: `io::Write for
+  &Bio` called itself (a stack overflow on any `write!` to a `BIO`), and the engine store
+  loader's scheme dangled (`OSSL_STORE_LOADER_new` keeps the pointer), so
+  `org.openssl.engine:` URIs never reached it.
+- **test-apps:** a line starting with `@<fixture>` copies `tests/apps/<fixture>` afresh into
+  the work directory before each of its runs (`ca`'s database and serial files, `x509
+  -CAserial`).
+- **Library differences seen** (upstream's tool on rustyssl differs too; those lines are left
+  out of the corpora): the error queue's function name for PEM's "no start line" (`get_name`
+  on the reference, `PEM_read_bio_ex` on rustyssl) and for `storeutl` on a directory without
+  `-r` (`get_string_ptr_internal` against `OSSL_PARAM_get_octet_string_ptr`); and the module
+  and engine directories in DSO errors, which differ by design.
+
+G6 (2026-10-21, branch `cli-g6`): `speed`, `engine`, `fipsinstall`, and `configutl` are ported,
+each with its corpus (`tests/apps/<command>.txt`, files under `tests/apps/<command>/`), every
+option covered, byte-exact in all three `test-apps` runs with the same exit codes:
+- **`configutl`:** the configuration linearized, with upstream's escaping (40 lines, including
+  upstream's own `.cnf` files and include, pragma, and error cases).
+- **`engine`:** the list, `-c` (methods, NIDs, store loaders), `-t`/`-tt`, `-v` to `-vvvv` with
+  the input flags, `-pre`/`-post` (48 lines; engines outside ENGINESDIR, which differs by
+  library, are loaded by path through `dynamic`).
+- **`fipsinstall`:** as upstream's tool behaves without a FIPS module: the module and
+  install-indicator MACs (`-mac_name`, `-macopt`), the generated section loaded with its
+  modules, `-verify`, `-config`, `-pedantic` and the options it excludes, every check option,
+  `-quiet`/`-noout`; the legacy provider's module stands in for a module that loads (73 lines).
+  The self-test callback (`-corrupt_desc`/`-corrupt_type`) is unit-tested, as no module here
+  runs self tests.
+- **`speed`:** every benchmark kind, `-mr`, `-multi` (forked children over pipes), `-async_jobs`,
+  `-mb`, `-engine`, `-primes`, `-mlock`, `-elapsed`, `-testmode`, providers and `-config`;
+  timed as upstream (SIGALRM, `times`); the keys from upstream's `apps/testrsa.h` and
+  `apps/testdsa.h`, now vendored (144 lines). Its lines start with `%`, a new `test-apps`
+  prefix: compared with the numbers masked, and the lines naming the library's build (decision
+  4). `-async_jobs` lines must only succeed: rustyssl's `ASYNC_is_capable()` is 0 (a recorded
+  deviation), where `speed` says so; their output matches upstream's on the reference. One
+  CLI deviation is recorded: a paused job left by a failed async run is abandoned, not resumed.
+- **Shared code added in the command files** (to move to `src/lib/` later): `speed.rs` has a
+  private `init_gen_str` (`genpkey.c`'s) and `app_tminterval` (`State::tminterval`);
+  `fipsinstall.rs` uses `rustyssl_ossl::params::Params::from_text` for
+  `app_params_new_from_opts`. New in `rustyssl-ossl`: the `params` (OSSL_PARAM lists), `os`
+  (alarm, `times`, fork to a pipe, `wait`, `select`, `mlock`), and `async_job` modules, and
+  wrappers in `bio`, `conf`, `engine`, `err`, `evp`, `pkey`, `provider`, and `rand`.
+- **Library fixes the corpora found:** configuration errors name upstream's functions
+  (`str_copy`, `parsebool`), and so do `OPENSSL_hexstr2buf(_ex)`'s (`hexstr2buf_sep`,
+  `ossl_hexstr2buf_sep`); `tests/c/conf.c` and `tests/c/crypto_str.c` check them.
+
+G4 (2026-10-21, branch `cli-g4`): `sess_id`, `pkcs7`, `pkcs12`, `smime`, `cms`, `ts`, `ocsp`, and
+`cmp` are ported, each byte-exact with the same exit codes in all three test-apps runs. Corpora
+(`tests/apps/<command>.txt`, fixtures made once by the reference under `tests/apps/data/`, each
+with a README): `sess_id` 27 lines, `pkcs7` 39, `pkcs12` 126, `smime` 107, `cms` 219, `ts` 114
+(with its `-help`, which prints more than its table), `ocsp` 122, `cmp` 296; every option of each
+command appears. Randomized output (signatures with random salts, encryption, nonces, transaction
+IDs) is compared structurally: fixed inputs where the options allow, RSA signers for byte-exact
+S/MIME and CMS signatures, results decrypted or verified again, and only exit codes otherwise.
+- **Shared helpers added** (`src/lib/`): `apps_http.rs` (`app_http_get_asn1`,
+  `app_http_post_asn1`), `http_server.rs` (`apps/lib/http_server.c`, without `HTTP_DAEMON`: no
+  forked children, so `ocsp -multi` is accepted and ignored, as on platforms without it), and
+  `cmp_mock_srv.rs` (`apps/lib/cmp_mock_srv.c`, but `useBadProtection` and
+  `ossl_cmp_mock_server_perform`, which `cmp.c` doesn't use). In command files: `ts.rs` holds
+  `apps.c`'s `load_cert_certs`, `load_certs_multifile`, `warn_cert`, and `next_item` (used by
+  `cmp`); `ocsp.rs` a private reader of the CA index (`load_index`, `index_index`,
+  `unpack_revinfo`) instead of G3's `ca_db.rs`; `cmp.rs` `load_certstore`.
+- **`rustyssl-ossl`:** new modules `session`, `pkcs7`, `object`, `pkcs12`, `cms`, `ts`, `http`,
+  `ocsp`, and `cmp` (with trampolines for the CMP log, transfer, and server callbacks, which
+  call Rust closures and a `Server` trait, so the mock server's logic stays in the CLI), plus
+  additions to `x509`, `err`, `util`, and `ui` (`set_base_ui_method(UI_null())` for `-batch`).
+- **`cmp`'s messages** name upstream's function and line in `apps/cmp.c`, as its `CMP_err`
+  macros print them; a unit test checks all of them against the vendored source. Upstream's
+  `CMP_print` takes `print_status`'s level unparenthesized, so only statuses other than
+  accepted, rejection, and waiting print there; ported as is. `rand` and `writerand` in a
+  configuration file aren't applied: upstream's `read_config` writes them into
+  `opt_tls_used`'s storage (undefined behavior). TLS to a CMP server is set up and checked
+  (`-reqout_only` stops before connecting) but no TLS session runs in the corpus.
+- **test-apps:** `&` lines run a server (`ocsp -port`, `cmp -port`) in the background on
+  loopback for the next line; `^` (G4's `@`, renamed at the merge since G3's fixtures use
+  `@`) masks times within a few days of now; `PID=n` and our tool's name (shown through
+  `opt_appname`) are masked.
+- **Library fixes found by the corpora** (`rustyssl-capi`): the functions errors are raised in
+  for PEM framing (`get_name`, `get_header_and_data`), `ASN1_INTEGER` conversions, and
+  `OPENSSL_hexstr2buf`. Left in the library: a failed AES key unwrap is raised in `update`
+  rather than `aes_wrap_cipher_internal` (the corpus avoids printing it).
+
+The forks' merge (2026-10-21, local, branch `cli-merge`): G1, G2, G3, G6 and G4 merged in that
+order, on top of the HMAC DRBG fix their random differential sessions found (seed
+1792544394: an HMAC DRBG ignores `cipher` when it loads its MAC).
+- **One copy of each shared helper:** `src/lib/keygen.rs` (`init_gen_str`, `app_keygen`,
+  `app_paramgen`), `src/lib/ec_common.rs`, `lib::opt::opt_cipher`, `lib::apps::perror`, and
+  in `src/lib/apps.rs` the `apps.c` helpers the commands share (`set_cert_times`,
+  `check_cert_time_string`, `check_cert_attributes`, `set_crl_lastupdate`,
+  `set_crl_nextupdate`, `policies_print`, `store_setup_crl_download`, `load_cert_certs`,
+  `load_certs_multifile`, `warn_cert`, `next_item`); `ocsp` reads the CA index with
+  `lib::ca_db`.
+- **`rustyssl-ossl`:** one handle per C type (`EVP_PKEY_CTX`, `EVP_SKEY`, `EVP_SKEYMGMT`,
+  `PKCS7`, `ASN1_TIME`, `ASN1_OBJECT`, `TXT_DB`, `BIGNUM`, `EVP_MAC`, `EVP_MAC_CTX`) and one
+  definition per wrapper; where two forks' wrappers of one call differ in form, the second is
+  named for what it does (`PkeyCtx::sign_into`, `Time::utc_from_string_kept`, ...). The
+  parameter lists are `Params` (from text), `ParamList` and `ParamValues` (built by the
+  caller), all `ParamArray`.
+- **test-apps on macOS** (the forks measured on Linux): the libraries' directories in dyld's
+  messages, both libraries' OPENSSLDIR, ENGINESDIR and MODULESDIR, dlopen's message, and the
+  line of an `apps/<file>.c` location (`__LINE__` of a two-line macro call: GCC and clang
+  differ) are masked. 3825 command lines pass on macOS.
+
+G5, the TLS commands (2026-10-21, branch `cli-g5`): `ciphers`, `srp`, `s_client`, `s_server` and
+`s_time` are ported, with `apps/lib/s_cb.c` and `s_socket.c` as `src/lib/s_cb.rs` and
+`src/lib/s_socket.rs` (with the TLS helpers of `apps.c` they use: `ctx_set_verify_locations`,
+`ctx_set_ctlog_list_file`, `next_protos_parse`, `wait_for_async`, `policies_print`, and the SRP
+set-up of `tlssrp_depr.c`). Private copies: `srp`'s index helpers (`apps.c`'s CA database) in
+`cmd/srp.rs`, and the OCSP responder query of `s_server`'s status callback in
+`rustyssl-ossl/src/ocsp_status.rs`. `rustyssl-ossl` gains `ssl`, `ssl_cb` (one trampoline per
+callback kind), `sock` and `ocsp_status`.
+- **Harness:** `test-apps` takes `{fresh:NAME}` (a pristine copy of a fixture per run, for
+  `srp`'s verifier files) and paired lines `SERVER ARGS | CLIENT ARGS` (`xtask/src/test_apps/pair.rs`):
+  the server on loopback reports its port, and each line runs in five pairings (upstream's
+  tool on the reference for both sides, the expectation; ours on rustyssl and on the reference
+  for both; ours against upstream's in each direction), with what is random masked (the port,
+  session IDs, master keys, tickets, times, dumps' octets, pointers). `test-interop --cli ours`
+  runs our tool on the rustyssl side: 65 of 65 cases in all four pairings.
+- **Corpora:** `ciphers.txt` (50 lines), `srp.txt` (57), `s_server.txt` (178), `s_client.txt`
+  (200) and `s_time.txt` (32), all passing; fixtures in `tests/apps/srp/` and `tests/apps/s_server/`.
+  `s_time`'s runs and the lines whose output is random or build-specific (`-nbio_test`, split
+  records, `-security_debug` on the client, `-security_debug_verbose`) only have to succeed.
+- **Library fixes found by the corpora:** `SSL_get1_supported_ciphers` (DSS suites, a server's
+  client PSK callback); the tlsext debug and not-resumable-session callbacks are called;
+  `split_send_fragment` applies to every record type; a client's `SSL_get_session` is its
+  in-progress session (also after a failure), its `SSL_version` follows the ClientHello, and its
+  new sessions take the default timeout; TLS 1.2 PSK sessions keep the identity and hint; the
+  accept/connect counters skip a failed set-up; the function names of RPK, binder and SRTP
+  errors.
+- **Left:** `-starttls` needs servers speaking SMTP, IMAP, XMPP, ... (only its errors are
+  tested); `-engine`'s errors name the build's directories; rustyssl's session tickets are its
+  own format, so their length (and `SSL handshake has read N bytes`) differs from OpenSSL's when
+  a session's contents vary (those lines use `-no_ticket`); rustyssl's TLS core makes its
+  security-callback checks in a different order and number (`-security_debug_verbose`).
+
 ## Phase 12: Hardening, performance, release 1.0 → M7
 
 - [ ] **12.1 Performance:** benchmark against the reference (per TEST_PLAN L10). Close the gaps

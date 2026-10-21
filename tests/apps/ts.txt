@@ -1,0 +1,129 @@
+# `openssl ts` (apps/ts.c): run with upstream's tool on the reference, then ours on
+# rustyssl and on the reference (cargo xtask test-apps); output and exit codes must match.
+# Queries without a nonce and the fixtures' replies (data/ts/, made once by the reference)
+# are byte-compared; nonces and new replies' times are random, so those go to files that
+# later lines print or verify. -help prints more than the option table.
+ts -help
+ts -h
+#
+# Queries.
+ts -query -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -no_nonce -text
+ts -query -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -no_nonce
+ts -query -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -no_nonce -sha1 -cert -tspolicy tsa_policy3 -text
+ts -query -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -no_nonce -sha512 -tspolicy 1.2.3.4.99 -out {dir}/q1.tsq
+ts -query -config {tests}/data/ts/ts.cnf -in {dir}/q1.tsq -text
+ts -query -config {tests}/data/ts/ts.cnf -in {dir}/q1.tsq -out {dir}/q1b.tsq
+ts -query -config {tests}/data/ts/ts.cnf -in {dir}/q1b.tsq -text -out {dir}/q1.txt
+ts -query -config {tests}/data/ts/ts.cnf -digest 3c7a1c6a7d5e8c1e4b0e6f9d1d2c3b4a5f6e7d8c9b0a1f2e3d4c5b6a7f8e9d0c -no_nonce -text
+ts -query -config {tests}/data/ts/ts.cnf -digest 3c7a1c6a7d5e8c1e4b0e6f9d1d2c3b4a5f6e7d8c9b0a1f2e3d4c5b6a7f8e9d0c -sha1 -no_nonce
+ts -query -config {tests}/data/ts/ts.cnf -digest 0011 -no_nonce
+ts -query -config {tests}/data/ts/ts.cnf -digest xyz -no_nonce
+ts -query -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -tspolicy nosuchpolicy -no_nonce
+ts -query -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -digest 00 -no_nonce
+ts -query -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -no_nonce -verify_depth 2
+ts -query -config {tests}/data/ts/ts.cnf -data {dir}/nonexistent.txt -no_nonce
+ts -query -config {tests}/data/ts/ts.cnf -in {dir}/nonexistent.tsq -text
+ts -query -config {tests}/data/ts/ts.cnf -in {tests}/data/ts/data.txt -text
+ts -query -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -no_nonce -out {dir}/nonexistent/q.tsq
+ts -query -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -no_nonce -nosuchmd
+ts -query -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -no_nonce -sha256 -sha512
+ts -query -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -out {dir}/q2.tsq
+ts -query -config {tests}/data/ts/ts.cnf -in {dir}/q2.tsq -out {dir}/q2b.tsq
+ts -query -config {tests}/data/ts/ts.cnf -text -no_nonce < {tests}/data/ts/data.txt
+ts -query -config {tests}/data/ts/ts.cnf -in {tests}/data/ts/req.tsq -text
+ts -query -config {tests}/data/ts/ts.cnf -in {tests}/data/ts/req-nonce.tsq -text
+ts -query -config {tests}/data/ts/ts.cnf -in {src}/test/recipes/80-test_tsa_data/all-zero.tsq -text
+ts -query -data {tests}/data/ts/data.txt -no_nonce
+ts -query -config {dir}/nonexistent.cnf -data {tests}/data/ts/data.txt -no_nonce
+ts -query -config {tests}/data/ts/ext.cnf -data {tests}/data/ts/data.txt -no_nonce -text
+#
+# Replies: the fixtures, printed and converted.
+ts -reply -config {tests}/data/ts/ts.cnf -in {tests}/data/ts/resp.tsr -text
+ts -reply -config {tests}/data/ts/ts.cnf -in {tests}/data/ts/resp-nonce.tsr -text
+ts -reply -config {tests}/data/ts/ts.cnf -in {tests}/data/ts/resp2.tsr -text
+ts -reply -config {tests}/data/ts/ts.cnf -in {tests}/data/ts/resp.tsr -token_out -text
+ts -reply -config {tests}/data/ts/ts.cnf -in {tests}/data/ts/resp.tsr -token_out -out {dir}/token.der
+ts -reply -config {tests}/data/ts/ts.cnf -in {dir}/token.der -token_in -text
+ts -reply -config {tests}/data/ts/ts.cnf -in {tests}/data/ts/token.der -token_in -token_out -text
+ts -reply -config {tests}/data/ts/ts.cnf -in {tests}/data/ts/token.der -token_in -out {dir}/resp-from-token.tsr
+ts -reply -config {tests}/data/ts/ts.cnf -in {dir}/resp-from-token.tsr -text
+ts -reply -config {tests}/data/ts/ts.cnf -in {tests}/data/ts/resp.tsr -out {dir}/resp-copy.tsr
+ts -reply -config {tests}/data/ts/ts.cnf -in {dir}/resp-copy.tsr -text
+ts -reply -config {tests}/data/ts/ts.cnf -in {src}/test/recipes/80-test_tsa_data/sectigo-all-zero.tsr -text
+ts -reply -config {tests}/data/ts/ts.cnf -in {tests}/data/ts/req.tsq -text
+ts -reply -config {tests}/data/ts/ts.cnf -in {tests}/data/ts/resp.tsr -token_in -text
+ts -reply -config {tests}/data/ts/ts.cnf -in {dir}/nonexistent.tsr -text
+ts -reply -config {tests}/data/ts/ts.cnf -in {tests}/data/ts/resp.tsr -text -out {dir}/nonexistent/x.txt
+#
+# Replies: new ones, verified.
+ts -reply -config {tests}/data/ts/ts.cnf -queryfile {tests}/data/ts/req.tsq -signer {tests}/data/ts/tsa_cert1.pem -inkey {tests}/data/ts/tsa_key1.pem -chain {tests}/data/ts/tsaca.pem -out {dir}/r1.tsr
+ts -verify -config {tests}/data/ts/ts.cnf -queryfile {tests}/data/ts/req.tsq -in {dir}/r1.tsr -CAfile {tests}/data/ts/tsaca.pem
+ts -verify -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -in {dir}/r1.tsr -CAfile {tests}/data/ts/tsaca.pem
+ts -reply -config {tests}/data/ts/ts.cnf -queryfile {tests}/data/ts/req-nonce.tsq -signer {tests}/data/ts/tsa_cert1.pem -inkey {tests}/data/ts/tsa_key1.pem -chain {tests}/data/ts/tsaca.pem -out {dir}/r2.tsr
+ts -verify -config {tests}/data/ts/ts.cnf -queryfile {tests}/data/ts/req-nonce.tsq -in {dir}/r2.tsr -CAfile {tests}/data/ts/tsaca.pem
+ts -verify -config {tests}/data/ts/ts.cnf -queryfile {tests}/data/ts/req-nonce.tsq -in {dir}/r2.tsr -CAfile {tests}/data/ts/tsaca.pem -untrusted {tests}/data/ts/tsa_cert1.pem
+ts -verify -config {tests}/data/ts/ts.cnf -queryfile {tests}/data/ts/req.tsq -in {dir}/r2.tsr -CAfile {tests}/data/ts/tsaca.pem
+ts -reply -config {tests}/data/ts/ts.cnf -queryfile {tests}/data/ts/req.tsq -signer {tests}/data/ts/tsa_cert1.pem -inkey {tests}/data/ts/tsa_key1.pem -chain {tests}/data/ts/tsaca.pem -token_out -out {dir}/t1.der
+ts -verify -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -in {dir}/t1.der -token_in -CAfile {tests}/data/ts/tsaca.pem
+ts -verify -config {tests}/data/ts/ts.cnf -queryfile {tests}/data/ts/req.tsq -in {dir}/t1.der -token_in -CAfile {tests}/data/ts/tsaca.pem
+ts -reply -config {tests}/data/ts/ts.cnf -queryfile {tests}/data/ts/req.tsq -signer {tests}/data/ts/tsa_cert1.pem -inkey {tests}/data/ts/tsa_key1.pem -chain {tests}/data/ts/tsaca.pem -tspolicy tsa_policy2 -sha512 -out {dir}/r3.tsr
+ts -verify -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -in {dir}/r3.tsr -CAfile {tests}/data/ts/tsaca.pem
+ts -reply -config {tests}/data/ts/ts.cnf -section tsa_config2 -queryfile {tests}/data/ts/req.tsq -signer {tests}/data/ts/tsa_cert1.pem -inkey {tests}/data/ts/tsa_key1.pem -chain {tests}/data/ts/tsaca.pem -sha384 -out {dir}/r4.tsr
+ts -verify -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -in {dir}/r4.tsr -CAfile {tests}/data/ts/tsaca.pem
+ts -reply -config {tests}/data/ts/ts.cnf -section tsa_config2 -queryfile {tests}/data/ts/req.tsq -signer {tests}/data/ts/tsa_cert1.pem -inkey {tests}/data/ts/tsa_key1.pem -chain {tests}/data/ts/tsaca.pem
+ts -reply -config {tests}/data/ts/ts.cnf -section tsa_config3 -queryfile {tests}/data/ts/req.tsq -inkey {tests}/data/ts/tsa_key1.pem
+ts -reply -config {tests}/data/ts/ts.cnf -section tsa_config3 -queryfile {tests}/data/ts/req.tsq -signer {tests}/data/ts/tsa_cert1.pem -inkey {tests}/data/ts/tsa_key1.pem -chain {tests}/data/ts/tsaca.pem
+ts -reply -config {tests}/data/ts/ts.cnf -section tsa_config4 -queryfile {tests}/data/ts/req.tsq -signer {tests}/data/ts/tsa_cert1.pem -inkey {tests}/data/ts/tsa_key1.pem -chain {tests}/data/ts/tsaca.pem
+ts -reply -config {tests}/data/ts/ts.cnf -section nosuchsection -queryfile {tests}/data/ts/req.tsq -signer {tests}/data/ts/tsa_cert1.pem -inkey {tests}/data/ts/tsa_key1.pem -chain {tests}/data/ts/tsaca.pem
+ts -reply -config {tests}/data/ts/ts.cnf -queryfile {tests}/data/ts/req.tsq -signer {tests}/data/ts/tsa_cert2.pem -inkey {tests}/data/ts/tsa_key2.pem
+ts -reply -config {tests}/data/ts/ts.cnf -queryfile {tests}/data/ts/req.tsq -signer {tests}/data/ts/tsa_cert1.pem -inkey {tests}/data/ts/tsa_key2.pem
+ts -reply -config {tests}/data/ts/ts.cnf -queryfile {tests}/data/ts/req.tsq -signer {tests}/data/ts/tsa_cert1.pem -inkey {dir}/nonexistent.pem
+ts -reply -config {tests}/data/ts/ts.cnf -queryfile {tests}/data/ts/req.tsq -signer {tests}/data/ts/tsa_cert1.pem -inkey {tests}/data/ts/tsa_key1.pem -passin pass:unused -out {dir}/r5.tsr
+ts -reply -config {tests}/data/ts/ts.cnf -queryfile {tests}/data/ts/req.tsq -signer {tests}/data/ts/tsa_cert1.pem -inkey {tests}/data/ts/tsa_key1.pem -passin bad:x
+ts -reply -config {tests}/data/ts/ts.cnf -queryfile {tests}/data/ts/req.tsq -signer {tests}/data/ts/tsa_cert1.pem -inkey {tests}/data/ts/tsa_key1.pem -chain {dir}/nonexistent.pem
+ts -reply -config {tests}/data/ts/ts.cnf -queryfile {src}/test/recipes/80-test_tsa_data/all-zero.tsq -signer {tests}/data/ts/tsa_cert1.pem -inkey {tests}/data/ts/tsa_key1.pem -chain {tests}/data/ts/tsaca.pem
+ts -reply -config {tests}/data/ts/ts.cnf -queryfile {dir}/nonexistent.tsq -signer {tests}/data/ts/tsa_cert1.pem -inkey {tests}/data/ts/tsa_key1.pem -chain {tests}/data/ts/tsaca.pem
+ts -reply -config {tests}/data/ts/ts.cnf -queryfile {tests}/data/ts/req.tsq -signer {tests}/data/ts/tsa_cert1.pem -inkey {tests}/data/ts/tsa_key1.pem -chain {tests}/data/ts/tsaca.pem -engine /nonexistent/engine.so -out {dir}/r6.tsr
+ts -reply -config {tests}/data/ts/ts.cnf -queryfile {tests}/data/ts/req.tsq -signer {tests}/data/ts/tsa_cert1.pem -inkey {tests}/data/ts/tsa_key1.pem -chain {tests}/data/ts/tsaca.pem -in {tests}/data/ts/resp.tsr
+ts -reply -config {tests}/data/ts/ts.cnf -signer {tests}/data/ts/tsa_cert1.pem -inkey {tests}/data/ts/tsa_key1.pem -chain {tests}/data/ts/tsaca.pem
+ts -reply -config {tests}/data/ts/ts.cnf -queryfile {tests}/data/ts/req.tsq -token_in -signer {tests}/data/ts/tsa_cert1.pem -inkey {tests}/data/ts/tsa_key1.pem -chain {tests}/data/ts/tsaca.pem
+ts -reply -config {tests}/data/ts/ts.cnf -queryfile {tests}/data/ts/req.tsq -signer {tests}/data/ts/tsa_cert1.pem -inkey {tests}/data/ts/tsa_key1.pem -chain {tests}/data/ts/tsaca.pem -attime 0
+ts -reply -config {dir}/nonexistent.cnf -in {tests}/data/ts/resp.tsr -text
+#
+# Verification of the fixtures.
+ts -verify -config {tests}/data/ts/ts.cnf -queryfile {tests}/data/ts/req.tsq -in {tests}/data/ts/resp.tsr -CAfile {tests}/data/ts/tsaca.pem
+ts -verify -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -in {tests}/data/ts/resp.tsr -CAfile {tests}/data/ts/tsaca.pem
+ts -verify -config {tests}/data/ts/ts.cnf -digest 00 -in {tests}/data/ts/resp.tsr -CAfile {tests}/data/ts/tsaca.pem
+ts -verify -config {tests}/data/ts/ts.cnf -digest xyz -in {tests}/data/ts/resp.tsr -CAfile {tests}/data/ts/tsaca.pem
+ts -verify -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -in {tests}/data/ts/resp-nonce.tsr -CAfile {tests}/data/ts/tsaca.pem
+ts -verify -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -in {tests}/data/ts/resp.tsr -CAfile {tests}/data/ts/tsaca.pem -untrusted {tests}/data/ts/tsa_cert1.pem
+ts -verify -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -in {tests}/data/ts/resp.tsr -CAfile {tests}/data/ts/tsaca.pem -untrusted {tests}/data/ts/tsa_cert1.pem,{tests}/data/ts/tsaca.pem
+ts -verify -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -in {tests}/data/ts/resp.tsr -CAfile {tests}/data/ts/tsaca.pem -untrusted {dir}/nonexistent.pem
+ts -verify -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -in {tests}/data/ts/resp.tsr -CApath {dir} -CAstore file:{tests}/data/ts/tsaca.pem
+ts -verify -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -in {tests}/data/ts/resp.tsr -CApath {dir}
+ts -verify -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -in {tests}/data/ts/resp.tsr -CAstore file:{dir}/nonexistent.pem
+ts -verify -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -in {tests}/data/ts/resp.tsr -CAfile {dir}/nonexistent.pem
+ts -verify -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -in {tests}/data/ts/resp.tsr
+ts -verify -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -in {tests}/data/ts/token.der -token_in -CAfile {tests}/data/ts/tsaca.pem
+ts -verify -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -in {tests}/data/ts/resp.tsr -CAfile {tests}/data/ts/tsaca.pem -attime 0
+ts -verify -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -in {tests}/data/ts/resp.tsr -CAfile {tests}/data/ts/tsaca.pem -attime 0 -no_check_time
+ts -verify -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -in {tests}/data/ts/resp.tsr -CAfile {tests}/data/ts/tsaca.pem -purpose sslserver
+ts -verify -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -in {tests}/data/ts/resp.tsr -CAfile {tests}/data/ts/tsaca.pem -x509_strict -verify_depth 1
+ts -verify -config {tests}/data/ts/ts.cnf -data {src}/test/recipes/80-test_tsa_data/all-zero.tsq -in {src}/test/recipes/80-test_tsa_data/sectigo-all-zero.tsr -CAfile {src}/test/recipes/80-test_tsa_data/comodo-aaa.pem -untrusted {src}/test/recipes/80-test_tsa_data/sectigo-signer.pem,{src}/test/recipes/80-test_tsa_data/sectigo-time-stamping-ca.pem,{src}/test/recipes/80-test_tsa_data/user-trust-ca-aaa.pem -no_check_time
+ts -verify -config {tests}/data/ts/ts.cnf -queryfile {src}/test/recipes/80-test_tsa_data/all-zero.tsq -in {src}/test/recipes/80-test_tsa_data/sectigo-all-zero.tsr -CAfile {src}/test/recipes/80-test_tsa_data/user-trust-ca.pem -untrusted {src}/test/recipes/80-test_tsa_data/sectigo-signer.pem,{src}/test/recipes/80-test_tsa_data/sectigo-time-stamping-ca.pem -no_check_time
+ts -verify -config {tests}/data/ts/ts.cnf -queryfile {tests}/data/ts/req.tsq -in {dir}/nonexistent.tsr -CAfile {tests}/data/ts/tsaca.pem
+ts -verify -config {tests}/data/ts/ts.cnf -queryfile {dir}/nonexistent.tsq -in {tests}/data/ts/resp.tsr -CAfile {tests}/data/ts/tsaca.pem
+ts -verify -config {tests}/data/ts/ts.cnf -queryfile {tests}/data/ts/req.tsq -data {tests}/data/ts/data.txt -in {tests}/data/ts/resp.tsr
+ts -verify -config {tests}/data/ts/ts.cnf -in {tests}/data/ts/resp.tsr
+ts -verify -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt
+#
+# Options.
+ts -config {tests}/data/ts/ts.cnf
+ts -query -reply -config {tests}/data/ts/ts.cnf
+ts -query -config {tests}/data/ts/ts.cnf extra
+ts -nosuchoption -alsounknown
+ts -query -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -no_nonce -rand {bin} -writerand {dir}/rand.out
+ts -query -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -no_nonce -rand {dir}/nonexistent
+ts -query -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -no_nonce -text -provider default -propquery provider=default
+ts -query -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -no_nonce -text -provider-path {dir} -provparam default:x=1
+ts -query -config {tests}/data/ts/ts.cnf -data {tests}/data/ts/data.txt -no_nonce -text -engine nosuchengine

@@ -134,3 +134,10 @@ rbytes 16 0
 rfree
 rctx 1
 rfree
+# An HMAC DRBG ignores `cipher` when it loads its MAC (random session, seed 1792544394)
+rnew HMAC-DRBG
+rset use_derivation_function=0 cipher=AES-192-CTR mac=CMAC
+rget
+rfree
+rctx 1
+rfree

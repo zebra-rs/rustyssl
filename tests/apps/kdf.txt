@@ -1,0 +1,38 @@
+# `openssl kdf` (apps/kdf.c).
+kdf -keylen 32 -kdfopt digest:SHA256 -kdfopt pass:pw -kdfopt salt:salt -kdfopt iter:1000 PBKDF2
+kdf -keylen 32 -digest SHA1 -kdfopt pass:pw -kdfopt salt:salt -kdfopt iter:2 PBKDF2
+kdf -keylen 16 -kdfopt digest:SHA256 -kdfopt key:secret -kdfopt salt:s -kdfopt info:i HKDF
+kdf -keylen 16 -digest SHA256 -kdfopt hexkey:00ff -kdfopt hexsalt:0011 -kdfopt hexinfo:22 HKDF
+kdf -keylen 16 -digest SHA256 -kdfopt mode:EXTRACT_ONLY -kdfopt key:secret -kdfopt salt:s HKDF
+kdf -keylen 64 -kdfopt pass:pw -kdfopt salt:NaCl -kdfopt n:1024 -kdfopt r:8 -kdfopt p:16 SCRYPT
+kdf -keylen 16 -kdfopt digest:SHA256 -kdfopt secret:s -kdfopt seed:x TLS1-PRF
+kdf -keylen 16 -kdfopt digest:SHA256 -kdfopt key:k -kdfopt xcghash:x -kdfopt session_id:s -kdfopt type:A SSHKDF
+kdf -keylen 16 -mac HMAC -digest SHA256 -kdfopt key:k -kdfopt salt:s -kdfopt info:i KBKDF
+kdf -keylen 16 -mac CMAC -cipher AES-128-CBC -kdfopt hexkey:00112233445566778899aabbccddeeff -kdfopt salt:s KBKDF
+kdf -keylen 16 -digest SHA256 -kdfopt key:k SSKDF
+kdf -keylen 16 -digest SHA256 -kdfopt pass:pw -kdfopt salt:saltsalt -kdfopt iter:1 PKCS12KDF
+kdf -keylen 16 -kdfopt pass:pw -kdfopt salt:saltsaltsaltsalt -kdfopt iter:1 -kdfopt lanes:1 -kdfopt memcost:32 ARGON2ID
+kdf -keylen 24 -digest SHA256 -kdfopt pass:pw -kdfopt salt:salt -kdfopt iter:1000 -binary -out {dir}/kdf.bin PBKDF2
+dgst -sha256 -r {dir}/kdf.bin
+kdf -keylen 24 -digest SHA256 -kdfopt pass:pw -kdfopt salt:salt -kdfopt iter:1000 -out {dir}/kdf.txt PBKDF2
+dgst -sha256 -r {dir}/kdf.txt
+kdf -keylen 24 -digest SHA256 -kdfopt pass:pw -kdfopt salt:salt -kdfopt iter:1000 -out /nonexistent/kdf PBKDF2
+kdf -keylen 0 -kdfopt pass:pw PBKDF2
+kdf -keylen -1 -kdfopt pass:pw PBKDF2
+kdf -keylen x -kdfopt pass:pw PBKDF2
+kdf -kdfopt pass:pw PBKDF2
+kdf -keylen 16 PBKDF2
+kdf -keylen 16 -kdfopt digest:SHA256 HKDF
+kdf -keylen 16 -kdfopt nosuch:1 HKDF
+kdf -keylen 16 -kdfopt bad HKDF
+kdf -keylen 16 -kdfopt digest:nosuch HKDF
+kdf -keylen 16 -digest nosuch -kdfopt key:k HKDF
+kdf -keylen 16 NOSUCH
+kdf -keylen 16
+kdf -keylen 16 HKDF extra
+kdf -provider default -keylen 16 -digest SHA256 -kdfopt key:k HKDF
+kdf -provider-path {dir} -provider nosuch -keylen 16 HKDF
+kdf -propquery provider=default -keylen 16 -digest SHA256 -kdfopt key:k HKDF
+kdf -provparam default:x=y -keylen 16 -digest SHA256 -kdfopt key:k HKDF
+kdf -help
+kdf -x

@@ -70,6 +70,7 @@ fn psk_preamble_inner(c: &mut Connection, w: &mut Writer) -> Result<Option<Const
         return Err(Error::internal());
     }
     state(c)?.psk = Some(Secret::new(psk.key.clone()));
+    c.neg.session.psk_identity = Some(psk.identity.clone());
     w.vec(2, &psk.identity).map_err(|_| Error::internal())?;
     Ok(None)
 }

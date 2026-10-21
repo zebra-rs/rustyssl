@@ -1,0 +1,158 @@
+# `openssl enc`, `base64`, and cipher names as commands (apps/enc.c). Lines starting with `~`
+# must only succeed: a new random salt, -debug's BIO addresses, -engine's directory, and -p/-P
+# with -K but no -nosalt (upstream prints its salt buffer uninitialized), as with a wrap
+# cipher's IV when none is given.
+# An empty file for the lines below.
+rand -out {dir}/empty
+enc -aes-256-cbc -K 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -in {bin} -a
+enc -aes-256-cbc -K 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -in {bin} -out {dir}/e1.bin
+enc -d -aes-256-cbc -K 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -in {dir}/e1.bin -out {dir}/d1.bin
+dgst -sha256 -r {dir}/d1.bin
+enc -d -aes-256-cbc -K 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -in {txt}
+enc -e -aes-128-cbc -K 00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -in {txt} -a
+enc -aes-128-ecb -K 00112233445566778899aabbccddeeff -in {txt} -a
+enc -aes-128-ecb -K 00112233445566778899aabbccddeeff -iv 00 -in {txt} -a
+enc -aes-128-ctr -pbkdf2 -k pw -S 0011223344556677 -in {txt} -a
+enc -aes-128-ofb -K 00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -in {bin} -a
+enc -aes-192-cfb8 -K 00112233445566778899aabbccddeeff0011223344556677 -iv 00112233445566778899aabbccddeeff -in {txt} -a
+enc -des-ede3-cbc -k pw -S 0011223344556677 -md sha256 -in {txt} -a
+enc -des-ede3-cbc -k pw -S 0011223344556677 -md sha1 -in {txt} -a -p
+enc -aria-256-cfb -K 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -in {txt} -a
+enc -camellia-192-ofb -K 00112233445566778899aabbccddeeff0011223344556677 -iv 00112233445566778899aabbccddeeff -in {bin} -a
+enc -sm4-cbc -K 00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -in {txt} -a
+enc -chacha20 -K 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff -iv 00000000000000000000000000000000 -in {txt} -a
+enc -rc4 -K 00112233445566778899aabbccddeeff -in {txt} -a
+enc -bf-cbc -K 00112233445566778899aabbccddeeff -iv 0011223344556677 -in {txt} -a
+enc -des-cbc -k pw -S 0011223344556677 -in {txt} -a
+aes-128-cbc -K 00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -in {txt} -a
+aes256 -K 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -in {txt} -a
+des3 -k pw -S 0011223344556677 -in {txt} -a
+enc -aes-256-cbc -pbkdf2 -iter 2000 -k pw -S 0011223344556677 -p -in {txt}
+enc -aes-128-cbc -k x -iter 5 -S 00 -in {txt} -a -p
+enc -aes-128-cbc -k x -pbkdf2 -iter 5 -S 00 -in {txt} -a -p
+enc -aes-128-cbc -k x -iter 5 -pbkdf2 -md sha1 -S 00 -in {txt} -a -p
+enc -aes-128-cbc -k x -iter 0 -in {txt}
+enc -aes-128-cbc -k x -iter x -in {txt}
+enc -aes-128-cbc -pbkdf2 -saltlen 16 -k x -S 00 -in {txt} -a -p
+enc -aes-128-cbc -pbkdf2 -saltlen 32 -k x -S 00 -in {txt} -a -p
+enc -aes-128-cbc -pbkdf2 -saltlen 4 -k x -S 0011223344556677 -in {txt} -a -p
+enc -aes-128-cbc -saltlen 4 -k x -S 00 -in {txt} -a -p
+enc -aes-128-cbc -saltlen 0 -k x -in {txt}
+enc -aes-128-cbc -k pw -S 00 -P
+enc -aes-128-cbc -k pw -S 00 -P -nosalt
+enc -aes-128-cbc -k pw -nosalt -in {txt} -a -p
+enc -aes-128-cbc -k pw -nosalt -salt -S 00 -in {txt} -a -p
+enc -aes-128-cbc -K 00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -nosalt -p -in {txt} -a
+enc -aes-128-cbc -K 00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -nosalt -P
+~enc -aes-128-cbc -K 00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -P
+~enc -aes-128-cbc -K 00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -p -in {txt} -a
+~enc -aes-128-cbc -k pw -in {txt} -a
+~enc -aes-128-cbc -pbkdf2 -k pw -P
+enc -aes-128-cbc -pbkdf2 -k pw -S 0011223344556677 -in {bin} -out {dir}/salted.bin
+enc -d -aes-128-cbc -pbkdf2 -k pw -in {dir}/salted.bin -out {dir}/d2.bin
+dgst -sha256 -r {dir}/d2.bin
+enc -d -aes-128-cbc -pbkdf2 -k wrong -in {dir}/salted.bin
+enc -d -aes-128-cbc -pbkdf2 -k pw -nopad -in {dir}/salted.bin -out {dir}/d3.bin
+enc -d -aes-128-cbc -pbkdf2 -k pw -S 0011223344556677 -in {dir}/salted.bin -out {dir}/d4.bin
+enc -d -aes-128-cbc -pbkdf2 -k pw -P -in {dir}/salted.bin
+enc -aes-128-cbc -k pw -S 0011223344556677 -in {txt} -a -out {dir}/salted.b64
+enc -d -aes-128-cbc -k pw -a -in {dir}/salted.b64
+enc -d -aes-128-cbc -k pw -base64 -in {dir}/salted.b64 -v
+enc -d -aes-128-cbc -k pw -S 0011223344556677 -a -in {dir}/salted.b64
+enc -d -aes-128-cbc -k pw -in {txt}
+enc -d -aes-128-cbc -k pw -in {dir}/empty
+enc -d -aes-128-cbc -k pw -nosalt -in {txt}
+enc -d -base64 -in {dir}/salted.b64
+enc -d -aes-128-cbc -k pw -a < {dir}/salted.b64
+enc -d -a -A < {dir}/salted.b64
+enc -base64 -in {bin}
+enc -base64 -A -in {txt}
+enc -a -A -in {bin}
+enc -base64 -e -in {txt} -out {dir}/t.b64
+enc -base64 -d -in {dir}/t.b64
+enc -base64 < {txt}
+enc -base64 -in - < {txt}
+base64 -in {txt}
+base64 -d -in {dir}/t.b64
+base64 < {bin}
+enc -in {txt}
+enc -none -in {txt}
+enc -aes-128-cbc -none -k x -S 00 -in {txt} -a
+enc -bufsize 1k -base64 -in {bin}
+enc -bufsize 10 -base64 -in {txt} -v
+enc -bufsize 100 -aes-128-cbc -k x -S 00 -in {bin} -a -v
+enc -bufsize 0x10 -base64 -in {txt}
+enc -bufsize 4294967296 -base64 -in {txt}
+enc -bufsize 4294967296 -in {txt}
+enc -bufsize -1 -base64 -in {txt}
+enc -bufsize x -base64 -in {txt}
+enc -bufsize 9007199254740992k -in {txt}
+enc -bufsize k -in {txt}
+enc -id-aes128-wrap -K 00112233445566778899aabbccddeeff -in {txt} -a
+enc -id-aes128-wrap -K 00112233445566778899aabbccddeeff -in {txt} -out {dir}/wrapped.bin
+enc -d -id-aes128-wrap -K 00112233445566778899aabbccddeeff -in {dir}/wrapped.bin
+enc -d -id-aes128-wrap -K 00112233445566778899aabbccddeeff -in {bin}
+enc -id-aes128-wrap-pad -K 00112233445566778899aabbccddeeff -in {txt} -a
+enc -id-aes128-wrap -K 00112233445566778899aabbccddeeff -a < {txt}
+enc -id-aes128-wrap -K 00112233445566778899aabbccddeeff -in - -a < {txt}
+~enc -id-aes128-wrap -K 00112233445566778899aabbccddeeff -nosalt -P
+enc -aes-128-cbc -K 00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -nopad -in {txt}
+enc -aes-128-cbc -K 00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -nopad -in {dir}/empty -a
+enc -aes-128-cbc -K 0011 -iv 00112233445566778899aabbccddeeff -in {txt} -a
+enc -aes-128-cbc -K 00112233445566778899aabbccddeeff00 -iv 00112233445566778899aabbccddeeff -in {txt} -a
+enc -aes-128-cbc -K zz -iv 00112233445566778899aabbccddeeff -in {txt}
+enc -aes-128-cbc -K 00112233445566778899aabbccddeeff -iv zz -in {txt}
+enc -aes-128-cbc -K 00112233445566778899aabbccddeeff -iv 0011 -in {txt} -a
+enc -aes-128-ecb -K 00112233445566778899aabbccddeeff -iv 0011 -in {txt} -a
+enc -aes-128-cbc -K 00112233445566778899aabbccddeeff -in {txt}
+enc -aes-128-cbc -k a -S zz -in {txt}
+enc -aes-128-cbc -k a -S 00112233445566778899 -in {txt} -a
+enc -aes-128-cbc -k a -pass pass:b -S 00 -in {txt} -a -p
+enc -aes-128-cbc -pass pass:pw -S 00 -in {txt} -a
+enc -aes-128-cbc -pass env:RUSTYSSL_NO_SUCH_VARIABLE -S 00 -in {txt} -a
+enc -aes-128-cbc -pass file:{tests}/enc-pass.dat -S 00 -in {txt} -a -p
+enc -aes-128-cbc -pass nosuch:x -in {txt}
+enc -aes-128-cbc -kfile {tests}/enc-pass.dat -S 00 -in {txt} -a -p
+enc -aes-128-cbc -kfile {tests}/enc-pass-crlf.dat -S 00 -in {txt} -a -p
+enc -aes-128-cbc -kfile {tests}/enc-pass-1.dat -S 00 -in {txt} -a
+enc -aes-128-cbc -kfile {tests}/enc-pass-nl.dat -S 00 -in {txt} -a
+enc -aes-128-cbc -kfile {dir}/empty -S 00 -in {txt} -a
+enc -aes-128-cbc -kfile /nonexistent/pass -in {txt}
+enc -aes-128-cbc -K 00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -skeyopt raw-bytes:00112233445566778899aabbccddeeff -in {txt}
+enc -aes-128-cbc -iv 00112233445566778899aabbccddeeff -skeyopt raw-bytes:00112233445566778899aabbccddeeff -in {txt} -a
+enc -aes-128-cbc -iv 00112233445566778899aabbccddeeff -skeyopt raw-bytes:0011 -in {txt} -a
+enc -aes-128-cbc -iv 00112233445566778899aabbccddeeff -skeyopt nosuch:00 -in {txt} -a
+enc -aes-128-cbc -iv 00112233445566778899aabbccddeeff -skeyopt bad -in {txt} -a
+enc -aes-128-cbc -iv 00112233445566778899aabbccddeeff -skeymgmt GENERIC-SECRET -skeyopt raw-bytes:00112233445566778899aabbccddeeff -in {txt} -a
+enc -aes-128-cbc -iv 00112233445566778899aabbccddeeff -skeymgmt nosuch -skeyopt raw-bytes:00 -in {txt} -a
+enc -aes-128-cbc -skeyopt raw-bytes:00112233445566778899aabbccddeeff -in {txt} -a
+enc -aes-128-gcm -K 00112233445566778899aabbccddeeff -in {txt}
+enc -aes-128-xts -K 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff -in {txt}
+enc -chacha20-poly1305 -K 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff -in {txt}
+enc -aes-128-cbc-hmac-sha1 -K 00112233445566778899aabbccddeeff -in {txt}
+enc -nosuchcipher -in {txt}
+enc -aes-128-cbc -aes-256-cbc
+enc -aes-128-cbc -k x -md nosuch -in {txt}
+enc -aes-128-cbc -K 00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -in {txt} -out /nonexistent/x
+enc -aes-128-cbc -K 00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -in /nonexistent/x
+~enc -aes-128-cbc -K 00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -nosalt -debug -in {txt} -a
+~enc -debug -base64 -in {txt}
+~enc -engine nosuch -base64 -in {txt}
+enc -z -base64 -in {txt}
+enc -rand {bin} -base64 -in {txt}
+enc -rand /nonexistent/rand -base64 -in {txt}
+enc -writerand {dir}/rand.out -base64 -in {txt}
+enc -provider default -aes-128-cbc -K 00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -in {txt} -a
+enc -provider default -rc4 -K 00112233445566778899aabbccddeeff -in {txt} -a
+enc -provider legacy -provider default -rc4 -K 00112233445566778899aabbccddeeff -in {txt} -a
+enc -provider-path {dir} -provider nosuch -base64 -in {txt}
+enc -propquery provider=default -aes-128-cbc -K 00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -in {txt} -a
+enc -provparam default:x=y -base64 -in {txt}
+enc -list
+enc -ciphers
+enc -list -aes-128-cbc
+enc -aes-128-cbc -k x extra
+enc -help
+enc -h
+enc -x
+aes-128-cbc -help

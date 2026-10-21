@@ -1,0 +1,4 @@
+.pragma dollarid:on
+a = value$with$dollars
+[sec]
+b = x

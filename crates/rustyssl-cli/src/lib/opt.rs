@@ -1003,6 +1003,15 @@ pub fn help_only<O: Choice + PartialEq>(argv: &[String], list: &'static [OptDef<
     asked
 }
 
+/// `opt_cipher(name, &cipher)` where no name is no cipher: `Err` (the message printed) when
+/// the name isn't a cipher the key encryption can use.
+pub fn opt_cipher(name: Option<&str>) -> Result<Option<evp::Cipher>, ()> {
+    match name {
+        None => Ok(None),
+        Some(n) => cipher(n).map(Some).ok_or(()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

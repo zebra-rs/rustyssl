@@ -1,0 +1,24 @@
+# `openssl errstr` (apps/errstr.c): each argument read as `%lx`; the exit status counts the
+# arguments that aren't numbers.
+errstr 1C80006B
+errstr 0A000086 0A000102 80000002
+errstr 0x1C80006B
+errstr 1c80006b
+errstr -1
+errstr +10
+errstr 0
+errstr 0x
+errstr 0xzz
+errstr 12zz
+errstr zz
+errstr zz yy 1
+errstr 11112222333344445555
+errstr ffffffffffffffff
+errstr 8000000D
+errstr 05800074 12800067 1E08010C
+errstr
+errstr -help
+errstr -h
+errstr -x
+errstr -- -1
+errstr 1 -- 2

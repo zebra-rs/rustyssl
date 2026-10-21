@@ -62,3 +62,10 @@ pub fn hexstr2buf(s: &str) -> Option<Vec<u8>> {
     crate::util::openssl_free(p.cast());
     Some(v)
 }
+
+/// `OPENSSL_buf2hexstr(buf, len)`: `AA:BB:...`.
+pub fn buf2hexstr(buf: &[u8]) -> Option<String> {
+    let n = core::ffi::c_long::try_from(buf.len()).ok()?;
+    // SAFETY: buf is valid for n bytes; the string is ours to free, which take_string does.
+    take_string(unsafe { ffi::OPENSSL_buf2hexstr(buf.as_ptr(), n) })
+}

@@ -515,11 +515,49 @@ static void test_split_writes(int max, int pipes)
     done(cctx, sctx, c, s);
 }
 
+/* The records a connection writes, by content type, through the message callback. */
+static int records_written[256];
+
+static void count_records(int write_p, int version, int content_type, const void *buf, size_t len,
+                          SSL *ssl, void *arg)
+{
+    (void)version;
+    (void)ssl;
+    (void)arg;
+    if (write_p && content_type == SSL3_RT_HEADER && len >= 1)
+        records_written[((const unsigned char *)buf)[0]]++;
+}
+
+/*
+ * SSL_CTX_set_split_send_fragment applies to the handshake too: a server's messages go out
+ * in records of at most that size.
+ */
+static void test_split_handshake(int max)
+{
+    SSL_CTX *cctx = client_ctx(), *sctx = server_ctx();
+    SSL *c, *s;
+
+    printf("# split_send_fragment 100 for the handshake, %s\n",
+           max == TLS1_3_VERSION ? "TLS 1.3" : "TLS 1.2");
+    SSL_CTX_set_max_proto_version(cctx, max);
+    check(SSL_CTX_set_split_send_fragment(sctx, 100) == 1, "SSL_CTX_set_split_send_fragment");
+    memset(records_written, 0, sizeof(records_written));
+    connect_pair(cctx, sctx, &c, &s);
+    SSL_set_msg_callback(s, count_records);
+    check(run(c, s, 0) == 0, "the handshake");
+    printf("  the server wrote %d handshake, %d change cipher spec, %d application data record(s)\n",
+           records_written[SSL3_RT_HANDSHAKE], records_written[SSL3_RT_CHANGE_CIPHER_SPEC],
+           records_written[SSL3_RT_APPLICATION_DATA]);
+    done(cctx, sctx, c, s);
+}
+
 int main(void)
 {
     /* A write to the closed socket must fail, not kill the test. */
     signal(SIGPIPE, SIG_IGN);
     test_basic(TLS1_3_VERSION);
+    test_split_handshake(TLS1_3_VERSION);
+    test_split_handshake(TLS1_2_VERSION);
     test_basic(TLS1_2_VERSION);
     test_write_starts_handshake();
     test_big_writes();

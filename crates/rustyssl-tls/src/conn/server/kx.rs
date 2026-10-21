@@ -259,6 +259,8 @@ fn psk_preamble_inner(c: &mut Connection, rd: &mut Reader<'_>) -> Result<Option<
     }
     let identity = id.rest().to_vec();
     state(c)?.psk_identity = Some(identity.clone());
+    // `PACKET_strndup`: up to the first NUL.
+    c.neg.session.psk_identity = Some(crate::conn::common::until_nul(&identity).to_vec());
     let r = Request::Psk {
         hint_or_identity: identity,
     };

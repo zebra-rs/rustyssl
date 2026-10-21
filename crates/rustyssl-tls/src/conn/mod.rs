@@ -948,7 +948,20 @@ impl Connection {
             return self.dtls_write_record(p, ty, data, epoch);
         }
         let start = self.output.len();
-        self.rw.write(p, ty, data, &mut self.output)?;
+        // Records of at most `split_send_fragment` octets, whatever their type
+        // (`ssl3_write_bytes`; application data comes already apportioned).
+        let max_send = self.rw.max_frag_len.clamp(1, record::MAX_PLAIN);
+        let split = match self.cfg.split_send_fragment {
+            0 => max_send,
+            n => n.min(max_send),
+        };
+        if data.len() <= split {
+            self.rw.write(p, ty, data, &mut self.output)?;
+        } else {
+            for chunk in data.chunks(split) {
+                self.rw.write(p, ty, chunk, &mut self.output)?;
+            }
+        }
         if self.cfg.callbacks.msg {
             let protected13 = self.rw.mode() == record::Mode::Tls13;
             let mut at = start;

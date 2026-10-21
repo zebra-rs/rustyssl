@@ -39,6 +39,9 @@
 //!
 //! The server's report of the client (its certificate, the ALPN list and the host name it
 //! sent) joins the summary.
+//!
+//! `--cli ours` runs our `openssl` tool (`target/dist/bin/openssl-rs`) on the rustyssl side of
+//! each pairing, so the cases check our `s_server` and `s_client` too (Phase 11).
 
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -143,6 +146,8 @@ const PAIRINGS: [Pairing; 4] = [
 /// The reference tool with a library directory.
 struct Tool<'a> {
     bin: &'a Path,
+    /// With `--cli ours`: the tool the rustyssl side runs.
+    ours_bin: Option<&'a Path>,
     reference: &'a Path,
     ours: &'a Path,
     work: &'a Path,
@@ -150,7 +155,11 @@ struct Tool<'a> {
 
 impl Tool<'_> {
     fn command(&self, ours: bool, args: &[String]) -> Command {
-        let mut c = Command::new(self.bin);
+        let bin = match self.ours_bin {
+            Some(b) if ours => b,
+            _ => self.bin,
+        };
+        let mut c = Command::new(bin);
         c.args(args)
             .current_dir(self.work)
             .env(LOADER_PATH, if ours { self.ours } else { self.reference })
@@ -700,8 +709,13 @@ pub fn run(args: &[String]) -> Result {
     fresh_dir(&work)?;
     let ref_lib = reference.join("lib");
     let our_lib = dist.join("lib");
+    let our_cli = dist.join("bin").join(crate::dist::CLI_NAME);
+    let cli_ours = args
+        .windows(2)
+        .any(|w| w.first().is_some_and(|a| a == "--cli") && w.get(1).is_some_and(|a| a == "ours"));
     let t = Tool {
         bin: &bin,
+        ours_bin: cli_ours.then_some(our_cli.as_path()),
         reference: &ref_lib,
         ours: &our_lib,
         work: &work,
@@ -716,6 +730,10 @@ pub fn run(args: &[String]) -> Result {
                 relay::set_seed(s.parse().map_err(|_| format!("bad --seed {s}"))?);
             }
             "--peer" => peer = Some(it.next().ok_or("--peer needs a name")?.as_str()),
+            "--cli" => match it.next().map(String::as_str) {
+                Some("ours") => {}
+                _ => return Err("--cli takes `ours`".into()),
+            },
             "--reference-only" => {}
             _ if a.starts_with("--") => return Err(format!("unknown option {a}").into()),
             _ => only.push(a),

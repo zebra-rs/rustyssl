@@ -11,13 +11,43 @@
 //!   is ported (`crates/rustyssl-cli/src/cmd/<command>.rs` exists) also run (2) and (3).
 //!
 //! Every run must print the same and exit the same as (1), after masking what differs by
-//! design: the library's version metadata (`+rustyssl...`), the directories it was built with,
-//! and errors' thread id and file and line. A line starting with `~` (timings) must only
-//! succeed on every run.
+//! design: the library's version metadata (`+rustyssl...`), the directories it was built with
+//! (OPENSSLDIR, ENGINESDIR, MODULESDIR, the libraries' own), errors' thread id and file and
+//! line, dlopen's message, our tool's name (`openssl-rs`), and every `PID=n`.
 //!
 //! In a line, `{bin}` is 100,000 octets of fixed data, `{txt}` a line of text, `{dir}` the work
 //! directory, `{src}` the reference's source tree (its `test/certs/`, ...), and `{tests}`
 //! `tests/apps/`; a final `< file` gives the command its standard input (otherwise empty).
+//!
+//! A line may start with these prefixes, in any order:
+//! - `~`: only success is compared (random output, timings);
+//! - `%`: compared with its numbers masked, and the lines naming the library's build
+//!   (`built on:`, `compiler:`, `CPUINFO:`) (`speed`);
+//! - `&`: a server (`ocsp -port`, `cmp -port`): it starts in the background, the next line runs
+//!   once it has printed its `ACCEPT` line, and then both outputs are compared (the server must
+//!   exit by itself, as with `-nrequest 1`);
+//! - `^`: the times within a few days of now (a reply made now) are masked.
+//!
+//! `{fresh:NAME}` in an argument is `fresh/NAME` in the work directory, a pristine copy of the
+//! file `tests/apps/NAME` made again before each run (for commands that change the file they're
+//! given, as `srp` does).
+//!
+//! A line `SERVER ARGS || CLIENT ARGS` pairs an `s_server` with a client (`{port}` is the
+//! server's port), each library's server with each library's client: see [`pair`]. (G5 used a
+//! lone `|`, which G2's `| check` already meant; it became `||` at the merge.)
+//!
+//! After the prefixes, `@<fixture> ` makes the line stateful: before each of its runs, the directory
+//! `tests/apps/<fixture>` is copied afresh to `{dir}/<its last component>` (a CA's database and
+//! serial files, which the command changes), so every run starts the same. (Forks G3 and G4
+//! both used `@`; G4's time masking became `^`.)
+//!
+//! Output that is random by design (key and parameter generation, randomized signatures) is
+//! compared structurally: in `command ... | check ...`, each run of `command` is followed by
+//! `check` with upstream's tool on the reference libraries, reading the command's standard
+//! output (further `| check` stages chain the same way). What is compared is the command's
+//! exit status and the last check's output, with runs of hex-dump lines (`    01:ab:...`)
+//! collapsed to one and `asn1parse`'s `[HEX DUMP]:` values masked; a `< file` comes before
+//! the first `|`.
 //!
 //! Run whole (no list named), it also runs the CLI's library-backed unit tests (`live_*`, the
 //! shared helpers) on each library.
@@ -30,6 +60,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+
+mod pair;
 
 use crate::dist::CLI_NAME;
 use crate::test_c::{LOADER_PATH, prepare};
@@ -84,11 +116,13 @@ fn run_tool(
 }
 
 /// The output with the expected differences masked: the version's build metadata, the
-/// directories the libraries were built with, and errors' `file:line:`.
+/// directories the libraries were built with, errors' `file:line:`, and process ids.
 fn masked(text: &str) -> String {
     text.lines()
         .map(|line| {
-            let mut l = line.to_owned();
+            // Our tool's own name, which commands show through `opt_appname` ("openssl cmp").
+            let mut l =
+                mask_apps_line(&mask_pid(line)).replace(&format!("{CLI_NAME} "), "openssl ");
             if let Some(at) = l.find("+rustyssl") {
                 let end = l[at..].find(' ').map_or(l.len(), |e| at + e);
                 l.replace_range(at..end, "");
@@ -104,9 +138,166 @@ fn masked(text: &str) -> String {
                     l.replace_range(..at, "THREAD");
                 }
                 l = mask_location(&l);
+                l = mask_libdir(&l);
+                // dlopen's message is the platform's (macOS's lists every path dyld tried, and
+                // past ERR_MAX_DATA_SIZE the data is dropped), so only its place is compared.
+                if let Some(at) = l.find(":dlfcn_load:")
+                    && let Some(end) = l[at..].find(":FILE:LINE:")
+                {
+                    l.truncate(at + end + ":FILE:LINE:".len());
+                }
+            }
+            for (dir, name) in OPENSSLDIRS.get().into_iter().flatten() {
+                l = l.replace(dir.as_str(), name);
             }
             l
         })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Both libraries' OPENSSLDIR, ENGINESDIR and MODULESDIR (each with a trailing `/`) and the
+/// name each is masked as, set once the libraries are found: a default file's path
+/// (`cert.pem`, an engine's module, ...) is `OPENSSLDIR/<file>` and so on in the output.
+static OPENSSLDIRS: std::sync::OnceLock<Vec<(String, String)>> = std::sync::OnceLock::new();
+
+/// The libraries' own directory as `LIBDIR/`: macOS's `dlopen` errors list the paths dyld
+/// tried, the library's directory first (`target/ref/openssl-<version>/lib/` on the reference,
+/// `target/dist/lib/` on ours).
+fn mask_libdir(line: &str) -> String {
+    let mut l = line.replace("target/dist/lib/", "LIBDIR/");
+    while let Some(at) = l.find("target/ref/openssl-") {
+        let Some(end) = l[at..].find("/lib/") else {
+            break;
+        };
+        l.replace_range(at..at + end + "/lib/".len(), "LIBDIR/");
+    }
+    l
+}
+
+/// The line of an `apps/<file>.c:<line>:` location (`cmp`'s log lines) as `LINE`: it is
+/// `__LINE__` of a macro call that may span lines, which GCC and clang report differently.
+fn mask_apps_line(line: &str) -> String {
+    let mut out = String::new();
+    let mut rest = line;
+    while let Some(at) = rest.find("apps/") {
+        let (before, after) = rest.split_at(at);
+        out.push_str(before);
+        let file_end = after.find(".c:").filter(|&e| {
+            after[..e]
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'/')
+        });
+        let Some(e) = file_end else {
+            out.push_str("apps/");
+            rest = &after["apps/".len()..];
+            continue;
+        };
+        let digits = after[e + 3..]
+            .bytes()
+            .take_while(u8::is_ascii_digit)
+            .count();
+        if digits > 0 && after[e + 3 + digits..].starts_with(':') {
+            out.push_str(&after[..e + 3]);
+            out.push_str("LINE");
+            rest = &after[e + 3 + digits..];
+        } else {
+            out.push_str("apps/");
+            rest = &after["apps/".len()..];
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+/// `PID=<digits>` as `PID=PID` (a server's `ACCEPT` line).
+fn mask_pid(line: &str) -> String {
+    let mut out = String::new();
+    let mut rest = line;
+    while let Some((before, after)) = rest.split_once("PID=") {
+        out.push_str(before);
+        out.push_str("PID=");
+        let n = after.bytes().take_while(u8::is_ascii_digit).count();
+        if n > 0 {
+            out.push_str("PID");
+        }
+        rest = after.get(n..).unwrap_or_default();
+    }
+    out.push_str(rest);
+    out
+}
+
+const MONTHS: [&str; 12] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+/// Days since 1970-01-01 of a civil date (Howard Hinnant's `days_from_civil`).
+fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let mp = (m + 9) % 12;
+    let doy = (153 * mp + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146_097 + doe - 719_468
+}
+
+/// The length of the time `ASN1_TIME_print` writes (`Mmm dd hh:mm:ss[.fff] yyyy GMT`) at the
+/// start of `s`, if it is within three days of `today` (days since the epoch).
+fn time_near(s: &str, today: i64) -> Option<usize> {
+    let m = MONTHS.iter().position(|m| s.starts_with(m))?;
+    let rest = s.get(3..)?;
+    let rb = rest.as_bytes();
+    if rb.first() != Some(&b' ') {
+        return None;
+    }
+    let day: i64 = rest.get(1..3)?.trim().parse().ok()?;
+    let time = rest.get(4..12)?.as_bytes();
+    if time.get(2) != Some(&b':') || time.get(5) != Some(&b':') {
+        return None;
+    }
+    let mut j = 12;
+    if rb.get(j) == Some(&b'.') {
+        j += 1;
+        while rb.get(j).is_some_and(u8::is_ascii_digit) {
+            j += 1;
+        }
+    }
+    if rb.get(j) != Some(&b' ') {
+        return None;
+    }
+    let year: i64 = rest.get(j + 1..j + 5)?.parse().ok()?;
+    if rest.get(j + 5..j + 9) != Some(" GMT") {
+        return None;
+    }
+    let days = days_from_civil(year, i64::try_from(m).ok()? + 1, day);
+    ((days - today).abs() <= 3).then_some(3 + j + 9)
+}
+
+/// The times near `today` ([`time_near`]) of a line, as `TIME`.
+fn mask_times_near(line: &str, today: i64) -> String {
+    let mut out = String::new();
+    let mut rest = line;
+    while let Some(c) = rest.chars().next() {
+        if let Some(len) = time_near(rest, today) {
+            out.push_str("TIME");
+            rest = rest.get(len..).unwrap_or_default();
+        } else {
+            out.push(c);
+            rest = rest.get(c.len_utf8()..).unwrap_or_default();
+        }
+    }
+    out
+}
+
+/// [`mask_times_near`] for every line, around the current day.
+fn mask_now_times(text: &str) -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
+    let today = i64::try_from(secs / 86_400).unwrap_or(0);
+    text.lines()
+        .map(|l| mask_times_near(l, today))
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -131,9 +322,77 @@ fn mask_location(line: &str) -> String {
     }
 }
 
-/// The first difference between two outputs, after masking.
-fn compare(expected: &Output, got: &Output, label: &str) -> std::result::Result<(), String> {
-    let (t, o) = (masked(&expected.text), masked(&got.text));
+/// The output with what varies from run to run masked too: each number (`12`, `0.25s`,
+/// `1234.50k`, `inf`, `-nan`) as `N`, runs of spaces as one, and the lines that name how the
+/// library was built.
+fn masked_timings(text: &str) -> String {
+    let mut out = Vec::new();
+    for line in masked(text).lines() {
+        if let Some(p) = ["built on:", "compiler:", "CPUINFO:"]
+            .iter()
+            .find(|p| line.starts_with(**p))
+        {
+            out.push((*p).to_owned());
+            continue;
+        }
+        let c: Vec<char> = line.chars().collect();
+        let mut l = String::new();
+        let mut i = 0;
+        while let Some(&here) = c.get(i) {
+            let word_start = i == 0 || !c.get(i - 1).is_some_and(char::is_ascii_alphabetic);
+            let sign = usize::from(here == '-');
+            let rest = c.get(i + sign..).unwrap_or_default();
+            let num = rest
+                .iter()
+                .take_while(|c| c.is_ascii_digit() || **c == '.')
+                .count();
+            // `inf` or `nan` as a word (or with `k`), not the start of one.
+            let alpha = |j: usize| rest.get(j).is_some_and(char::is_ascii_alphabetic);
+            let ends = !alpha(3) || (rest.get(3) == Some(&'k') && !alpha(4));
+            let starts = |w: &str| ends && rest.iter().take(3).copied().eq(w.chars());
+            let len = if rest.iter().take(num).any(char::is_ascii_digit) {
+                num
+            } else if word_start && (starts("inf") || starts("nan")) {
+                3
+            } else {
+                0
+            };
+            if len == 0 {
+                l.push(here);
+                i += 1;
+                continue;
+            }
+            l.push('N');
+            i += sign + len;
+            if c.get(i) == Some(&'k') {
+                i += 1;
+            }
+        }
+        let mut collapsed = String::new();
+        for c in l.chars() {
+            if !(c == ' ' && collapsed.ends_with(' ')) {
+                collapsed.push(c);
+            }
+        }
+        out.push(collapsed);
+    }
+    out.join("\n")
+}
+
+/// The first difference between two outputs, after masking (and with `timings`, after
+/// [`masked_timings`]).
+fn compare(
+    expected: &Output,
+    got: &Output,
+    label: &str,
+    timings: bool,
+    times: bool,
+) -> std::result::Result<(), String> {
+    let mask = if timings { masked_timings } else { masked };
+    let (mut t, mut o) = (mask(&expected.text), mask(&got.text));
+    if times {
+        (t, o) = (mask_now_times(&t), mask_now_times(&o));
+    }
     if t == o {
         return Ok(());
     }
@@ -157,15 +416,88 @@ struct Setup {
     ref_lib: PathBuf,
     our_lib: PathBuf,
     work: PathBuf,
+    /// `tests/apps/`.
+    tests: PathBuf,
     subst: Vec<(&'static str, String)>,
 }
 
-/// One line of a list: its arguments, its standard input, and whether it is compared.
+/// One line of a list: its arguments, its standard input, whether it is compared, and the
+/// checks its output is piped through (each one's arguments).
 struct Line {
     text: String,
     compare: bool,
+    /// Compared with its timings masked (`%` lines).
+    timings: bool,
     args: Vec<String>,
     stdin: Option<PathBuf>,
+    checks: Vec<Vec<String>>,
+    /// The fixture directory copied afresh before each run, and where it goes.
+    reset: Option<(PathBuf, PathBuf)>,
+    /// A server for the next line (`&`).
+    background: bool,
+    /// The current times masked (`^`).
+    times: bool,
+    /// The `{fresh:NAME}` files.
+    fresh: Vec<String>,
+    /// A paired line's server and client (`SERVER ARGS || CLIENT ARGS`).
+    pair: Option<pair::Pair>,
+}
+
+/// Replaces each `{fresh:NAME}` of `arg` with its path, recording the names.
+fn fresh_files(arg: &str, work: &Path, names: &mut Vec<String>) -> String {
+    let mut out = String::new();
+    let mut rest = arg;
+    while let Some(at) = rest.find("{fresh:") {
+        let Some(end) = rest[at..].find('}') else {
+            break;
+        };
+        let name = &rest[at + 7..at + end];
+        out.push_str(&rest[..at]);
+        out.push_str(&work.join("fresh").join(name).display().to_string());
+        names.push(name.to_owned());
+        rest = &rest[at + end + 1..];
+    }
+    out.push_str(rest);
+    out
+}
+
+/// Makes the `{fresh:NAME}` copies again (`tests/apps/NAME` when it exists).
+fn refresh(setup: &Setup, line: &Line) -> Result {
+    if line.fresh.is_empty() {
+        return Ok(());
+    }
+    let dir = setup.work.join("fresh");
+    fresh_dir(&dir)?;
+    for name in &line.fresh {
+        let src = setup.tests.join(name);
+        let dst = dir.join(name);
+        if let Some(parent) = dst.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        if src.is_file() {
+            fs::copy(&src, &dst)?;
+        }
+    }
+    Ok(())
+}
+
+/// Copies the directory `from` to `to`, replacing what was there.
+fn copy_fresh(from: &Path, to: &Path) -> Result {
+    if to.exists() {
+        fs::remove_dir_all(to)?;
+    }
+    fs::create_dir_all(to)?;
+    for entry in fs::read_dir(from)? {
+        let entry = entry?;
+        let path = entry.path();
+        let dest = to.join(entry.file_name());
+        if path.is_dir() {
+            copy_fresh(&path, &dest)?;
+        } else {
+            fs::copy(&path, &dest)?;
+        }
+    }
+    Ok(())
 }
 
 fn parse_list(text: &str, setup: &Setup) -> Vec<Line> {
@@ -174,30 +506,64 @@ fn parse_list(text: &str, setup: &Setup) -> Vec<Line> {
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
-        let (compare, rest) = match line.strip_prefix('~') {
-            Some(rest) => (false, rest),
-            None => (true, line),
+        let (mut compare, mut timings, mut background, mut times) = (true, false, false, false);
+        let mut rest = line;
+        loop {
+            match rest.as_bytes().first() {
+                Some(b'~') => compare = false,
+                Some(b'%') => timings = true,
+                Some(b'&') => background = true,
+                Some(b'^') => times = true,
+                _ => break,
+            }
+            rest = rest.get(1..).unwrap_or_default().trim_start();
+        }
+        let mut reset = None;
+        let rest = match rest.strip_prefix('@').and_then(|r| r.split_once(' ')) {
+            Some((fixture, r)) => {
+                let from = setup.tests.join(fixture);
+                let name = from.file_name().map(PathBuf::from).unwrap_or_default();
+                reset = Some((from, setup.work.join(name)));
+                r
+            }
+            None => rest,
         };
+        let mut fresh = Vec::new();
         let mut args: Vec<String> = rest
             .split_whitespace()
             .map(|a| {
-                let mut a = a.to_owned();
+                let mut a = fresh_files(a, &setup.work, &mut fresh);
                 for (key, value) in &setup.subst {
                     a = a.replace(key, value);
                 }
                 a
             })
             .collect();
+        let pair = pair::split(&args);
+        let mut checks: Vec<Vec<String>> = Vec::new();
+        while pair.is_none()
+            && let Some(at) = args.iter().rposition(|a| a == "|")
+        {
+            checks.insert(0, args.split_off(at + 1));
+            args.pop();
+        }
         let mut stdin = None;
-        if args.len() >= 2 && args.get(args.len() - 2).is_some_and(|a| a == "<") {
+        if pair.is_none() && args.len() >= 2 && args.get(args.len() - 2).is_some_and(|a| a == "<") {
             stdin = args.pop().map(PathBuf::from);
             args.pop();
         }
         out.push(Line {
             text: rest.to_owned(),
             compare,
+            timings,
             args,
             stdin,
+            checks,
+            reset,
+            background,
+            times,
+            fresh,
+            pair,
         });
     }
     out
@@ -215,6 +581,71 @@ fn ported(root: &Path, command: &str) -> bool {
             .is_file()
 }
 
+/// Runs a line's command with `tool` on `lib`, then its checks (if any) with upstream's tool on
+/// the reference, each reading the previous one's standard output. With checks, the result is
+/// the command's exit status and the last check's output, hex dumps collapsed.
+fn run_line(setup: &Setup, line: &Line, tool: &Path, lib: &Path) -> Result<Output> {
+    let w = &setup.work;
+    if let Some((from, to)) = &line.reset {
+        copy_fresh(from, to)?;
+    }
+    refresh(setup, line)?;
+    let first = run_tool(tool, lib, &line.args, line.stdin.as_deref(), w)?;
+    if line.checks.is_empty() {
+        return Ok(first);
+    }
+    let mut prev = first.stdout.clone();
+    let mut last = None;
+    for check in &line.checks {
+        let piped = w.join("pipe.in");
+        fs::write(&piped, &prev)?;
+        let out = run_tool(&setup.upstream, &setup.ref_lib, check, Some(&piped), w)?;
+        prev = out.stdout.clone();
+        last = Some(out);
+    }
+    let last = last.ok_or("no check")?;
+    let text = format!(
+        "[command: {}]\n{}",
+        if first.ok { "success" } else { "failure" },
+        collapse_hex(&last.text)
+    );
+    Ok(Output {
+        stdout: last.stdout,
+        stderr: last.stderr,
+        text,
+        ok: first.ok && last.ok,
+    })
+}
+
+/// Collapses each run of hex-dump lines (`    00:c3:...`, the random parts of a printed key)
+/// into one `HEX` line, and masks `asn1parse`'s `[HEX DUMP]:` values.
+fn collapse_hex(text: &str) -> String {
+    let is_hex = |l: &str| {
+        let t = l.trim();
+        l.starts_with(' ')
+            && !t.is_empty()
+            && t.split(':')
+                .filter(|p| !p.is_empty())
+                .all(|p| p.len() == 2 && p.bytes().all(|b| b.is_ascii_hexdigit()))
+    };
+    let mut out: Vec<String> = Vec::new();
+    for l in text.lines() {
+        if is_hex(l) {
+            if out.last().map(String::as_str) != Some("HEX") {
+                out.push("HEX".to_owned());
+            }
+        } else if let Some(at) = l.find("[HEX DUMP]:") {
+            // asn1parse's dump of a primitive's (random) octets.
+            out.push(format!("{}[HEX DUMP]:HEX", &l[..at]));
+        } else {
+            out.push(l.to_owned());
+        }
+    }
+    let mut s = out.join("\n");
+    s.push('\n');
+    s
+}
+
 /// Runs one line: upstream's tool on the reference (the expectation), then the runs `ours`
 /// lists, each as (tool, libraries, label).
 fn check(
@@ -222,18 +653,11 @@ fn check(
     line: &Line,
     runs: &[(&Path, &Path, &str)],
 ) -> Result<std::result::Result<(), String>> {
-    let w = &setup.work;
-    let expected = run_tool(
-        &setup.upstream,
-        &setup.ref_lib,
-        &line.args,
-        line.stdin.as_deref(),
-        w,
-    )?;
+    let expected = run_line(setup, line, &setup.upstream, &setup.ref_lib)?;
     for (tool, lib, label) in runs {
-        let got = run_tool(tool, lib, &line.args, line.stdin.as_deref(), w)?;
+        let got = run_line(setup, line, tool, lib)?;
         let verdict = if line.compare {
-            compare(&expected, &got, label)
+            compare(&expected, &got, label, line.timings, line.times)
         } else if expected.ok && got.ok {
             Ok(())
         } else {
@@ -251,6 +675,121 @@ fn check(
         };
         if verdict.is_err() {
             return Ok(verdict);
+        }
+    }
+    Ok(Ok(()))
+}
+
+/// A server line's run: started in the background, then (once it has printed its `ACCEPT`
+/// line) the client's run, then the server's end. Both outputs, as (server, client).
+fn run_pair(
+    tool: &Path,
+    lib: &Path,
+    server: &Line,
+    client: &Line,
+    work: &Path,
+) -> Result<(Output, Output)> {
+    use std::io::{BufRead, BufReader, Read};
+    use std::time::{Duration, Instant};
+    let mut child = Command::new(tool)
+        .args(&server.args)
+        .current_dir(work)
+        .env(LOADER_PATH, lib)
+        .env("OPENSSL_MODULES", crate::test_c::modules_of(lib))
+        .env("OPENSSL_CONF", MISSING_CONFIG)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("cannot run {}: {e}", tool.display()))?;
+    let stdout = child.stdout.take().ok_or("no server stdout")?;
+    let mut stderr = child.stderr.take().ok_or("no server stderr")?;
+    let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
+    let out_thread = std::thread::spawn(move || {
+        let mut all = Vec::new();
+        let mut r = BufReader::new(stdout);
+        let mut line = Vec::new();
+        while r.read_until(b'\n', &mut line).unwrap_or(0) > 0 {
+            all.extend_from_slice(&line);
+            let _ = tx.send(line.clone());
+            line.clear();
+        }
+        all
+    });
+    let err_thread = std::thread::spawn(move || {
+        let mut all = Vec::new();
+        let _ = stderr.read_to_end(&mut all);
+        all
+    });
+    // The server is ready once it reports where it accepts (or gone, if it failed).
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while Instant::now() < deadline {
+        match rx.recv_timeout(Duration::from_millis(100)) {
+            Ok(l) if l.starts_with(b"ACCEPT") => break,
+            Ok(_) => {}
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+        }
+    }
+    let got = run_tool(tool, lib, &client.args, client.stdin.as_deref(), work)?;
+    let deadline = Instant::now() + Duration::from_secs(20);
+    let status = loop {
+        if let Some(s) = child.try_wait()? {
+            break s;
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            break child.wait()?;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    };
+    let stdout = out_thread.join().unwrap_or_default();
+    let stderr = err_thread.join().unwrap_or_default();
+    let mut text = String::from_utf8_lossy(&stdout).into_owned();
+    text.push_str(&String::from_utf8_lossy(&stderr));
+    text.push_str(&format!("[{status}]\n"));
+    let server_out = Output {
+        stdout,
+        stderr,
+        text,
+        ok: status.success(),
+    };
+    Ok((server_out, got))
+}
+
+/// [`check`] for a server line and its client line.
+fn check_pair(
+    setup: &Setup,
+    server: &Line,
+    client: &Line,
+    runs: &[(&Path, &Path, &str)],
+) -> Result<std::result::Result<(), String>> {
+    let w = &setup.work;
+    let (es, ec) = run_pair(&setup.upstream, &setup.ref_lib, server, client, w)?;
+    for (tool, lib, label) in runs {
+        let (gs, gc) = run_pair(tool, lib, server, client, w)?;
+        let both = [(&es, &gs, server, "server"), (&ec, &gc, client, "client")];
+        for (expected, got, line, which) in both {
+            let label = format!("{label} ({which})");
+            let verdict = if line.compare {
+                compare(
+                    expected,
+                    got,
+                    &label,
+                    line.timings,
+                    line.times || server.times,
+                )
+            } else if expected.ok == got.ok {
+                Ok(())
+            } else {
+                Err(format!(
+                    "{label}: exit: expected success {}, got {}",
+                    expected.ok, got.ok
+                ))
+            };
+            if verdict.is_err() {
+                return Ok(verdict);
+            }
         }
     }
     Ok(Ok(()))
@@ -277,6 +816,7 @@ pub fn run(args: &[String]) -> Result {
         ref_lib: reference.join("lib"),
         our_lib: dist.join("lib"),
         work: work.clone(),
+        tests: root.join("tests/apps"),
         subst: vec![
             ("{bin}", bin.display().to_string()),
             ("{txt}", txt.display().to_string()),
@@ -305,6 +845,24 @@ pub fn run(args: &[String]) -> Result {
             .into());
         }
     }
+    // Each library's OPENSSLDIR (the reference's is under its prefix, ours the target's
+    // default), masked wherever an output names a file in it.
+    let mut dirs = Vec::new();
+    for lib in [&setup.ref_lib, &setup.our_lib] {
+        let args = ["version", "-d", "-e", "-m"].map(str::to_owned);
+        let out = run_tool(&setup.upstream, lib, &args, None, &work)?;
+        for line in String::from_utf8_lossy(&out.stdout).lines() {
+            let Some((name, value)) = line.split_once(": ") else {
+                continue;
+            };
+            if let Some(dir) = value.strip_prefix('"').and_then(|d| d.strip_suffix('"')) {
+                dirs.push((format!("{dir}/"), format!("{name}/")));
+            }
+        }
+    }
+    // The longest first, so a directory inside another one is masked as itself.
+    dirs.sort_by_key(|(dir, _)| core::cmp::Reverse(dir.len()));
+    let _ = OPENSSLDIRS.set(dirs);
 
     let mut lists: Vec<(String, PathBuf)> = Vec::new();
     for entry in fs::read_dir(root.join("tests/apps"))? {
@@ -327,7 +885,8 @@ pub fn run(args: &[String]) -> Result {
     let mut count = 0;
     for (name, path) in &lists {
         let text = fs::read_to_string(path)?;
-        for line in parse_list(&text, &setup) {
+        let mut lines = parse_list(&text, &setup).into_iter();
+        while let Some(line) = lines.next() {
             let command = line.args.first().map_or("", String::as_str);
             let mut runs: Vec<(&Path, &Path, &str)> = Vec::new();
             if name == "commands" {
@@ -342,7 +901,34 @@ pub fn run(args: &[String]) -> Result {
                 runs.push((&setup.ours, &setup.ref_lib, "our tool on the reference"));
             }
             count += 1;
-            match check(&setup, &line, &runs)? {
+            if line.background {
+                let Some(client) = lines.next() else {
+                    println!(
+                        "FAIL {name}: openssl {}: no client line after it",
+                        line.text
+                    );
+                    failures += 1;
+                    continue;
+                };
+                count += 1;
+                let text = format!("{} & {}", line.text, client.text);
+                match check_pair(&setup, &line, &client, &runs)? {
+                    Ok(()) => println!("PASS {name}: openssl {text}"),
+                    Err(e) => {
+                        println!("FAIL {name}: openssl {text}: {e}");
+                        failures += 1;
+                    }
+                }
+                continue;
+            }
+            let verdict = match &line.pair {
+                Some(p) => {
+                    refresh(&setup, &line)?;
+                    pair::check(&setup, p, line.compare, &format!("{name}-{count}"))?
+                }
+                None => check(&setup, &line, &runs)?,
+            };
+            match verdict {
                 Ok(()) => println!("PASS {name}: openssl {}", line.text),
                 Err(e) => {
                     println!("FAIL {name}: openssl {}: {e}", line.text);
@@ -482,6 +1068,62 @@ mod tests {
             "THREAD:error:0308010C:x:f:unsupported:FILE:LINE:Global, Algorithm (a : 0)"
         );
         assert_eq!(masked("OPENSSLDIR: \"/usr/local/ssl\""), "OPENSSLDIR: DIR");
+        assert_eq!(
+            mask_libdir("tried: '/r/target/ref/openssl-3.6.5/lib/p.dylib' (no such file)"),
+            "tried: '/r/LIBDIR/p.dylib' (no such file)"
+        );
+        assert_eq!(
+            mask_libdir("tried: '/r/target/dist/lib/p.dylib' (no such file)"),
+            "tried: '/r/LIBDIR/p.dylib' (no such file)"
+        );
+    }
+
+    #[test]
+    fn timings_masking() {
+        assert_eq!(
+            masked_timings("Doing sha256 ops for 1s on 16 size blocks: 12 sha256 ops in 0.99s"),
+            "Doing shaN ops for Ns on N size blocks: N shaN ops in Ns"
+        );
+        assert_eq!(
+            masked_timings("sha256           1234.50k        infk     -nan       12.00 "),
+            "shaN N N N N "
+        );
+        assert_eq!(masked_timings("+F:6:sha256:inf:0.50"), "+F:N:shaN:N:N");
+        assert_eq!(
+            masked_timings("built on: Tue Oct 20 2026\ncompiler: gcc"),
+            "built on:\ncompiler:"
+        );
+        assert_eq!(masked_timings("information: é 3"), "information: é N");
+    }
+
+    #[test]
+    fn current_times() {
+        let today = days_from_civil(2026, 10, 21);
+        assert_eq!(days_from_civil(1970, 1, 1), 0);
+        assert_eq!(
+            mask_times_near("This Update: Oct 21 01:02:03 2026 GMT", today),
+            "This Update: TIME"
+        );
+        assert_eq!(
+            mask_times_near(
+                "a Oct 23 01:02:03.123 2026 GMT b Nov  2 00:00:00 2026 GMT",
+                today
+            ),
+            "a TIME b Nov  2 00:00:00 2026 GMT"
+        );
+        assert_eq!(
+            mask_times_near("Not After : Jan  1 00:00:00 2030 GMT", today),
+            "Not After : Jan  1 00:00:00 2030 GMT"
+        );
+        assert_eq!(
+            masked("ACCEPT [::]:8888 PID=4242"),
+            "ACCEPT [::]:8888 PID=PID"
+        );
+        assert_eq!(
+            masked("opt_str:apps/cmp.c:2853:CMP warning: x"),
+            "opt_str:apps/cmp.c:LINE:CMP warning: x"
+        );
+        assert_eq!(masked("see apps/lib/x.c: here"), "see apps/lib/x.c: here");
     }
 
     #[test]
@@ -491,17 +1133,53 @@ mod tests {
             ours: PathBuf::new(),
             ref_lib: PathBuf::new(),
             our_lib: PathBuf::new(),
-            work: PathBuf::new(),
+            work: PathBuf::from("/w"),
+            tests: PathBuf::from("/t"),
             subst: vec![("{txt}", "/w/t".to_owned())],
         };
         let lines = parse_list(
-            "# c\n\n~speed -seconds 1\nenc -base64 -in {txt}\nx509 -noout < {txt}\n",
+            "# c\n\n~speed -seconds 1\nenc -base64 -in {txt}\nx509 -noout < {txt}\n~@pki/db ca -x\n&^ ocsp -port 1\n%speed -seconds 1 sha256\n",
             &setup,
         );
-        assert_eq!(lines.len(), 3);
+        assert_eq!(lines.len(), 6);
+        assert!(lines[4].background && lines[4].times && lines[4].compare);
+        assert_eq!(lines[4].args, ["ocsp", "-port", "1"]);
+        assert!(lines[5].timings && lines[5].compare && !lines[5].background);
+        assert!(!lines[3].compare);
+        assert_eq!(lines[3].args, ["ca", "-x"]);
+        assert_eq!(
+            lines[3].reset,
+            Some((PathBuf::from("/t/pki/db"), PathBuf::from("/w/db")))
+        );
         assert!(!lines[0].compare);
         assert_eq!(lines[1].args, ["enc", "-base64", "-in", "/w/t"]);
         assert_eq!(lines[2].args, ["x509", "-noout"]);
         assert_eq!(lines[2].stdin.as_deref(), Some(Path::new("/w/t")));
+        let lines = parse_list("srp -srpvfile {fresh:srp/v.txt} -list\n", &setup);
+        assert_eq!(
+            lines[0].args,
+            ["srp", "-srpvfile", "/w/fresh/srp/v.txt", "-list"]
+        );
+        assert_eq!(lines[0].fresh, ["srp/v.txt"]);
+        let piped = parse_list("genrsa 512 < {txt} | rsa -check | pkey -noout\n", &setup);
+        assert_eq!(piped[0].args, ["genrsa", "512"]);
+        assert_eq!(piped[0].stdin.as_deref(), Some(Path::new("/w/t")));
+        assert_eq!(
+            piped[0].checks,
+            [vec!["rsa", "-check"], vec!["pkey", "-noout"]]
+        );
+    }
+
+    #[test]
+    fn hex_collapses() {
+        assert_eq!(
+            collapse_hex("modulus:\n    00:c3:\n    ab:01\nexponent: 3\n    12\n"),
+            "modulus:\nHEX\nexponent: 3\nHEX\n"
+        );
+        assert_eq!(collapse_hex("a: 1:\n"), "a: 1:\n");
+        assert_eq!(
+            collapse_hex("  34:d=5  hl=2 l=  16 prim: OCTET STRING [HEX DUMP]:A1EA\n"),
+            "  34:d=5  hl=2 l=  16 prim: OCTET STRING [HEX DUMP]:HEX\n"
+        );
     }
 }

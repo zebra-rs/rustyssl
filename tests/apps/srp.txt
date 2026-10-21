@@ -1,0 +1,64 @@
+# `openssl srp` (cargo xtask test-apps: upstream's tool on the reference, then ours on
+# rustyssl and on the reference). Each run gets a fresh copy of its verifier files
+# ({fresh:...}): users.txt holds alice and bob (valid) and carol (revoked) on the default
+# groups; index.txt a gN entry "myidx" and dave on it; index2.txt the same, the entry last.
+# Salts are random, so -add and -modify are compared with at most one -verbose (`~` where
+# that prints a new verifier). A password under 4 characters isn't tested: upstream's UI
+# then leaves srp's password buffer unset, and srp uses whatever the stack held.
+srp -help
+srp
+srp -list
+srp -add
+srp -list -add
+srp -add -delete alice
+srp -x
+srp -srpvfile {fresh:srp/users.txt} -list
+srp -srpvfile {fresh:srp/users.txt} -list alice
+srp -srpvfile {fresh:srp/users.txt} -list alice nobody bob
+srp -srpvfile {fresh:srp/users.txt} -list -verbose
+srp -srpvfile {fresh:srp/users.txt} -list -verbose -verbose
+srp -srpvfile {fresh:srp/users.txt} -list -verbose -verbose -verbose carol
+srp -srpvfile {fresh:srp/empty.txt} -list
+srp -srpvfile {fresh:srp/empty.txt} -list -verbose -verbose
+srp -srpvfile {fresh:srp/index.txt} -list -verbose -verbose
+srp -srpvfile {fresh:srp/index.txt} -list -gn myidx -verbose -verbose
+srp -srpvfile {fresh:srp/index2.txt} -list -gn bogus
+srp -srpvfile {fresh:srp/index2.txt} -list -gn 1024 -verbose
+srp -srpvfile {fresh:srp/index.txt} -list -gn bogus -verbose
+srp -srpvfile {dir}/nonexistent.txt -list
+srp -srpvfile {fresh:srp/users.txt} -add
+srp -srpvfile {fresh:srp/users.txt} -add -passout pass:password4 erin
+~srp -srpvfile {fresh:srp/users.txt} -add -passout pass:password4 -verbose erin
+srp -srpvfile {fresh:srp/users.txt} -add -passout pass:password4 -userinfo erin_info -gn 1536 erin
+srp -srpvfile {fresh:srp/users.txt} -add -passout pass:password4 -gn bogus erin
+srp -srpvfile {fresh:srp/users.txt} -add -passout pass:password4 -verbose carol
+srp -srpvfile {fresh:srp/users.txt} -add -passout pass:password4 alice bob
+srp -srpvfile {fresh:srp/users.txt} -add carol alice
+srp -srpvfile {fresh:srp/users.txt} -add -passout file:{tests}/srp/pass.txt erin
+srp -srpvfile {fresh:srp/users.txt} -add -passout file:{dir}/nonexistent erin
+~srp -srpvfile {fresh:srp/index.txt} -add -gn myidx -passout pass:password5 -verbose frank
+srp -srpvfile {fresh:srp/index.txt} -add -gn myidx -passout pass:password5 frank
+srp -srpvfile {fresh:srp/users.txt} -delete alice
+srp -srpvfile {fresh:srp/users.txt} -delete -verbose alice nobody bob
+srp -srpvfile {fresh:srp/users.txt} -modify -passin pass:password1 -passout pass:password9 alice
+~srp -srpvfile {fresh:srp/users.txt} -modify -passin pass:password1 -passout pass:password9 -verbose alice
+srp -srpvfile {fresh:srp/users.txt} -modify -passin pass:wrongpass -passout pass:password9 alice
+srp -srpvfile {fresh:srp/users.txt} -modify -passin pass:x -passout pass:password9 carol
+srp -srpvfile {fresh:srp/users.txt} -modify -passin pass:x -passout pass:password9 nobody
+srp -srpvfile {fresh:srp/users.txt} -modify -passin pass:password2 -passout pass:password9 -userinfo new_info bob
+srp -srpvfile {fresh:srp/users.txt} -modify -passin stdin -passout pass:password9 alice < {tests}/srp/pass.txt
+srp -srpvfile {fresh:srp/index.txt} -modify -passin pass:password1 -passout pass:password9 -gn myidx dave
+srp -srpvfile {fresh:srp/users.txt} -config {tests}/srp/srp.cnf -list
+srp -config {tests}/srp/srp.cnf -list
+srp -config {tests}/srp/srp.cnf -list -verbose
+srp -config {tests}/srp/srp.cnf -name other -list -verbose -verbose
+srp -config {tests}/srp/srp.cnf -name nofile -list
+srp -config {tests}/srp/srp.cnf -name missing -list
+srp -config {tests}/srp/nodefault.cnf -list
+srp -config {dir}/nonexistent.cnf -list
+srp -config {tests}/srp/srp.cnf -list {fresh:srp/users.txt}
+srp -srpvfile {fresh:srp/users.txt} -list -rand {txt} -writerand {dir}/srp.rand
+srp -srpvfile {fresh:srp/users.txt} -list -rand {dir}/nonexistent
+srp -srpvfile {fresh:srp/users.txt} -list -provider default -propquery provider=default
+srp -srpvfile {fresh:srp/users.txt} -list -provider-path {dir} -provider default
+srp -srpvfile {fresh:srp/users.txt} -list -provparam bogus

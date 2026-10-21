@@ -1,0 +1,48 @@
+# `openssl dsa`. Keys from the reference's test/ tree; encrypted output goes through
+# `| check` (decrypted by upstream's tool on the reference).
+dsa -help
+dsa -in {src}/test/testdsa.pem
+dsa -in {src}/test/testdsa.pem -text
+dsa -in {src}/test/testdsa.pem -text -noout
+dsa -in {src}/test/testdsa.pem -modulus -noout
+dsa -in {src}/test/testdsa.pem -pubout
+dsa -in {src}/test/testdsa.pem -pubout -text
+dsa -in {src}/test/testdsa.pem -outform DER
+dsa -in {src}/test/testdsa.pem -outform DER -pubout
+dsa -in {src}/test/testdsa.pem -outform MSBLOB
+dsa -in {src}/test/testdsa.pem -outform MSBLOB -pubout
+dsa -in {src}/test/testdsa.pem -outform PVK -pvk-none
+dsa -in {src}/test/testdsa.pem -outform PVK -pvk-weak -passout pass:secret | dsa -inform PVK -passin pass:secret -noout -modulus
+dsa -in {src}/test/testdsa.pem -outform PVK -pvk-strong -passout pass:secret | dsa -inform PVK -passin pass:secret -noout -modulus
+dsa -in {src}/test/testdsa.pem -outform PVK -passout pass:secret | dsa -inform PVK -passin pass:secret -noout -text
+dsa -in {src}/test/testdsapub.pem -pubin -outform PVK
+dsa -in {src}/test/testdsa.pem -outform NSS
+dsa -in {src}/test/testdsa.pem -outform XYZ
+dsa -in {src}/test/testdsa.pem -inform XYZ
+dsa -in {src}/test/testdsa.pem -aes128 -passout pass:secret | dsa -passin pass:secret -noout -text
+dsa -in {src}/test/testdsa.pem -des3 -passout pass:secret -outform DER | dsa -inform DER -passin pass:secret -noout -modulus
+dsa -in {src}/test/testdsa.pem -aes-128-gcm -passout pass:secret
+dsa -in {src}/test/testdsa.pem -nosuchcipher
+dsa -in {src}/test/testdsa.pem -passout pass:secret
+dsa -in {src}/test/testdsapub.pem -pubin
+dsa -in {src}/test/testdsapub.pem -pubin -text
+dsa -in {src}/test/testdsapub.pem -pubin -modulus -noout
+dsa -in {src}/test/testdsapub.pem -pubin -outform DER
+dsa -in {src}/test/testdsapub.pem
+dsa -in {src}/test/testrsa.pem
+dsa -in {src}/test/testdsa.pem -passin nosuch:x
+dsa -in /nonexistent/key.pem
+dsa -noout -text < {src}/test/testdsa.pem
+dsa -in {src}/test/testdsa.pem -out {dir}/dsa-out.pem | dsa -in {dir}/dsa-out.pem -noout -text
+dsa -in {src}/test/testdsa.pem -out /nonexistent/dir/out.pem
+dsa -in {src}/test/testdsa.pem -engine /nonexistent/eng.so -noout
+dsa -in {src}/test/testdsa.pem -provider default -noout -modulus
+dsa -in {src}/test/testdsa.pem -provider /nonexistent/prov.so
+dsa -in {src}/test/testdsa.pem extra
+dsa -nosuchoption
+dsa -in
+dsa -provider-path {dir} -provider default -in {src}/test/testdsa.pem -noout -modulus
+dsa -provparam default:x=y -in {src}/test/testdsa.pem -noout -modulus
+dsa -provparam bad -in {src}/test/testdsa.pem -noout -modulus
+dsa -propquery provider=default -in {src}/test/testdsa.pem -noout -modulus
+dsa -propquery provider=nosuch -in {src}/test/testdsa.pem -noout -modulus

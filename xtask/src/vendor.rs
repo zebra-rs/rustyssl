@@ -77,6 +77,9 @@ const FILES: &[&str] = &[
     // configuration; its `progs.c` comes with `apps/` below): the commands, digests, and ciphers
     // it dispatches, which the Rust CLI's codegen reads (ADR 0007).
     "apps/progs.h",
+    // The keys `openssl speed` benchmarks with: RSA private keys (DER) and DSA key parts.
+    "apps/testrsa.h",
+    "apps/testdsa.h",
 ];
 
 /// Directories whose files with the given extension are vendored.

@@ -1,0 +1,10 @@
+openssl_conf = openssl_init
+
+[openssl_init]
+providers = provider_section
+
+[provider_section]
+nosuchprovider = nosuch_sect
+
+[nosuch_sect]
+activate = 1

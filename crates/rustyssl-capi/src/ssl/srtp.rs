@@ -110,7 +110,9 @@ fn entries(list: *mut stack_st_SRTP_PROTECTION_PROFILE) -> Vec<*const SRTP_PROTE
 
 /// `ssl_ctx_make_profiles`: `text`'s colon-separated names as a list, replacing `out`: 0, or 1
 /// with the error raised.
-fn make_profiles(text: &[u8], out: &mut Profiles, function: &str) -> c_int {
+fn make_profiles(text: &[u8], out: &mut Profiles) -> c_int {
+    // OpenSSL raises these in ssl_ctx_make_profiles, for the connection's too.
+    let function = "ssl_ctx_make_profiles";
     // SAFETY: no preconditions.
     let list: *mut stack_st_SRTP_PROTECTION_PROFILE = unsafe { OPENSSL_sk_new_null() }.cast();
     if list.is_null() {
@@ -183,7 +185,7 @@ ffi_export! {
         let (Some(c), Some(t)) = (unsafe { ctxs::ctx(ctx) }, unsafe { text(profiles) }) else {
             return 1;
         };
-        make_profiles(t, &mut c.state().srtp, "SSL_CTX_set_tlsext_use_srtp")
+        make_profiles(t, &mut c.state().srtp)
     }
 }
 
@@ -203,7 +205,7 @@ ffi_export! {
         let (Some(x), Some(t)) = (unsafe { ssl(s) }, unsafe { text(profiles) }) else {
             return 1;
         };
-        make_profiles(t, &mut x.state().srtp, "SSL_set_tlsext_use_srtp")
+        make_profiles(t, &mut x.state().srtp)
     }
 }
 

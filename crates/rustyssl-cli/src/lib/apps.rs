@@ -9,6 +9,7 @@ use std::cell::RefCell;
 use std::ffi::c_ulong;
 use std::io::Write;
 
+use rustyssl_ossl::abi as a;
 use rustyssl_ossl::abi::{
     ASN1_DTFLGS_ISO8601, ASN1_DTFLGS_RFC822, ASN1_STRFLGS_DUMP_ALL, ASN1_STRFLGS_DUMP_DER,
     ASN1_STRFLGS_DUMP_UNKNOWN, ASN1_STRFLGS_ESC_2253, ASN1_STRFLGS_ESC_2254, ASN1_STRFLGS_ESC_CTRL,
@@ -29,8 +30,8 @@ use rustyssl_ossl::conf::Conf;
 use rustyssl_ossl::pkey::{MdCtx, Pkey, PkeyCtxRef};
 use rustyssl_ossl::store::{self, Store};
 use rustyssl_ossl::ui::Passphrase;
-use rustyssl_ossl::verify::{FileType, LookupKind};
-use rustyssl_ossl::x509::{self, Cert, CertStack, Crl, CrlStack, Name, NameRef, Req, V3Ctx};
+use rustyssl_ossl::verify::{FileType, LookupKind, StoreCtxRef, VerifyParam};
+use rustyssl_ossl::x509::{self, Cert, CertStack, Crl, CrlStack, Name, NameRef, Req, Time, V3Ctx};
 use rustyssl_ossl::{Bio, err};
 
 use super::app_libctx::{libctx, propq};
@@ -412,6 +413,15 @@ fn modeverb(mode: char) -> &'static str {
 fn last_os_error() -> String {
     let e = std::io::Error::last_os_error();
     strerror(e.raw_os_error().unwrap_or(0))
+}
+
+/// C's `perror(s)`: `s: ` (when given and not empty) and `strerror(errno)`.
+pub fn perror(s: Option<&str>) {
+    let reason = strerror(std::io::Error::last_os_error().raw_os_error().unwrap_or(0));
+    match s {
+        Some(s) if !s.is_empty() => eprintf!("{s}: {reason}\n"),
+        _ => eprintf!("{reason}\n"),
+    };
 }
 
 /// `strerror(code)`, as the C library words it.
@@ -1718,9 +1728,323 @@ pub fn do_x509_req_verify(x: &Req, pkey: Option<&Pkey>, vfyopts: &[String]) -> i
     x.verify_ex(pkey, lc.as_deref(), pq.as_deref())
 }
 
+/// `set_cert_times(x, startdate, enddate, days, strict_compare_times)`.
+pub fn set_cert_times(
+    x: &Cert,
+    startdate: Option<&str>,
+    enddate: Option<&str>,
+    days: i32,
+    strict_compare_times: bool,
+) -> bool {
+    if !check_cert_time_string(startdate, "start date")
+        || !check_cert_time_string(enddate, "end date")
+    {
+        return false;
+    }
+    let start = startdate.filter(|s| *s != "today");
+    if !x.set_not_before(start) {
+        eprintf!("Error setting notBefore certificate field\n");
+        return false;
+    }
+    let (enddate, days) = match enddate {
+        Some("today") => (None, 0),
+        e => (e, days),
+    };
+    if !x.set_not_after(enddate, days) {
+        eprintf!("Error setting notAfter certificate field\n");
+        return false;
+    }
+    if let (Some(a), Some(b)) = (x.not_after(), x.not_before())
+        && x509::time_compare(a, b) < 0
+    {
+        let what = if strict_compare_times {
+            "Error"
+        } else {
+            "Warning"
+        };
+        eprintf!("{what}: end date before start date\n");
+        if strict_compare_times {
+            return false;
+        }
+    }
+    true
+}
+
+/// `check_cert_time_string`.
+pub fn check_cert_time_string(time: Option<&str>, desc: &str) -> bool {
+    match time {
+        None => true,
+        Some("today") => true,
+        Some(t) if x509::time_string_ok(t) => true,
+        Some(_) => {
+            eprintf!(
+                "{desc} is invalid, it should be \"today\" or have format [CC]YYMMDDHHMMSSZ\n"
+            );
+            false
+        }
+    }
+}
+
+/// `check_cert_attributes(bio, x, checkhost, checkemail, checkip, print)`.
+pub fn check_cert_attributes(
+    bio: &Bio,
+    x: &Cert,
+    checkhost: Option<&str>,
+    checkemail: Option<&str>,
+    checkip: Option<&str>,
+    print: bool,
+) -> bool {
+    let mut ret = true;
+    let mut out = bio;
+    if let Some(h) = checkhost {
+        let valid = x.check_host(h);
+        if print {
+            let not = if valid == 1 { "" } else { " NOT" };
+            let _ = writeln!(out, "Hostname {h} does{not} match certificate");
+        }
+        ret = ret && valid > 0;
+    }
+    if let Some(e) = checkemail {
+        let valid = x.check_email(e);
+        if print {
+            let not = if valid != 0 { "" } else { " NOT" };
+            let _ = writeln!(out, "Email {e} does{not} match certificate");
+        }
+        ret = ret && valid > 0;
+    }
+    if let Some(ip) = checkip {
+        let valid = x.check_ip_asc(ip);
+        if print {
+            let not = if valid != 0 { "" } else { " NOT" };
+            let _ = writeln!(out, "IP {ip} does{not} match certificate");
+        }
+        ret = ret && valid > 0;
+    }
+    ret
+}
+
+/// `set_crl_lastupdate`.
+pub fn set_crl_lastupdate(crl: &Crl, lastupdate: Option<&str>) -> bool {
+    let Some(tm) = Time::new() else {
+        return false;
+    };
+    let ok = match lastupdate {
+        None => tm.set_adj(0, 0),
+        Some(s) => tm.set_string_x509(s),
+    };
+    ok && crl.set1_last_update(&tm)
+}
+
+/// `set_crl_nextupdate`.
+pub fn set_crl_nextupdate(
+    crl: &Crl,
+    nextupdate: Option<&str>,
+    days: i64,
+    hours: i64,
+    secs: i64,
+) -> bool {
+    let Some(tm) = Time::new() else {
+        return false;
+    };
+    let ok = match nextupdate {
+        None => {
+            // C passes long days to an int and hours * 3600 + secs as a long.
+            let d = i32::try_from(days).unwrap_or(if days < 0 { i32::MIN } else { i32::MAX });
+            let s = hours.saturating_mul(3600).saturating_add(secs);
+            tm.set_adj(d, s)
+        }
+        Some(s) => tm.set_string_x509(s),
+    };
+    ok && crl.set1_next_update(&tm)
+}
+
+/// `policies_print` of `apps.c`, to standard error.
+pub fn policies_print(ctx: StoreCtxRef<'_>) {
+    let explicit = if ctx.explicit_policy() {
+        "True"
+    } else {
+        "False"
+    };
+    eprintf!("Require explicit Policy: {explicit}\n");
+    for (name, user) in [("Authority", false), ("User", true)] {
+        eprintf!("{name} Policies:");
+        let printed = io::bio_err().and_then(|b| ctx.print_policy_nodes(user, b, 2));
+        if printed.is_none() {
+            eprintf!(" <empty>\n");
+        }
+    }
+}
+
+/// `store_setup_crl_download` of `apps.c`: CRLs fetched from the certificates' distribution
+/// points (`http://` only).
+pub fn store_setup_crl_download(store: &x509::Store) {
+    store.set_lookup_crls_cb(crls_http_cb);
+}
+
+/// `load_cert_certs` of `apps.c`: the first certificate (`want_cert`) and the others (all
+/// of them without `want_cert`) when `want_certs`, with the validity warnings.
+pub fn load_cert_certs(
+    uri: &str,
+    want_cert: bool,
+    want_certs: bool,
+    exclude_http: bool,
+    pass: Option<&str>,
+    desc: Option<&str>,
+    vpm: Option<&VerifyParam>,
+) -> Option<(Option<Cert>, Option<CertStack>)> {
+    let desc = desc.unwrap_or(if want_certs {
+        "certificates"
+    } else {
+        "certificate"
+    });
+    let lower = uri.to_ascii_lowercase();
+    if exclude_http && (lower.starts_with("http://") || lower.starts_with("https://")) {
+        eprintf!("error: HTTP retrieval not allowed for {desc}\n");
+        return None;
+    }
+    let pass_string = get_passwd(pass, Some(desc));
+    let wanted = Wanted {
+        cert: want_cert,
+        certs: if want_certs {
+            Some(CertStack::new()?)
+        } else {
+            None
+        },
+        ..Wanted::default()
+    };
+    let (ok, got) = load_key_certs_crls(
+        Some(uri),
+        format::UNDEF,
+        false,
+        pass_string.as_ref().map(|p| p.as_str()),
+        Some(desc),
+        false,
+        wanted,
+    );
+    if !ok {
+        return None;
+    }
+    if let Some(c) = &got.cert {
+        warn_cert(uri, c, false, vpm);
+    }
+    if let Some(cs) = &got.certs {
+        for c in cs.to_vec() {
+            warn_cert(uri, &c, true, vpm);
+        }
+    }
+    Some((got.cert, got.certs))
+}
+
+/// `load_certs_multifile` of `apps.c`: every certificate of each file of the list, without
+/// duplicates.
+pub fn load_certs_multifile(
+    files: &str,
+    pass: Option<&str>,
+    desc: Option<&str>,
+    vpm: Option<&VerifyParam>,
+) -> Option<CertStack> {
+    let Some(result) = CertStack::new() else {
+        eprintf!("out of memory\n");
+        return None;
+    };
+    for f in items(files) {
+        let (_, certs) = load_cert_certs(&f, false, true, false, pass, desc, vpm)?;
+        let certs = certs?;
+        if !result.add_certs(&certs, a::X509_ADD_FLAG_UP_REF | a::X509_ADD_FLAG_NO_DUP) {
+            eprintf!("out of memory\n");
+            return None;
+        }
+    }
+    Some(result)
+}
+
+/// `warn_cert` of `apps.c`.
+pub fn warn_cert(uri: &str, cert: &Cert, warn_ee: bool, vpm: Option<&VerifyParam>) {
+    let ex_flags = cert.extension_flags();
+    let res = cert.cmp_timeframe(vpm);
+    if res != 0 {
+        let msg = if res > 0 {
+            "has expired"
+        } else {
+            "not yet valid"
+        };
+        warn_cert_msg(uri, cert, msg);
+    }
+    let flag = |f: i32| u32::try_from(f).unwrap_or(0);
+    if warn_ee && ex_flags & flag(a::EXFLAG_V1) == 0 && ex_flags & flag(a::EXFLAG_CA) == 0 {
+        warn_cert_msg(uri, cert, "is not a CA cert");
+    }
+}
+
+/// `next_item` of `apps.c`: the items of a list separated by commas and/or whitespace.
+pub fn items(list: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let b = list.as_bytes();
+    let mut i = 0;
+    loop {
+        let start = i;
+        while i < b.len()
+            && b.get(i) != Some(&b',')
+            && !b.get(i).is_some_and(u8::is_ascii_whitespace)
+        {
+            i += 1;
+        }
+        out.push(String::from_utf8_lossy(b.get(start..i).unwrap_or_default()).into_owned());
+        if i >= b.len() {
+            break;
+        }
+        i += 1;
+        while b.get(i).is_some_and(u8::is_ascii_whitespace) {
+            i += 1;
+        }
+        if i >= b.len() {
+            break;
+        }
+    }
+    out
+}
+
+/// `crls_http_cb`.
+pub fn crls_http_cb(ctx: StoreCtxRef<'_>) -> Option<CrlStack> {
+    let crls = CrlStack::new()?;
+    let x = ctx.current_cert()?;
+    let crl = load_crl_crldp(&x.dp_http_urls(a::NID_crl_distribution_points))?;
+    if !crls.push(crl) {
+        return None;
+    }
+    // A delta CRL, if there is one.
+    if let Some(crl) = load_crl_crldp(&x.dp_http_urls(a::NID_freshest_crl))
+        && !crls.push(crl)
+    {
+        return None;
+    }
+    Some(crls)
+}
+
+/// `warn_cert_msg` of `apps.c`.
+pub fn warn_cert_msg(uri: &str, cert: &Cert, msg: &str) {
+    let subj = x509::name_oneline(cert.subject_name()).unwrap_or_default();
+    eprintf!("Warning: certificate from '{uri}' with subject '{subj}' {msg}\n");
+}
+
+/// `load_crl_crldp`: the CRL at the first distribution point with an HTTP URL.
+pub fn load_crl_crldp(urls: &[Option<String>]) -> Option<rustyssl_ossl::x509::Crl> {
+    let url = urls.iter().flatten().next()?;
+    load_crl(Some(url), format::UNDEF, false, Some("CRL via CDP"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn next_item_lists() {
+        assert_eq!(items("a,b c"), ["a", "b", "c"]);
+        assert_eq!(items("a, b"), ["a", "b"]);
+        assert_eq!(items("a,"), ["a"]);
+        assert_eq!(items("a"), ["a"]);
+        assert_eq!(items(""), [""]);
+    }
 
     #[test]
     fn c_atoi() {

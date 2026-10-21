@@ -1,0 +1,41 @@
+# `openssl pkcs7` (apps/pkcs7.c): run with upstream's tool on the reference, then ours on
+# rustyssl and on the reference (cargo xtask test-apps); output and exit codes must match.
+pkcs7 -in {src}/test/testp7.pem
+pkcs7 -in {src}/test/testp7.pem -outform DER -out {dir}/p7.der
+pkcs7 -in {dir}/p7.der -inform DER
+pkcs7 -inform D -in {dir}/p7.der -outform PEM
+pkcs7 -in {src}/test/pkcs7-1.pem -print -noout
+pkcs7 -in {src}/test/pkcs7-1.pem -print
+pkcs7 -in {src}/test/testp7.pem -print -noout
+pkcs7 -in {src}/test/testp7.pem -print_certs
+pkcs7 -in {src}/test/testp7.pem -print_certs -noout
+pkcs7 -in {src}/test/testp7.pem -print_certs -quiet
+pkcs7 -in {src}/test/testp7.pem -print_certs -quiet -noout
+pkcs7 -in {src}/test/testp7.pem -print_certs -text
+pkcs7 -in {src}/test/testp7.pem -print_certs -text -noout
+pkcs7 -in {src}/test/pkcs7-1.pem -print_certs
+pkcs7 -in {src}/test/recipes/25-test_pkcs7_data/malformed.pkcs7
+pkcs7 -in {src}/test/recipes/25-test_pkcs7_data/malformed.pkcs7 -print -noout
+pkcs7 -in {src}/test/testp7.pem -noout
+pkcs7 -in {src}/test/testp7.pem -out {dir}/p7.pem
+pkcs7 -in {dir}/p7.pem -print_certs -quiet
+pkcs7 < {src}/test/testp7.pem
+pkcs7 -print_certs -quiet < {src}/test/testp7.pem
+pkcs7 -in {src}/test/pkcs7.pem
+pkcs7 -in {src}/test/testx509.pem
+pkcs7 -in {src}/test/testp7.pem -inform DER
+pkcs7 -in {dir}/p7.der
+pkcs7 -in {dir}/nonexistent.pem
+pkcs7 -in {src}/test/testp7.pem -out {dir}/nonexistent/x.pem
+pkcs7 -in {src}/test/testp7.pem -inform XYZ
+pkcs7 -in {src}/test/testp7.pem -outform SMIME
+pkcs7 -in {src}/test/testp7.pem -print_certs -provider default -quiet
+pkcs7 -in {src}/test/testp7.pem -print_certs -quiet -propquery provider=default
+pkcs7 -in {src}/test/testp7.pem -print_certs -quiet -provider-path {dir} -provider default
+pkcs7 -in {src}/test/testp7.pem -provider-path {dir} -provider nosuchprovider
+pkcs7 -in {src}/test/testp7.pem -provparam default:x=1
+pkcs7 -in {src}/test/testp7.pem -print_certs -quiet -engine /nonexistent/engine.so
+pkcs7 -in {src}/test/testp7.pem extra
+pkcs7 -nosuchoption
+pkcs7 -help
+pkcs7 -in

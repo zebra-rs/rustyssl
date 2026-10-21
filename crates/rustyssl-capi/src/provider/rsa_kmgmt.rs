@@ -1011,10 +1011,23 @@ ffi_callback! {
 
 /// `rsa_gettable_params`'s list.
 static GETTABLE: Params<38> = Params([
-    defn(OSSL_PKEY_PARAM_BITS, OSSL_PARAM_INTEGER, 0),
-    defn(OSSL_PKEY_PARAM_SECURITY_BITS, OSSL_PARAM_INTEGER, 0),
-    defn(OSSL_PKEY_PARAM_MAX_SIZE, OSSL_PARAM_INTEGER, 0),
-    defn(OSSL_PKEY_PARAM_SECURITY_CATEGORY, OSSL_PARAM_INTEGER, 0),
+    // `OSSL_PARAM_int`s.
+    defn(OSSL_PKEY_PARAM_BITS, OSSL_PARAM_INTEGER, size_of::<c_int>()),
+    defn(
+        OSSL_PKEY_PARAM_SECURITY_BITS,
+        OSSL_PARAM_INTEGER,
+        size_of::<c_int>(),
+    ),
+    defn(
+        OSSL_PKEY_PARAM_MAX_SIZE,
+        OSSL_PARAM_INTEGER,
+        size_of::<c_int>(),
+    ),
+    defn(
+        OSSL_PKEY_PARAM_SECURITY_CATEGORY,
+        OSSL_PARAM_INTEGER,
+        size_of::<c_int>(),
+    ),
     defn(OSSL_PKEY_PARAM_DEFAULT_DIGEST, OSSL_PARAM_UTF8_STRING, 0),
     defn(OSSL_PKEY_PARAM_RSA_N, OSSL_PARAM_UNSIGNED_INTEGER, 0),
     defn(OSSL_PKEY_PARAM_RSA_E, OSSL_PARAM_UNSIGNED_INTEGER, 0),

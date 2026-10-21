@@ -244,6 +244,14 @@ impl core::fmt::Debug for Shared {
     }
 }
 
+/// The method's default session timeout (`tls1_default_timeout`), in seconds.
+pub(crate) const DEFAULT_TIMEOUT: i64 = 7200;
+
+/// The octets up to the first NUL (`PACKET_strndup`).
+pub(crate) fn until_nul(b: &[u8]) -> &[u8] {
+    b.split(|&x| x == 0).next().unwrap_or_default()
+}
+
 /// Asks `r` once per message: an answer already given for `r` (with `tag`, such as a
 /// certificate's index in its chain) while making or processing the current message is
 /// returned again, so work re-run after a later request doesn't repeat earlier ones. The

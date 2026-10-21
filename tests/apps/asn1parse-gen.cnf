@@ -1,0 +1,16 @@
+# For asn1parse -genconf (tests/apps/asn1parse.txt).
+asn1 = SEQUENCE:seq
+
+[seq]
+version = INTEGER:2
+name = UTF8String:rustyssl
+flag = BOOLEAN:true
+when = UTCTIME:251020000000Z
+oid = OID:1.2.3.4
+bits = FORMAT:HEX,BITSTRING:0F
+octets = FORMAT:HEX,OCTETSTRING:00112233
+inner = EXPLICIT:0,SEQUENCE:inner
+
+[inner]
+n = INTEGER:-129
+nothing = NULL

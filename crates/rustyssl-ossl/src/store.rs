@@ -185,3 +185,98 @@ pub fn type_string(kind: c_int) -> Option<String> {
     // SAFETY: a static string or NULL for any kind.
     string_at(unsafe { ffi::OSSL_STORE_INFO_type_string(kind) }.cast::<c_char>())
 }
+
+crate::handle!(
+    /// An owned `OSSL_STORE_SEARCH`.
+    Search, OSSL_STORE_SEARCH, OSSL_STORE_SEARCH_free
+);
+
+impl Search {
+    /// `OSSL_STORE_SEARCH_by_name` (the search copies nothing: `name` must outlive it, which
+    /// the borrow ensures).
+    pub fn by_name(name: &crate::x509::Name) -> Option<Self> {
+        // SAFETY: the name is live.
+        Self::from_ptr(unsafe { ffi::OSSL_STORE_SEARCH_by_name(name.as_ptr()) })
+    }
+
+    /// `OSSL_STORE_SEARCH_by_issuer_serial`.
+    pub fn by_issuer_serial(
+        issuer: &crate::x509::Name,
+        serial: &crate::x509::Integer,
+    ) -> Option<Self> {
+        // SAFETY: both are live.
+        Self::from_ptr(unsafe {
+            ffi::OSSL_STORE_SEARCH_by_issuer_serial(issuer.as_ptr(), serial.as_ptr())
+        })
+    }
+
+    /// `OSSL_STORE_SEARCH_by_key_fingerprint` (a NULL digest allowed).
+    pub fn by_key_fingerprint(md: Option<&crate::evp::Md>, bytes: &[u8]) -> Option<Self> {
+        // SAFETY: the digest is live or NULL; bytes is valid for its length.
+        Self::from_ptr(unsafe {
+            ffi::OSSL_STORE_SEARCH_by_key_fingerprint(
+                md.map_or(core::ptr::null(), |m| m.as_ptr().cast_const()),
+                bytes.as_ptr(),
+                bytes.len(),
+            )
+        })
+    }
+
+    /// `OSSL_STORE_SEARCH_by_alias`.
+    pub fn by_alias(alias: &std::ffi::CStr) -> Option<Self> {
+        // SAFETY: a valid C string.
+        Self::from_ptr(unsafe { ffi::OSSL_STORE_SEARCH_by_alias(alias.as_ptr()) })
+    }
+}
+
+impl Store {
+    /// `OSSL_STORE_open_ex(uri, libctx, propq, get_ui_method(), uidata, NULL, NULL, NULL)`,
+    /// as [`Store::open`] with no parameters.
+    pub fn open_plain(
+        uri: &str,
+        libctx: Option<&LibCtx>,
+        propq: Option<&str>,
+        uidata: &Passphrase,
+    ) -> Option<Self> {
+        Self::open(uri, libctx, propq, uidata, None)
+    }
+
+    /// `OSSL_STORE_error`.
+    pub fn error(&self) -> bool {
+        // SAFETY: the store is live.
+        unsafe { ffi::OSSL_STORE_error(self.as_ptr()) != 0 }
+    }
+
+    /// `OSSL_STORE_supports_search`.
+    pub fn supports_search(&self, criterion: c_int) -> bool {
+        // SAFETY: the store is live.
+        unsafe { ffi::OSSL_STORE_supports_search(self.as_ptr(), criterion) != 0 }
+    }
+
+    /// `OSSL_STORE_find` (the search must outlive the loading, as the borrow ensures for
+    /// the caller's scope).
+    pub fn find(&self, search: &Search) -> bool {
+        // SAFETY: both are live.
+        unsafe { ffi::OSSL_STORE_find(self.as_ptr(), search.as_ptr()) == 1 }
+    }
+
+    /// `OSSL_STORE_close`: whether it succeeded.
+    pub fn close(self) -> bool {
+        // SAFETY: the store is owned here and closed once.
+        unsafe { ffi::OSSL_STORE_close(self.into_ptr()) == 1 }
+    }
+}
+
+impl Info {
+    /// `OSSL_STORE_INFO_get0_NAME`.
+    pub fn name(&self) -> Option<String> {
+        // SAFETY: the info is live; the string is owned by it.
+        string_at(unsafe { ffi::OSSL_STORE_INFO_get0_NAME(self.as_ptr()) })
+    }
+
+    /// `OSSL_STORE_INFO_get0_NAME_description`.
+    pub fn name_description(&self) -> Option<String> {
+        // SAFETY: as above.
+        string_at(unsafe { ffi::OSSL_STORE_INFO_get0_NAME_description(self.as_ptr()) })
+    }
+}

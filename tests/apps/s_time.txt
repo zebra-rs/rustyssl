@@ -1,0 +1,35 @@
+# `openssl s_time` (cargo xtask test-apps). Its timings differ by design, so the runs against
+# an s_server (paired lines, xtask/src/test_apps/pair.rs) only have to succeed (`~`); the
+# failures are compared.
+s_time -help
+s_time -bogus
+s_time extra
+s_time -time x
+s_time -verify x
+s_time -connect 127.0.0.1:1 -time 1
+s_time -connect 127.0.0.1:1 -time 1 -reuse
+s_time -connect 127.0.0.1:1 -time 1 -new -verify 2
+s_time -connect bogus:host:spec -time 1
+s_time -cipher bogus
+s_time -ciphersuites bogus
+s_time -cert {dir}/nonexistent.pem
+s_time -cert {src}/test/certs/servercert.pem -key {src}/test/certs/ee-key.pem
+s_time -nameopt bogus
+s_time -CAfile {dir}/nonexistent.pem
+s_time -provparam bogus
+s_time -ssl3
+s_time -tls1 -tls1_1 -tls1_2 -tls1_3 -connect 127.0.0.1:1 -time 1
+~s_server -accept 127.0.0.1:0 -www -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem || s_time -connect 127.0.0.1:{port} -time 1
+~s_server -accept 127.0.0.1:0 -www -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem || s_time -connect 127.0.0.1:{port} -time 1 -new
+~s_server -accept 127.0.0.1:0 -www -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem || s_time -connect 127.0.0.1:{port} -time 1 -reuse
+~s_server -accept 127.0.0.1:0 -www -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem || s_time -connect 127.0.0.1:{port} -time 1 -www /
+~s_server -accept 127.0.0.1:0 -www -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem || s_time -connect 127.0.0.1:{port} -time 1 -www / -new -tls1_2
+~s_server -accept 127.0.0.1:0 -www -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem || s_time -connect 127.0.0.1:{port} -time 1 -reuse -tls1_3 -ciphersuites TLS_AES_128_GCM_SHA256
+~s_server -accept 127.0.0.1:0 -www -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem || s_time -connect 127.0.0.1:{port} -time 1 -new -tls1_2 -cipher AES128-SHA -bugs
+~s_server -accept 127.0.0.1:0 -www -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -cipher DEFAULT@SECLEVEL=0 || s_time -connect 127.0.0.1:{port} -time 1 -new -tls1_1 -cipher DEFAULT@SECLEVEL=0
+~s_server -accept 127.0.0.1:0 -www -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -cipher DEFAULT@SECLEVEL=0 || s_time -connect 127.0.0.1:{port} -time 1 -new -tls1 -cipher DEFAULT@SECLEVEL=0
+~s_server -accept 127.0.0.1:0 -www -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem || s_time -connect 127.0.0.1:{port} -time 1 -new -verify 1 -CAfile {src}/test/certs/rootcert.pem -cafile {src}/test/certs/rootcert.pem -nameopt RFC2253
+~s_server -accept 127.0.0.1:0 -www -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem || s_time -connect 127.0.0.1:{port} -time 1 -new -CApath {dir} -CAstore file:{src}/test/certs/rootcert.pem -no-CAfile -no-CApath -no-CAstore
+~s_server -accept 127.0.0.1:0 -www -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -verify 1 || s_time -connect 127.0.0.1:{port} -time 1 -new -cert {src}/test/certs/ee-client.pem -key {src}/test/certs/ee-key.pem
+~s_server -accept 127.0.0.1:0 -www -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem || s_time -connect 127.0.0.1:{port} -time 1 -new -provider default -provider-path {dir} -propquery provider=default
+s_server -accept 127.0.0.1:0 -www -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -naccept 1 -tls1_2 || s_time -connect 127.0.0.1:{port} -time 1 -tls1_3

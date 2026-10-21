@@ -1,0 +1,47 @@
+# `openssl configutl` (cargo xtask test-apps runs each line with upstream's tool on the reference,
+# then with ours on rustyssl and on the reference). The files are in tests/apps/configutl/.
+configutl -help
+configutl -h
+configutl -config {tests}/configutl/basic.cnf
+configutl -config {tests}/configutl/basic.cnf -noheader
+configutl -noheader -config {tests}/configutl/basic.cnf
+configutl -config {tests}/configutl/nodefault.cnf
+configutl -config {tests}/configutl/empty.cnf
+configutl -config {tests}/configutl/empty.cnf -noheader
+configutl -config {tests}/configutl/pragma.cnf
+configutl -config {tests}/configutl/nonl.cnf
+configutl -config {tests}/configutl/include.cnf
+configutl -config {tests}/configutl/bad.cnf
+configutl -config {tests}/configutl/badvar.cnf
+configutl -config {tests}/configutl/badpragma.cnf
+configutl -config {tests}/configutl/nobrace.cnf
+configutl -config {tests}/configutl/missing.cnf
+configutl -config {tests}/configutl
+# -config given twice: the last wins.
+configutl -config {tests}/configutl/bad.cnf -config {tests}/configutl/nodefault.cnf
+# The default file (OPENSSL_CONF, which the harness points at a missing file).
+configutl
+configutl -noheader
+# Upstream's own configuration files.
+configutl -config {src}/apps/openssl.cnf
+configutl -config {src}/apps/ct_log_list.cnf -noheader
+configutl -config {src}/test/default-and-legacy.cnf
+configutl -config {src}/test/ca-and-certs.cnf
+configutl -config {src}/test/recursive.cnf
+# -out, then the file it wrote, read back.
+configutl -config {tests}/configutl/basic.cnf -out out.cnf
+configutl -config out.cnf -noheader
+configutl -config {tests}/configutl/basic.cnf -out -
+configutl -config {tests}/configutl/basic.cnf -out /nonexistent/dir/out.cnf
+configutl -config {tests}/configutl/missing.cnf -out out2.cnf
+# Option errors.
+configutl -x
+configutl -config
+configutl -out
+configutl extra
+configutl -noheader extra
+configutl -help -x
+configutl -x -help
+configutl --
+configutl -- extra
+configutl -noheader=1

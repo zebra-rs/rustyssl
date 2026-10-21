@@ -59,7 +59,7 @@ use rustyssl_abi::{
 };
 
 use super::builtin::libctx_of;
-use super::kdfs::macctx_load;
+use super::kdfs::macctx_load_without_cipher;
 use super::macs::{Prov, boxed, is_empty, locate, unbox, wipe};
 use super::tables::{
     ALG_END, Algorithms, Dispatch, END, PARAM_END, Params, alg, base_alg, defn, entry,
@@ -2056,16 +2056,7 @@ unsafe fn hmac_set_params(d: &mut Drbg, params: *const OSSL_PARAM) -> bool {
             m.digest.method = prov_md;
         }
         // SAFETY: the context's MAC context; the caller's array.
-        if !unsafe {
-            macctx_load(
-                &mut m.ctx,
-                params,
-                ptr::null(),
-                ptr::null(),
-                ptr::null(),
-                libctx,
-            )
-        } {
+        if !unsafe { macctx_load_without_cipher(&mut m.ctx, params, libctx) } {
             return false;
         }
     } else {
@@ -2078,16 +2069,7 @@ unsafe fn hmac_set_params(d: &mut Drbg, params: *const OSSL_PARAM) -> bool {
             return false;
         }
         // SAFETY: the context's MAC context; the caller's array.
-        if !unsafe {
-            macctx_load(
-                &mut m.ctx,
-                params,
-                ptr::null(),
-                ptr::null(),
-                ptr::null(),
-                libctx,
-            )
-        } {
+        if !unsafe { macctx_load_without_cipher(&mut m.ctx, params, libctx) } {
             return false;
         }
     }

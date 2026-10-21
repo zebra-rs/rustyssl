@@ -1,0 +1,24 @@
+# `openssl nseq` (apps/nseq.c): certificates to a Netscape certificate sequence and back. A
+# provider that fails to load is looked for in -provider-path, so the message is the same on
+# every library.
+nseq -toseq -in {src}/test/certs/ee-cert.pem
+nseq -toseq -in {src}/test/certs/ee-cert.pem -out {dir}/seq1.pem
+nseq -in {dir}/seq1.pem
+nseq -toseq -in {src}/test/certs/ee-ecdsa-client-chain.pem -out {dir}/seq3.pem
+nseq -in {dir}/seq3.pem
+nseq -in {dir}/seq3.pem -out {dir}/certs3.pem
+nseq -toseq -in {dir}/certs3.pem
+nseq -toseq < {src}/test/certs/root-cert.pem
+nseq < {dir}/seq3.pem
+nseq -toseq -in {txt}
+nseq -toseq
+nseq -in {src}/test/certs/ee-cert.pem
+nseq
+nseq -in /nonexistent/seq.pem
+nseq -toseq -in {src}/test/certs/ee-cert.pem -out /nonexistent/seq.pem
+nseq -provider default -in {dir}/seq1.pem
+nseq -provider-path {dir} -provider nosuchprov -in {dir}/seq1.pem
+nseq -propquery provider=default -in {dir}/seq1.pem
+nseq extra
+nseq -help
+nseq -x
