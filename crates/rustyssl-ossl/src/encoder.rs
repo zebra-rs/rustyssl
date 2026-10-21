@@ -39,7 +39,10 @@ impl Encoder {
         output_structure: Option<&str>,
     ) -> Self {
         let (Ok(t), Ok(s)) = (opt_c(output_type), opt_c(output_structure)) else {
-            return Self(core::ptr::null_mut(), [None, None]);
+            return Self {
+                ctx: core::ptr::null_mut(),
+                _strings: [None, None],
+            };
         };
         // SAFETY: the key is live; the strings are valid or NULL, and kept in self for the
         // context's life.
@@ -52,18 +55,21 @@ impl Encoder {
                 core::ptr::null(),
             )
         };
-        Self(ctx, [t, s])
+        Self {
+            ctx,
+            _strings: [t, s],
+        }
     }
 
     /// Whether the constructor returned NULL.
     pub fn is_null(&self) -> bool {
-        self.0.is_null()
+        self.ctx.is_null()
     }
 
     /// `OSSL_ENCODER_CTX_get_num_encoders`.
     pub fn num_encoders(&self) -> c_int {
         // SAFETY: the context is NULL (which the function reports) or live.
-        unsafe { ffi::OSSL_ENCODER_CTX_get_num_encoders(self.0) }
+        unsafe { ffi::OSSL_ENCODER_CTX_get_num_encoders(self.ctx) }
     }
 
     /// `OSSL_ENCODER_CTX_set_cipher(ctx, name, NULL)`.
@@ -72,7 +78,7 @@ impl Encoder {
             return 0;
         };
         // SAFETY: as above; n is valid or NULL.
-        unsafe { ffi::OSSL_ENCODER_CTX_set_cipher(self.0, ptr_of(&n), core::ptr::null()) }
+        unsafe { ffi::OSSL_ENCODER_CTX_set_cipher(self.ctx, ptr_of(&n), core::ptr::null()) }
     }
 
     /// `OSSL_ENCODER_CTX_set_passphrase_ui(ctx, get_ui_method(), NULL)`.
@@ -80,7 +86,7 @@ impl Encoder {
         // SAFETY: as above; the method is the apps' (or NULL), live for the program.
         unsafe {
             ffi::OSSL_ENCODER_CTX_set_passphrase_ui(
-                self.0,
+                self.ctx,
                 crate::ui::method(),
                 core::ptr::null_mut(),
             )
@@ -90,26 +96,26 @@ impl Encoder {
     /// `OSSL_ENCODER_CTX_set_passphrase`.
     pub fn set_passphrase(&self, pass: &[u8]) -> c_int {
         // SAFETY: as above; pass is valid for its length (the library copies it).
-        unsafe { ffi::OSSL_ENCODER_CTX_set_passphrase(self.0, pass.as_ptr(), pass.len()) }
+        unsafe { ffi::OSSL_ENCODER_CTX_set_passphrase(self.ctx, pass.as_ptr(), pass.len()) }
     }
 
     /// `OSSL_ENCODER_CTX_set_params`.
     pub fn set_params(&self, params: &ParamList) -> c_int {
         // SAFETY: as above; params is a valid, ended array.
-        unsafe { ffi::OSSL_ENCODER_CTX_set_params(self.0, params.as_ptr()) }
+        unsafe { ffi::OSSL_ENCODER_CTX_set_params(self.ctx, params.as_ptr()) }
     }
 
     /// `OSSL_ENCODER_to_bio`.
     pub fn to_bio(&self, out: &Bio) -> c_int {
         // SAFETY: as above; the BIO is live.
-        unsafe { ffi::OSSL_ENCODER_to_bio(self.0, out.as_ptr()) }
+        unsafe { ffi::OSSL_ENCODER_to_bio(self.ctx, out.as_ptr()) }
     }
 }
 
 impl Drop for Encoder {
     fn drop(&mut self) {
         // SAFETY: NULL or owned by self, freed once here.
-        unsafe { ffi::OSSL_ENCODER_CTX_free(self.0) };
+        unsafe { ffi::OSSL_ENCODER_CTX_free(self.ctx) };
     }
 }
 
