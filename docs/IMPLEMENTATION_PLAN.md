@@ -6023,6 +6023,41 @@ database and serial-file helpers of `apps.c` (G3, `ca`), its HTTP and TLS-for-HT
 (G4, `ocsp`/`cmp`), `http_server.c`, `cmp_mock_srv.c`, `app_params.c`, `names.c`, `log.c`, and
 `s_cb.c`/`s_socket.c` (G5).
 
+G4 (2026-10-21, branch `cli-g4`): `sess_id`, `pkcs7`, `pkcs12`, `smime`, `cms`, `ts`, `ocsp`, and
+`cmp` are ported, each byte-exact with the same exit codes in all three test-apps runs. Corpora
+(`tests/apps/<command>.txt`, fixtures made once by the reference under `tests/apps/data/`, each
+with a README): `sess_id` 27 lines, `pkcs7` 39, `pkcs12` 126, `smime` 107, `cms` 219, `ts` 114
+(with its `-help`, which prints more than its table), `ocsp` 122, `cmp` 296; every option of each
+command appears. Randomized output (signatures with random salts, encryption, nonces, transaction
+IDs) is compared structurally: fixed inputs where the options allow, RSA signers for byte-exact
+S/MIME and CMS signatures, results decrypted or verified again, and only exit codes otherwise.
+- **Shared helpers added** (`src/lib/`): `apps_http.rs` (`app_http_get_asn1`,
+  `app_http_post_asn1`), `http_server.rs` (`apps/lib/http_server.c`, without `HTTP_DAEMON`: no
+  forked children, so `ocsp -multi` is accepted and ignored, as on platforms without it), and
+  `cmp_mock_srv.rs` (`apps/lib/cmp_mock_srv.c`, but `useBadProtection` and
+  `ossl_cmp_mock_server_perform`, which `cmp.c` doesn't use). In command files: `ts.rs` holds
+  `apps.c`'s `load_cert_certs`, `load_certs_multifile`, `warn_cert`, and `next_item` (used by
+  `cmp`); `ocsp.rs` a private reader of the CA index (`load_index`, `index_index`,
+  `unpack_revinfo`) instead of G3's `ca_db.rs`; `cmp.rs` `load_certstore`.
+- **`rustyssl-ossl`:** new modules `session`, `pkcs7`, `object`, `pkcs12`, `cms`, `ts`, `http`,
+  `ocsp`, and `cmp` (with trampolines for the CMP log, transfer, and server callbacks, which
+  call Rust closures and a `Server` trait, so the mock server's logic stays in the CLI), plus
+  additions to `x509`, `err`, `util`, and `ui` (`set_base_ui_method(UI_null())` for `-batch`).
+- **`cmp`'s messages** name upstream's function and line in `apps/cmp.c`, as its `CMP_err`
+  macros print them; a unit test checks all of them against the vendored source. Upstream's
+  `CMP_print` takes `print_status`'s level unparenthesized, so only statuses other than
+  accepted, rejection, and waiting print there; ported as is. `rand` and `writerand` in a
+  configuration file aren't applied: upstream's `read_config` writes them into
+  `opt_tls_used`'s storage (undefined behavior). TLS to a CMP server is set up and checked
+  (`-reqout_only` stops before connecting) but no TLS session runs in the corpus.
+- **test-apps:** `&` lines run a server (`ocsp -port`, `cmp -port`) in the background on
+  loopback for the next line; `@` masks times within a few days of now; `PID=n` and our tool's
+  name (shown through `opt_appname`) are masked.
+- **Library fixes found by the corpora** (`rustyssl-capi`): the functions errors are raised in
+  for PEM framing (`get_name`, `get_header_and_data`), `ASN1_INTEGER` conversions, and
+  `OPENSSL_hexstr2buf`. Left in the library: a failed AES key unwrap is raised in `update`
+  rather than `aes_wrap_cipher_internal` (the corpus avoids printing it).
+
 ## Phase 12: Hardening, performance, release 1.0 → M7
 
 - [ ] **12.1 Performance:** benchmark against the reference (per TEST_PLAN L10). Close the gaps
