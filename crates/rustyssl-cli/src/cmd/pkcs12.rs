@@ -3,12 +3,12 @@
 use std::io::Write;
 
 use rustyssl_ossl::abi::{
-    ERR_LIB_MASK, ERR_LIB_OFFSET, ERR_LIB_PKCS12, KEY_EX, KEY_SIG, MBSTRING_ASC, NID_LocalKeySet,
-    NID_certBag, NID_keyBag, NID_localKeyID, NID_ms_csp_name,
-    NID_pbe_WithSHA1And3_Key_TripleDES_CBC, NID_pbe_WithSHA1And40BitRC2_CBC, NID_pbmac1,
-    NID_pkcs7_data, NID_pkcs7_encrypted, NID_pkcs8ShroudedKeyBag, NID_safeContentsBag,
-    NID_secretBag, NID_undef, NID_x509Certificate, PKCS12_R_MAC_ABSENT, PKCS12_SALT_LEN,
-    X509_ADD_FLAG_NO_DUP, X509_ADD_FLAG_UP_REF, X509_V_ERR_UNSPECIFIED,
+    ERR_LIB_PKCS12, KEY_EX, KEY_SIG, MBSTRING_ASC, NID_LocalKeySet, NID_certBag, NID_keyBag,
+    NID_localKeyID, NID_ms_csp_name, NID_pbe_WithSHA1And3_Key_TripleDES_CBC,
+    NID_pbe_WithSHA1And40BitRC2_CBC, NID_pbmac1, NID_pkcs7_data, NID_pkcs7_encrypted,
+    NID_pkcs8ShroudedKeyBag, NID_safeContentsBag, NID_secretBag, NID_undef, NID_x509Certificate,
+    PKCS12_R_MAC_ABSENT, PKCS12_SALT_LEN, X509_ADD_FLAG_NO_DUP, X509_ADD_FLAG_UP_REF,
+    X509_V_ERR_UNSPECIFIED,
 };
 use rustyssl_ossl::evp::Cipher;
 use rustyssl_ossl::object::{self, Attribute, Object, Value};
@@ -408,10 +408,7 @@ pub fn main(argv: &[String]) -> i32 {
                 // May be UTF-8 from a previous version of OpenSSL: convert to a UTF-8 form
                 // which will translate to the same Unicode password.
                 let e = err::peek_error();
-                let lib = (e >> ERR_LIB_OFFSET) & std::ffi::c_ulong::from(ERR_LIB_MASK as u8);
-                let lib_is_pkcs12 = !err::is_system_error(e)
-                    && lib == std::ffi::c_ulong::from(ERR_LIB_PKCS12 as u8);
-                if lib_is_pkcs12 && err::reason(e) == PKCS12_R_MAC_ABSENT {
+                if err::lib(e) == ERR_LIB_PKCS12 && err::reason(e) == PKCS12_R_MAC_ABSENT {
                     eprintf!("Warning: MAC is absent!\n");
                 } else {
                     let badpass = match pkcs12::asc2uni_utf8(&mpass) {

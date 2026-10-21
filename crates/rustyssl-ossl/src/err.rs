@@ -108,3 +108,14 @@ pub fn snapshot() -> Vec<Entry> {
         });
     }
 }
+
+/// `ERR_GET_LIB(e)`.
+pub fn lib(e: c_ulong) -> c_int {
+    if is_system_error(e) {
+        return crate::abi::ERR_LIB_SYS;
+    }
+    let offset = u32::try_from(crate::abi::ERR_LIB_OFFSET).unwrap_or(0);
+    let mask = c_ulong::try_from(crate::abi::ERR_LIB_MASK).unwrap_or(0);
+    // The mask fits an int.
+    c_int::try_from(e.checked_shr(offset).unwrap_or(0) & mask).unwrap_or(0)
+}
