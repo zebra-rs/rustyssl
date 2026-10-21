@@ -249,34 +249,51 @@ fn run(
 /// ticket's block was.
 const STRAY: &str = "\u{1}stray:";
 
-/// The text after a `BIO_dump` line cut short, where a raw write of the peer's data landed:
-/// after a byte and its space (`    0530 - 95 f6 5a olleh`), right after a byte (`5aolleh`),
-/// or within one (`5 olleh` cut to `5olleh`: the half byte isn't the peer's). `None` for a
-/// whole line (its text column follows the bytes after spaces) or one with nothing after.
-fn stray_text(line: &str) -> Option<&str> {
+/// The peer's data in a `BIO_dump` line the stdio buffer cut short, where a raw write of
+/// it landed: whatever doesn't fit the dump's layout (indent, `0050 - `, 16 three-character
+/// byte slots, two spaces, one character per byte). In the hex, the first character out of
+/// place starts it (`    0530 - 95 f6 5aolleh`); the peer's leading hex digits can't be told
+/// from the dump's, and the corpora's peer data (`olleh`) has none. In the text column, `next`
+/// (the line after, the rest of the cut one) says how many of the dump's characters came
+/// before the cut (`    0050 - dc ... 49   ...=...olleh`, then `.....I`). `None` for a
+/// whole line.
+fn stray_text<'a>(line: &'a str, next: Option<&str>) -> Option<&'a str> {
     let t = line.trim_start();
-    let (offset, mut rest) = t.split_once(" - ")?;
+    let (offset, rest) = t.split_once(" - ")?;
     if offset.len() != 4 || !offset.bytes().all(|b| b.is_ascii_hexdigit()) {
         return None;
     }
-    let hex = |c: Option<&u8>| c.is_some_and(u8::is_ascii_hexdigit);
-    loop {
-        let b = rest.as_bytes();
-        if hex(b.first()) && hex(b.get(1)) {
-            rest = rest.get(2..)?;
-            match rest.as_bytes().first() {
-                None => return None,
-                Some(b' ' | b'-') => rest = rest.get(1..)?,
-                Some(_) => return Some(rest),
-            }
-        } else if hex(b.first()) && b.get(1).is_some_and(|c| *c != b' ') {
-            return rest.get(1..);
-        } else if rest.is_empty() || rest.starts_with(' ') {
-            return None;
-        } else {
-            return Some(rest);
+    let b = rest.as_bytes();
+    // The first byte that doesn't fit the layout starts the peer's text.
+    let stray_at = |at: usize| rest.get(at..).filter(|s| !s.is_empty());
+    let mut n = 0;
+    while n < 16 {
+        let at = n * 3;
+        if b.get(at..at + 3) == Some(b"   ") {
+            break;
         }
+        let sep = if n == 7 { b'-' } else { b' ' };
+        for i in 0..3 {
+            let &c = b.get(at + i)?;
+            if !(if i < 2 {
+                c.is_ascii_hexdigit()
+            } else {
+                c == sep
+            }) {
+                return stray_at(at + i);
+            }
+        }
+        n += 1;
     }
+    // The padding of a short last line, two spaces, and the text column.
+    let text = 48 + 2;
+    let pad = b.get(n * 3..text.min(b.len())).unwrap_or_default();
+    if let Some(i) = pad.iter().position(|&c| c != b' ') {
+        return stray_at(n * 3 + i);
+    }
+    let next = next.filter(|l| !is_dump_line(l))?;
+    let printed = n.checked_sub(next.len())?;
+    stray_at(text + printed)
 }
 
 /// A client's text with each TLS 1.3 session ticket's block (`---`, `Post-Handshake New
@@ -330,7 +347,9 @@ pub fn mask(text: &str, port: &str) -> String {
     let mut out = Vec::new();
     let mut in_pem = false;
     let mut in_ticket = false;
-    for line in text.lines() {
+    let mut cut = false;
+    let lines: Vec<&str> = text.lines().collect();
+    for (i, &line) in lines.iter().enumerate() {
         let mut l = if port.is_empty() {
             line.to_owned()
         } else {
@@ -339,15 +358,23 @@ pub fn mask(text: &str, port: &str) -> String {
         // A session's ticket (random), up to the blank line after it: a raw write of
         // the peer's data may split one of its lines where the stdio buffer filled.
         if in_ticket {
-            if l.is_empty() {
+            if l.is_empty() && !cut {
                 in_ticket = false;
             } else {
-                if out.last().is_none_or(|p: &String| p != "HEX") {
+                let hex = out.iter().rev().find(|p: &&String| !p.starts_with(STRAY));
+                if hex.is_none_or(|p| p != "HEX") {
                     out.push("HEX".to_owned());
                 }
-                // The peer's data written into a dump line the buffer cut short.
-                if let Some(stray) = stray_text(&l) {
+                if cut {
+                    // The rest of the line the buffer cut (maybe just its newline).
+                    cut = false;
+                } else if let Some(stray) = stray_text(line, lines.get(i + 1).copied()) {
+                    // The peer's data written into a dump line the buffer cut short.
                     out.push(format!("{STRAY}{stray}"));
+                    cut = true;
+                } else if !is_dump_line(&l) {
+                    // Or between two lines.
+                    out.push(format!("{STRAY}{l}"));
                 }
                 continue;
             }
@@ -582,23 +609,59 @@ mod tests {
         );
         assert_eq!(mask("x 43210", "4321"), "x 43210");
         assert_eq!(mask("    Session-ID: ABCD", ""), "    Session-ID: MASKED");
+        let full = "    0050 - dc e2 c2 3d 04 d9 0f dd-d6 77 45 46 96 a0 01 49   ...=....wEF....I";
+        assert_eq!(stray_text(full, Some("    0060 - 00")), None);
+        assert_eq!(stray_text(full, Some("")), None);
         assert_eq!(
-            stray_text("    0530 - 95 f6 5a ba 2b 7e 07 olleh"),
+            stray_text(
+                "    0050 - dc e2 c2 3d 04 d9 0f dd-d6 77 45 46 96 a0 01 49   ...=...olleh",
+                Some(".wEF....I")
+            ),
             Some("olleh")
         );
         assert_eq!(
-            stray_text("    01a0 - e1 9c fb 69 38 7a dolleh"),
+            stray_text(
+                "    0050 - dc e2 c2 3d 04 d9 0f dd-d6 77 45 46 96 a0 01 49  olleh",
+                None
+            ),
             Some("olleh")
         );
         assert_eq!(
-            stray_text("    01a0 - e1 9c fb 69 38 7aolleh"),
+            stray_text("    0530 - 95 f6 5a ba 2b 7e 07 olleh", None),
             Some("olleh")
         );
-        assert_eq!(stray_text("    01a0 - e1 9c fb"), None);
         assert_eq!(
-            stray_text("    0000 - 16 03 01 00 2a 01 00 00-26 03 03 01 02 03 04 05   ...."),
-            None
+            stray_text("    01a0 - e1 9c fb 69 38 7a dolleh", None),
+            Some("olleh")
         );
+        assert_eq!(
+            stray_text("    01a0 - e1 9c fb 69 38 7aolleh", None),
+            Some("olleh")
+        );
+        assert_eq!(stray_text("    01a0 - e1 9c fb", Some("")), None);
+        let short = format!("    01a0 - e1 9c fb {}...", " ".repeat(41));
+        assert_eq!(stray_text(&short, Some("")), None);
+        assert_eq!(
+            stray_text(&format!("{short}olleh"), Some("")),
+            Some("olleh")
+        );
+        // The reply cut into a ticket's dump comes out where an uncut run has it.
+        let ticket = |dump: &str, reply: &str| {
+            format!(
+                "x\n---\nPost-Handshake New Session Ticket arrived:\n    TLS session ticket:\n\
+                 {dump}\n\n---\nread R BLOCK\n{reply}closed\n"
+            )
+        };
+        let uncut = ticket(&format!("{full}\n{short}"), "olleh\n");
+        let uncut = tickets_last(&mask(&uncut, ""));
+        let cut = ticket(
+            &format!(
+                "    0050 - dc e2 c2 3d 04 d9 0f dd-d6 77 45 46 96 a0 01 49   ...=...olleh\n\
+             .wEF....I\n{short}",
+            ),
+            "",
+        );
+        assert_eq!(tickets_last(&mask(&cut, "")), uncut);
         assert_eq!(
             tickets_last(
                 "a\n---\nPost-Handshake New Session Ticket arrived:\nt\n---\nread R BLOCK\nolleh\nz\n"
