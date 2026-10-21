@@ -6023,6 +6023,28 @@ database and serial-file helpers of `apps.c` (G3, `ca`), its HTTP and TLS-for-HT
 (G4, `ocsp`/`cmp`), `http_server.c`, `cmp_mock_srv.c`, `app_params.c`, `names.c`, `log.c`, and
 `s_cb.c`/`s_socket.c` (G5).
 
+G2, the key commands (2026-10-21, branch `cli-g2`), is done: `genpkey`, `pkey`, `pkeyparam`,
+`pkeyutl`, `skeyutl`, `genrsa`, `rsa`, `rsautl`, `dsa`, `dsaparam`, `gendsa`, `ec`, `ecparam`,
+`dhparam`, `pkcs8` (`crates/rustyssl-cli/src/cmd/`).
+- **Corpora:** `tests/apps/<command>.txt`, 750 lines covering every option, the error paths and
+  `-help`, each byte-exact with the same exit code in all three `test-apps` runs. Output that is
+  random by design (generated keys and parameters, encryption, randomized signatures) is
+  compared structurally: `test-apps` gained `command ... | check ...`, which runs the check with
+  upstream's tool on the reference after each run, on the command's standard output, and
+  compares the command's exit status and the check's output (hex dumps collapsed, `asn1parse`'s
+  `[HEX DUMP]` values masked). Deterministic output (named groups' and curves' parameters,
+  PKCS#1 v1.5 and EdDSA signatures, derivations, KDFs) is compared byte for byte.
+- **Shared helpers, in the command files (to move to `src/lib/` later):** `opt_cipher` and
+  `ec_common.h`'s option lists (`cmd/pkey.rs`); `init_gen_str`, `app_keygen`, `app_paramgen`,
+  `mem_bio_to_file` (`cmd/genpkey.rs`); `perror` (`cmd/rsa.rs`); a private copy of
+  `app_params_new_from_opts` (`cmd/skeyutl.rs`).
+- **`rustyssl-ossl`:** key contexts (generation with the apps' progress callback, checks, the
+  one-shot operations, KEM), digest-sign contexts over a caller's key context, keys' parameters,
+  printers and PEM/DER writers, encoders and decoders (`encoder`), `OSSL_PARAM` lists, builders
+  and text parameters (`params`), `bn`, `pkcs8`, `skey`, `obj`.
+- **Library fix found by the corpus:** `PEM_read_bio_ex` raised "no start line" and "bad end
+  line" under its own name; upstream raises them from `get_name` and `get_header_and_data`.
+
 ## Phase 12: Hardening, performance, release 1.0 → M7
 
 - [ ] **12.1 Performance:** benchmark against the reference (per TEST_PLAN L10). Close the gaps
