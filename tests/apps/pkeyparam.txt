@@ -23,3 +23,6 @@ pkeyparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pe
 pkeyparam -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem extra
 pkeyparam -nosuchoption
 pkeyparam -in
+pkeyparam -provider-path {dir} -provider default -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -noout
+pkeyparam -provparam default:x=y -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -noout
+pkeyparam -provparam bad -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -noout

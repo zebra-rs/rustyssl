@@ -41,3 +41,6 @@ dsaparam -propquery provider=nosuch 512
 dsaparam -rand {bin} -writerand {dir}/dsaparam.rnd 1024 | pkeyparam -noout
 dsaparam -nosuchoption
 dsaparam -in
+dsaparam -provider-path {dir} -provider default -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -noout -text
+dsaparam -provparam default:x=y -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -noout -text
+dsaparam -provparam bad -in {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem -noout -text

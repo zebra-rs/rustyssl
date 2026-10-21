@@ -70,3 +70,6 @@ genpkey -algorithm X25519 -rand /nonexistent/rand.bin | pkey -noout -check
 genpkey -algorithm X25519 extra
 genpkey -algorithm
 genpkey -nosuchoption
+genpkey -provider-path {dir} -provider default -genparam -algorithm EC -pkeyopt ec_paramgen_curve:P-256
+genpkey -provparam default:x=y -genparam -algorithm EC -pkeyopt ec_paramgen_curve:P-256
+genpkey -provparam bad -genparam -algorithm EC -pkeyopt ec_paramgen_curve:P-256

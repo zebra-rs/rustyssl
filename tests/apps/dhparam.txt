@@ -49,3 +49,6 @@ dhparam -propquery provider=nosuch 512
 dhparam -rand {bin} -writerand {dir}/dhparam.rnd 512 | pkeyparam -noout
 dhparam -nosuchoption
 dhparam -in
+dhparam -provider-path {dir} -provider default -in {src}/test/certs/dhp2048.pem -noout -text
+dhparam -provparam default:x=y -in {src}/test/certs/dhp2048.pem -noout -text
+dhparam -provparam bad -in {src}/test/certs/dhp2048.pem -noout -text

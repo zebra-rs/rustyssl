@@ -19,3 +19,6 @@ skeyutl -genkey -cipher aes-128-cbc -propquery provider=nosuch
 skeyutl -genkey -cipher aes-128-cbc extra
 skeyutl -nosuchoption
 skeyutl -cipher
+skeyutl -provider-path {dir} -provider default -genkey -skeymgmt GENERIC-SECRET
+skeyutl -provparam default:x=y -genkey -skeymgmt GENERIC-SECRET
+skeyutl -provparam bad -genkey -skeymgmt GENERIC-SECRET

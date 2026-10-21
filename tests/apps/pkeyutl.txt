@@ -111,3 +111,6 @@ pkeyutl -sign -inkey {src}/test/testrsa.pem -in {dir}/pkeyutl.sha256 -rand {bin}
 pkeyutl -sign -inkey {src}/test/testrsa.pem extra
 pkeyutl -nosuchoption
 pkeyutl -inkey
+pkeyutl -provider-path {dir} -provider default -sign -inkey {src}/test/tested25519.pem -in {txt} -hexdump
+pkeyutl -provparam default:x=y -sign -inkey {src}/test/tested25519.pem -in {txt} -hexdump
+pkeyutl -provparam bad -sign -inkey {src}/test/tested25519.pem -in {txt} -hexdump

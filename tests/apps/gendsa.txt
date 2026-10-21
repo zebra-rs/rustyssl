@@ -23,3 +23,6 @@ gendsa -provider /nonexistent/prov.so {src}/test/recipes/15-test_dsaparam_data/v
 gendsa -propquery provider=nosuch {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem
 gendsa -rand {bin} -writerand {dir}/gendsa.rnd {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem | pkey -noout -check
 gendsa -nosuchoption
+gendsa -provider-path {dir} -provider default -out {dir}/gendsa-prov.pem {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem
+gendsa -provparam default:x=y -out {dir}/gendsa-prov.pem {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem
+gendsa -provparam bad -out {dir}/gendsa-prov.pem {src}/test/recipes/15-test_dsaparam_data/valid/p1024_q160_t1862.pem

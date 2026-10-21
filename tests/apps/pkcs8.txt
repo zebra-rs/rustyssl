@@ -68,3 +68,6 @@ pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret -rand {bin} -writer
 pkcs8 -in {src}/test/testrsa.pem extra
 pkcs8 -nosuchoption
 pkcs8 -in
+pkcs8 -provider-path {dir} -provider default -topk8 -nocrypt -in {src}/test/testrsa.pem
+pkcs8 -provparam default:x=y -topk8 -nocrypt -in {src}/test/testrsa.pem
+pkcs8 -provparam bad -topk8 -nocrypt -in {src}/test/testrsa.pem

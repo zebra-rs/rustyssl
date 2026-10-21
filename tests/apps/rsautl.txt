@@ -45,3 +45,6 @@ rsautl -sign -inkey {src}/test/testrsa.pem -in {txt} -rand {bin} -writerand {dir
 rsautl -sign -inkey {src}/test/testrsa.pem extra
 rsautl -nosuchoption
 rsautl -inkey
+rsautl -provider-path {dir} -provider default -sign -inkey {src}/test/testrsa.pem -in {txt} -hexdump
+rsautl -provparam default:x=y -sign -inkey {src}/test/testrsa.pem -in {txt} -hexdump
+rsautl -provparam bad -sign -inkey {src}/test/testrsa.pem -in {txt} -hexdump

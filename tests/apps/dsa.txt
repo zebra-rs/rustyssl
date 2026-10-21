@@ -41,3 +41,8 @@ dsa -in {src}/test/testdsa.pem -provider /nonexistent/prov.so
 dsa -in {src}/test/testdsa.pem extra
 dsa -nosuchoption
 dsa -in
+dsa -provider-path {dir} -provider default -in {src}/test/testdsa.pem -noout -modulus
+dsa -provparam default:x=y -in {src}/test/testdsa.pem -noout -modulus
+dsa -provparam bad -in {src}/test/testdsa.pem -noout -modulus
+dsa -propquery provider=default -in {src}/test/testdsa.pem -noout -modulus
+dsa -propquery provider=nosuch -in {src}/test/testdsa.pem -noout -modulus

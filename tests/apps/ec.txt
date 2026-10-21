@@ -55,3 +55,8 @@ ec -in {src}/test/testec-p256.pem -provider /nonexistent/prov.so
 ec -in {src}/test/testec-p256.pem extra
 ec -nosuchoption
 ec -in
+ec -provider-path {dir} -provider default -in {src}/test/testec-p256.pem -noout -text
+ec -provparam default:x=y -in {src}/test/testec-p256.pem -noout -text
+ec -provparam bad -in {src}/test/testec-p256.pem -noout -text
+ec -propquery provider=default -in {src}/test/testec-p256.pem -noout -text
+ec -propquery provider=nosuch -in {src}/test/testec-p256.pem -noout -text

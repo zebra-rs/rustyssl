@@ -65,3 +65,6 @@ rsa -in {src}/test/testrsa.pem -propquery provider=nosuch -check -noout
 rsa -in {src}/test/testrsa.pem extra
 rsa -nosuchoption
 rsa -in
+rsa -provider-path {dir} -provider default -in {src}/test/testrsa.pem -noout -modulus
+rsa -provparam default:x=y -in {src}/test/testrsa.pem -noout -modulus
+rsa -provparam bad -in {src}/test/testrsa.pem -noout -modulus

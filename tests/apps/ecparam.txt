@@ -60,3 +60,6 @@ ecparam -name prime256v1 -rand {bin} -writerand {dir}/ecparam.rnd -genkey -noout
 ecparam -name prime256v1 extra
 ecparam -nosuchoption
 ecparam -name
+ecparam -provider-path {dir} -provider default -name prime256v1
+ecparam -provparam default:x=y -name prime256v1
+ecparam -provparam bad -name prime256v1

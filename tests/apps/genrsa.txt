@@ -35,3 +35,6 @@ genrsa -rand {bin} -writerand {dir}/genrsa.rnd 1024 | pkey -noout -check
 genrsa -rand /nonexistent/rand.bin 1024
 genrsa -nosuchoption
 genrsa -out
+genrsa -provider-path {dir} -provider default -out {dir}/genrsa-prov.pem 1024
+genrsa -provparam default:x=y -out {dir}/genrsa-prov.pem 1024
+genrsa -provparam bad -out {dir}/genrsa-prov.pem 1024
