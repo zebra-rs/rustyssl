@@ -578,13 +578,17 @@ impl CertificateStatus {
         Ok(Self { response })
     }
 
-    /// The body.
+    /// The body: the type alone when there's no response (the form [`Self::parse`] reads as
+    /// empty, since an empty length-prefixed one is `SSL_R_BAD_PACKET`).
     ///
     /// # Errors
     /// The response is too long.
     pub fn encode(&self) -> Result<Vec<u8>> {
         encode_with(|w| {
             w.u8(1);
+            if self.response.is_empty() {
+                return Ok(());
+            }
             w.vec(3, &self.response)
         })
     }

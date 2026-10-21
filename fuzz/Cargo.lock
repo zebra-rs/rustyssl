@@ -327,6 +327,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "md2"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d503fa42a36d0bae709eee924b9531ac3dd5a7f30e47d85185fa7d3ea588a08"
+dependencies = [
+ "digest",
+]
+
+[[package]]
 name = "md4"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -464,6 +473,7 @@ dependencies = [
  "idea",
  "keccak",
  "md-5",
+ "md2",
  "md4",
  "poly1305",
  "polyval",
