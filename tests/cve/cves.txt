@@ -288,7 +288,7 @@ CVE-2026-42765 test cve_x509 a partial chain with OCSP checking and no issuer is
 CVE-2026-42766 test cve_pkcs a PWRI key-encryption cipher without an IV fails
 CVE-2026-42767 test cve_pkcs decrypting a CRMF EncryptedValue without symmAlg parameters fails
 CVE-2026-42768 test cve_pkcs CMS decryption across two RecipientInfos with an unrelated key reveals nothing
-CVE-2026-42769 gap cmp CMP rootCaKeyUpdate verification: needs a crafted CMP genp exchange
+CVE-2026-42769 test cve_cmp a rootCaKeyUpdate whose newWithOld names the old root but wasn't signed by it is refused; a genuine one is accepted
 CVE-2026-42770 test cve_pkey a DHX peer whose q differs from ours is refused as a peer
 CVE-2026-42771 n/a 4.0 OpenSSL 4.0 only (rustyssl targets the 3.x ABI)
 CVE-2026-42772 test cve_quic 20000 reversed one-octet STREAM frames reassemble quickly (found rustyssl closing with INTERNAL_ERROR)
@@ -302,13 +302,13 @@ CVE-2026-54875 gap timing SM2 scalar multiplication timing: not measured by test
 CVE-2026-54876 test cve_tls checking stapled OCSP responses releases what it parsed
 CVE-2026-63072 test cve_pkcs KARI with a key-wrap-pad OID fails without writing past its buffer
 CVE-2026-63073 covered test-openssl-suite a CMP sender DN as a format string: upstream's cmp_vfy_test, run by test-openssl-suite --all
-CVE-2026-63074 gap cmp CMP extraCerts cache growth: memory use isn't observable here
+CVE-2026-63074 test cve_cmp 50 requests failing validation, each with a new extra certificate, to one reused server context: none stays cached
 CVE-2026-63075 test cve_quic 20000 ack-eliciting packets whose ACK-only replies are never acknowledged: memory stays bounded
 CVE-2026-63076 test cve_pkcs a CMP request whose PBM protectionAlg parameter has the wrong type is refused
 CVE-2026-72897 test cve_tls switching SSL_CTX in the servername callback stays in bounds
 CVE-2026-75803 test cve_cipher an empty ciphertext with a forged tag fails through EVP_Cipher
 CVE-2026-75804 test cve_quic STREAM data over the connection window, each stream within its own: FLOW_CONTROL_ERROR
-CVE-2026-75805 gap cmp a crafted CMP revocation response: needs a crafted CMP rp exchange
+CVE-2026-75805 test cve_cmp an rp carrying a CertId, for a revocation requested by PKCS#10 CSR (crafted, re-protected)
 CVE-2026-75806 test cve_dtls forged AES-GCM and ChaCha20-Poly1305 records shorter than nonce and tag are dropped; the association lives on
 CVE-2026-77696 gap timing SM2 signing timing: not measured by test-timing yet
 CVE-2026-84782 test cve_dtls the server's flight is suspended by a full datagram pair and its timer expires: the flight stays intact
