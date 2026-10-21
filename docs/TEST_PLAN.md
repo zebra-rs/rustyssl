@@ -550,21 +550,33 @@ random class rotated through 64, so the fixed class ran warm in cache: the refer
 |t| 11–36 from that alone, and rustyssl 6–10. Both classes now draw from 64 key objects (the
 fixed class's are copies of one key), and the reference reads 2–4.
 
-**CVE regression suite (`tests/cve/`).** Every OpenSSL security advisory since 2014
-(openssl-library.org vulnerabilities list) is classified as **applicable** (a test
-reproduces the trigger and asserts safe behavior) or **not applicable** (the feature doesn't
-exist; recorded with the reason). Representative entries:
+**CVE regression suite (`tests/cve/`, `cargo xtask test-cve`).** Every OpenSSL CVE, from
+the reference's `CHANGES.md` and OpenSSL's vulnerabilities page (304 as of 3.6.5, 2002 to
+2026), is in `tests/cve/cves.txt` with how it's covered: a check in a `tests/cve/*.c`
+program (203), a commented `test-apps` line (1), another suite (12: `test-timing`'s dudect
+targets, or upstream's own regression test run by `test-openssl-suite --all`), not
+applicable with the reason (47: SSLv2, Kerberos, other platforms' assembly, the FIPS module,
+scripts, 4.0-only), or a gap with the reason (41: QUIC and post-handshake DTLS need crafted
+traffic, thread races, timing not yet measured, triggers needing > 2 GiB). The programs are
+TAP programs like L4's: built once, run on the reference (which has every fix) and on
+rustyssl, passing with identical output. They reproduce each trigger (malformed DER, PKCS#7,
+CMS and PKCS#12 inputs, some of them upstream's own regression files; handcrafted
+ClientHellos, records, server flights and DTLS datagrams through memory BIOs; API misuse) and
+print only outcomes (results, error codes, alerts), so the reference shows what the fixed
+behavior is. The driver also fails if the reference's `CHANGES.md` names a CVE the index
+lacks, so each new release's advisories must be classified. It runs in the gates and in CI.
+Representative entries:
 
 | CVE | Class | Test |
 |---|---|---|
 | CVE-2014-0160 (Heartbleed) | over-read | the heartbeat extension is not supported; the peer request is ignored or rejected |
 | CVE-2014-0224 | early CCS state confusion | an out-of-order ChangeCipherSpec is rejected |
 | CVE-2015-1793 | alternate-chain forgery | the forged chain is rejected |
-| CVE-2016-2105/2106 | length overflow | `EVP_EncodeUpdate`/`EncryptUpdate` with huge lengths fail safely |
+| CVE-2016-2105/2106 | length overflow | a gap: the trigger needs > 2 GiB of input; lengths are checked arithmetic (AGENTS.md rule 3) |
 | CVE-2016-2108 | ASN.1 negative zero | encode and decode are correct |
 | CVE-2016-6309 | UAF on message realloc | large handshake messages are handled safely |
 | CVE-2020-1971 | EDIPARTYNAME NULL deref | GENERAL_NAME_cmp is correct |
-| CVE-2021-3449 | renegotiation NULL deref | renegotiation without sigalgs is handled |
+| CVE-2021-3449 | renegotiation NULL deref | upstream's 70-test_renegotiation (TLSProxy), in `test-openssl-suite --all` |
 | CVE-2021-3711 / 3712 | SM2 overflow / non-NUL-terminated ASN1_STRING | correct sizing; no reads past `length` |
 | CVE-2022-0778 | BN_mod_sqrt infinite loop | it terminates on a non-prime modulus |
 | CVE-2022-3602 / 3786 | punycode overflow | malicious name constraints are safe |
@@ -577,7 +589,7 @@ exist; recorded with the reason). Representative entries:
 | CVE-2024-6119 | otherName type confusion | identity checks are correct |
 | CVE-2024-9143 | GF(2^m) out-of-bounds | invalid inputs are handled |
 | CVE-2024-12797 | RPK authentication not enforced (logic) | the handshake aborts on verification failure |
-| CVE-2025-9230 / 9231 / 9232 | KEK unwrap OOB / SM2 timing / `no_proxy` over-read | bounds and constant-time checks |
+| CVE-2025-9230 / 9232 | KEK unwrap OOB / `no_proxy` over-read | wrong passwords and crafted `no_proxy` lists stay in bounds (SM2's timing, CVE-2025-9231, is a gap) |
 
 **Resource-exhaustion tests.** Assert explicit limits, with bounded time and memory, for
 ASN.1 nesting depth, element counts, certificate chain length, `max_cert_list`, DTLS fragment

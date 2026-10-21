@@ -19,6 +19,7 @@ mod test_apps;
 mod test_bogo;
 mod test_c;
 mod test_consumers;
+mod test_cve;
 mod test_differential;
 mod test_interop;
 mod test_openssl_suite;
@@ -44,6 +45,7 @@ const COMMANDS: &[(&str, &str)] = &[
     ("coverage", "report implemented exports per library and header into docs/coverage.md"),
     ("usage-scan", "rank exported functions by how many distro packages import them"),
     ("test-c", "run the C conformance tests against the reference and target/dist"),
+    ("test-cve", "the CVE regression suite (tests/cve), on both libraries"),
     ("test-apps", "run the reference's openssl tool on rustyssl and compare its output"),
     ("test-bogo", "BoringSSL's TLS test runner (BoGo) with an OpenSSL-API shim, on both libraries"),
     ("test-interop", "TLS between the reference's s_server/s_client and rustyssl, in four pairings"),
@@ -77,6 +79,7 @@ fn main() -> ExitCode {
         Some("test-bogo") => report("test-bogo", test_bogo::run(&rest)),
         Some("test-interop") => report("test-interop", test_interop::run(&rest)),
         Some("test-c") => report("test-c", test_c::run(&rest)),
+        Some("test-cve") => report("test-cve", test_cve::run(&rest)),
         Some("test-consumers") => report("test-consumers", test_consumers::run(&rest)),
         Some("test-differential") => report("test-differential", test_differential::run(&rest)),
         Some("test-openssl-suite") => report("test-openssl-suite", test_openssl_suite::run(&rest)),

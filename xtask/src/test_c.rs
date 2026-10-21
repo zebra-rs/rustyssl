@@ -184,6 +184,17 @@ pub fn execute_with_input(
     work: &Path,
     input: Option<&Path>,
 ) -> Result<Outcome> {
+    execute_in(exe, lib_dir, work, input, None)
+}
+
+/// Like [`execute_with_input`], running the program in the directory `cwd` when given.
+pub fn execute_in(
+    exe: &Path,
+    lib_dir: &Path,
+    work: &Path,
+    input: Option<&Path>,
+    cwd: Option<&Path>,
+) -> Result<Outcome> {
     // Files rather than pipes, so a chatty program can't block on a full pipe.
     let stdout_path = work.join("stdout");
     let stderr_path = work.join("stderr");
@@ -192,6 +203,9 @@ pub fn execute_with_input(
         None => Stdio::null(),
     };
     let mut command = Command::new(exe);
+    if let Some(dir) = cwd {
+        command.current_dir(dir);
+    }
     if let Some(modules) = MODULES.get() {
         command.env("RUSTYSSL_TEST_MODULES", modules);
     }
@@ -225,7 +239,7 @@ pub fn execute_with_input(
 }
 
 /// Both runs must pass every TAP check and print the same output. Returns the check count.
-fn verdict(theirs: &Outcome, ours: &Outcome) -> std::result::Result<usize, String> {
+pub fn verdict(theirs: &Outcome, ours: &Outcome) -> std::result::Result<usize, String> {
     let checks = tap_checks(&theirs.stdout)
         .map_err(|e| format!("the reference run fails ({}): {e}", theirs.status))?;
     if !theirs.success {

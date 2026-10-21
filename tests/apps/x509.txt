@@ -66,6 +66,7 @@ x509 -in {src}/test/certs/ee-cert.pem -outform SMIME
 x509 -in {src}/test/certs/ee-cert.pem -outform XYZ
 x509 -in {src}/test/certs/ee-cert.pem -nocert -subject
 x509 -in {src}/test/certs/ee-cert.pem -noout
+# CVE-2025-4575: -addreject adds a rejected use, not a trusted one
 x509 -in {src}/test/certs/ee-cert.pem -trustout -addtrust serverAuth -addreject clientAuth -setalias myalias
 x509 -in {src}/test/certs/ee-cert.pem -trustout -addtrust serverAuth -noout -text -alias
 x509 -in {src}/test/certs/ee-cert.pem -addtrust nosuch.oid
