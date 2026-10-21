@@ -64,6 +64,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 mod pair;
+mod starttls;
 
 use crate::dist::CLI_NAME;
 use crate::test_c::{LOADER_PATH, prepare};

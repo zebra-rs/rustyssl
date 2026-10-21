@@ -1,4 +1,5 @@
-//! Paired lines of the TLS commands' corpora: `SERVER ARGS || CLIENT ARGS`.
+//! Paired lines of the TLS commands' corpora: `SERVER ARGS || CLIENT ARGS`, the server's
+//! optionally behind a STARTTLS front (`{starttls:NAME} SERVER ARGS`, see [`super::starttls`]).
 //!
 //! The server (`s_server`, which must report its port with `-accept 127.0.0.1:0` or the
 //! like) starts first; once it prints its `ACCEPT` line, the client runs with `{port}` in
@@ -37,11 +38,12 @@ pub struct Side {
     pub stdin: Option<PathBuf>,
 }
 
-/// A paired line's two sides.
+/// A paired line's two sides, and the STARTTLS script of a front between them, if any.
 #[derive(Clone, Debug, Default)]
 pub struct Pair {
     pub server: Side,
     pub client: Side,
+    pub starttls: Option<String>,
 }
 
 /// Splits a line's arguments at a lone `||`; `None` if there is none.
@@ -56,9 +58,20 @@ pub fn split(args: &[String]) -> Option<Pair> {
         }
         Side { args, stdin }
     };
+    let mut server = side(args.get(..at).unwrap_or_default());
+    // `{starttls:NAME} s_server ...`: a front plays NAME's plaintext part (see [`starttls`]).
+    let starttls = server
+        .args
+        .first()
+        .and_then(|a| a.strip_prefix("{starttls:")?.strip_suffix('}'))
+        .map(str::to_owned);
+    if starttls.is_some() {
+        server.args.remove(0);
+    }
     Some(Pair {
-        server: side(args.get(..at).unwrap_or_default()),
+        server,
         client: side(args.get(at + 1..).unwrap_or_default()),
+        starttls,
     })
 }
 
@@ -198,11 +211,22 @@ fn run(
     } else {
         String::new()
     };
+    // With a STARTTLS front, the client connects to it, and it to the server.
+    let front = match &pair.starttls {
+        Some(name) => Some(super::starttls::start(
+            name,
+            port.parse().map_err(|_| "no server port for the front")?,
+        )?),
+        None => None,
+    };
+    let client_port = front
+        .as_ref()
+        .map_or_else(|| port.clone(), |f| f.port.to_string());
     let cargs: Vec<String> = pair
         .client
         .args
         .iter()
-        .map(|a| a.replace("{port}", &port))
+        .map(|a| a.replace("{port}", &client_port))
         .collect();
     let mut cl = command(client.0, client.1, w, &cargs)
         .stdin(stdin_of(pair.client.stdin.as_deref(), Stdio::null())?)
@@ -227,11 +251,13 @@ fn run(
             String::from_utf8_lossy(&e)
         )
     };
+    // The front's port, where the client names it, as the server's (which is masked).
     let client_text = text(
         c_out.recv().unwrap_or_default(),
         c_err.recv().unwrap_or_default(),
         &c_status,
-    );
+    )
+    .replace(&client_port, &port);
     let server_text = text(
         out_rx.recv().unwrap_or_default(),
         err_rx.recv().unwrap_or_default(),
