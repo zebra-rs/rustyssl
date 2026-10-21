@@ -8,9 +8,9 @@ use rustyssl_ossl::encoder::{Decoder, Encoder};
 use rustyssl_ossl::params::ParamBld;
 use rustyssl_ossl::pkey::{Pkey, PkeyCtx};
 
-use super::genpkey::app_paramgen;
 use crate::generated::options::dhparam::{OPTIONS, Opt};
 use crate::lib::apps::bio_open_default;
+use crate::lib::keygen;
 use crate::lib::opt::{self, Parser, eprintf, fmt_flags, format};
 use crate::lib::{app_libctx, app_rand, engine, io};
 
@@ -182,7 +182,7 @@ fn run(argv: &[String]) -> i32 {
                 return 1;
             }
         }
-        let Some(tmppkey) = app_paramgen(&ctx, Some(alg)) else {
+        let Some(tmppkey) = keygen::app_paramgen(&ctx, Some(alg)) else {
             return 1;
         };
         drop(ctx);

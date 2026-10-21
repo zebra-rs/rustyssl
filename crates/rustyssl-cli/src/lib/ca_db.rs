@@ -8,6 +8,7 @@ use rustyssl_ossl::Bio;
 use rustyssl_ossl::abi::{BN_RAND_BOTTOM_ANY, BN_RAND_TOP_ANY};
 use rustyssl_ossl::x509::{Bn, Integer};
 
+use super::apps::perror;
 use super::io;
 use super::opt::eprintf;
 
@@ -16,13 +17,6 @@ pub const SERIAL_RAND_BITS: i32 = 159;
 
 /// `BSIZE` of `apps.c`: the longest file name the helpers make, plus one.
 const BSIZE: usize = 256;
-
-/// `perror(s)`: `s: <the last system error>`.
-pub fn perror(s: &str) {
-    let e = std::io::Error::last_os_error();
-    let reason = super::apps::strerror(e.raw_os_error().unwrap_or(0));
-    let _ = writeln!(io::err(), "{s}: {reason}");
-}
 
 /// `rand_serial(b, ai)`: a random serial number of [`SERIAL_RAND_BITS`] bits.
 pub fn rand_serial() -> Option<(Bn, Integer)> {
@@ -43,7 +37,7 @@ pub fn load_serial(serialfile: &str, create: bool) -> (Option<(Bn, Integer)>, bo
     let ret = match input {
         None => {
             if !create {
-                perror(serialfile);
+                perror(Some(serialfile));
                 None
             } else {
                 rustyssl_ossl::err::clear();
@@ -248,7 +242,7 @@ pub fn save_index(dbfile: &str, suffix: &str, db: &CaDb) -> bool {
         let attr_new = format!("{dbfile}.attr.{suffix}");
         let new = format!("{dbfile}.{suffix}");
         let Some(out) = Bio::new_file(&new, "w") else {
-            perror(dbfile);
+            perror(Some(dbfile));
             eprintf!("Unable to open '{dbfile}'\n");
             return false;
         };
@@ -258,7 +252,7 @@ pub fn save_index(dbfile: &str, suffix: &str, db: &CaDb) -> bool {
             return false;
         }
         let Some(out) = Bio::new_file(&attr_new, "w") else {
-            perror(&attr);
+            perror(Some(&attr));
             eprintf!("Unable to open '{attr}'\n");
             return false;
         };

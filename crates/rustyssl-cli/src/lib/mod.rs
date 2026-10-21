@@ -16,6 +16,7 @@ pub mod cmp_mock_srv;
 pub mod engine;
 pub mod http_server;
 pub mod io;
+pub mod keygen;
 pub mod opt;
 
 #[cfg(test)]

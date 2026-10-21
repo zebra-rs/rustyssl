@@ -25,6 +25,7 @@ use crate::cmd::x509::set_cert_times;
 use crate::generated::options::ca::{OPTIONS, Opt};
 use crate::lib::app_libctx::{libctx, opt_provider, propq};
 use crate::lib::app_rand;
+use crate::lib::apps::perror;
 use crate::lib::apps::{
     ConfigFile, ExtCopy, add_oid_section, app_conf_try_number, app_conf_try_string,
     app_load_config, app_load_config_verbose, app_load_modules, app_passwd, atoi, bio_open_default,
@@ -33,7 +34,7 @@ use crate::lib::apps::{
     parse_yesno, set_cert_ex, set_dateopt, set_ext_copy, set_nameopt,
 };
 use crate::lib::ca_db::{
-    CaDb, db_type, field, index_index, load_index, load_serial, perror, rand_serial, rotate_index,
+    CaDb, db_type, field, index_index, load_index, load_serial, rand_serial, rotate_index,
     rotate_serial, save_index, save_serial,
 };
 use crate::lib::engine::setup_engine;
@@ -1493,7 +1494,7 @@ fn run(argv: &[String]) -> i32 {
         };
         if opt::isdir(d) != Some(true) {
             eprintf!("{prog}: {d} is not a directory\n");
-            perror(d);
+            perror(Some(d));
             return 1;
         }
     }
@@ -1823,7 +1824,7 @@ fn run(argv: &[String]) -> i32 {
                 return 1;
             };
             let Some(cout) = Bio::new_file(&new_cert, "w") else {
-                perror(&new_cert);
+                perror(Some(&new_cert));
                 return 1;
             };
             write_new_certificate(&cout, &xi, false, notext);

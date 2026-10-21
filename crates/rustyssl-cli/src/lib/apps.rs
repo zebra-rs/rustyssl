@@ -414,6 +414,15 @@ fn last_os_error() -> String {
     strerror(e.raw_os_error().unwrap_or(0))
 }
 
+/// C's `perror(s)`: `s: ` (when given and not empty) and `strerror(errno)`.
+pub fn perror(s: Option<&str>) {
+    let reason = strerror(std::io::Error::last_os_error().raw_os_error().unwrap_or(0));
+    match s {
+        Some(s) if !s.is_empty() => eprintf!("{s}: {reason}\n"),
+        _ => eprintf!("{reason}\n"),
+    };
+}
+
 /// `strerror(code)`, as the C library words it.
 pub fn strerror(code: i32) -> String {
     let text = std::io::Error::from_raw_os_error(code).to_string();

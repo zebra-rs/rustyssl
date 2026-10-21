@@ -3,10 +3,10 @@
 use rustyssl_ossl::abi::OPENSSL_DSA_MAX_MODULUS_BITS;
 use rustyssl_ossl::pkey::{self, PkeyCtx};
 
-use super::genpkey::app_keygen;
 use super::pkey::opt_cipher;
 use crate::generated::options::gendsa::{OPTIONS, Opt};
 use crate::lib::apps::{app_passwd, bio_open_owner, load_keyparams};
+use crate::lib::keygen;
 use crate::lib::opt::{self, Parser, eprintf, format};
 use crate::lib::{app_libctx, app_rand, engine, io};
 
@@ -93,7 +93,7 @@ pub fn main(argv: &[String]) -> i32 {
         eprintf!("unable to set up for key generation\n");
         return fail();
     }
-    let Some(pkey) = app_keygen(&ctx, Some("DSA"), nbits, verbose) else {
+    let Some(pkey) = keygen::app_keygen(&ctx, Some("DSA"), nbits, verbose) else {
         return fail();
     };
     let pass = passout.as_ref().map(|p| p.as_str());

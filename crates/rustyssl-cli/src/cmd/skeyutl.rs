@@ -5,30 +5,11 @@
 
 use std::io::Write;
 
-use rustyssl_ossl::params::{Params, ParamsRef};
 use rustyssl_ossl::skey::{Skey, SkeyMgmt};
 
 use crate::generated::options::skeyutl::{OPTIONS, Opt};
 use crate::lib::opt::{self, Parser, eprintf};
-use crate::lib::{app_libctx, io};
-
-/// `app_params_new_from_opts`: `None` without options, or (the message printed) on an
-/// option the descriptions don't accept.
-pub fn app_params_new_from_opts(opts: Option<&[String]>, defs: ParamsRef<'_>) -> Option<Params> {
-    let opts = opts?;
-    match Params::from_text(defs, opts) {
-        Ok(p) => Some(p),
-        Err(e) => {
-            eprintf!(
-                "Parameter {} '{}'\n",
-                if e.found { "error" } else { "unknown" },
-                e.opt
-            );
-            io::print_errors();
-            None
-        }
-    }
-}
+use crate::lib::{app_libctx, app_params, io};
 
 pub fn main(argv: &[String]) -> i32 {
     let ret = run(argv);
@@ -92,7 +73,9 @@ fn run(argv: &[String]) -> i32 {
     let Some(mgmt) = SkeyMgmt::fetch(lc.as_deref(), &name, pq.as_deref()) else {
         return 1;
     };
-    let params = app_params_new_from_opts(skeyopts.as_deref(), mgmt.gen_settable_params());
+    let params = skeyopts
+        .as_deref()
+        .and_then(|o| app_params::app_params_new_from_opts(o, mgmt.gen_settable_params()));
     let skey = Skey::generate(lc.as_deref(), &name, pq.as_deref(), params.as_ref());
     drop(params);
     let Some(skey) = skey else {

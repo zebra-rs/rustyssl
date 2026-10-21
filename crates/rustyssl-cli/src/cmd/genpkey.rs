@@ -1,7 +1,7 @@
 //! `openssl genpkey` (`apps/genpkey.c`).
 //!
-//! Also the key commands' shared generation helpers (fork G2): [`init_gen_str`] (genpkey.c),
-//! and `apps.c`'s [`app_keygen`], [`app_paramgen`], and [`mem_bio_to_file`].
+//! Also `genpkey.c`'s [`mem_bio_to_file`], which `pkey`, `pkeyparam` and others share
+//! (`init_gen_str`, `app_keygen` and `app_paramgen` are in `lib::keygen`).
 
 use std::ffi::c_int;
 
@@ -10,8 +10,7 @@ use rustyssl_ossl::abi::{
     OSSL_PARAM_INTEGER, OSSL_PARAM_OCTET_STRING, OSSL_PARAM_REAL, OSSL_PARAM_UNSIGNED_INTEGER,
     OSSL_PARAM_UTF8_STRING,
 };
-use rustyssl_ossl::pkey::{self, Pkey, PkeyCtx};
-use rustyssl_ossl::rand;
+use rustyssl_ossl::pkey::{Pkey, PkeyCtx};
 
 use super::pkey::opt_cipher;
 use crate::generated::options::genpkey::{OPTIONS, Opt};
@@ -19,88 +18,9 @@ use crate::lib::apps::{
     ConfigFile, app_load_config_modules, app_passwd, bio_open_owner, pkey_ctrl_string, strerror,
 };
 use crate::lib::engine::Engine;
-use crate::lib::opt::{self, Parser, eprintf, fmt_flags, format, prog};
+use crate::lib::keygen;
+use crate::lib::opt::{self, Parser, eprintf, fmt_flags, format};
 use crate::lib::{app_libctx, app_rand, engine, io};
-
-/// `init_gen_str`: a context for generating `algname` keys (or parameters), from an
-/// ENGINE's key method if one has it.
-pub fn init_gen_str(
-    pctx: &mut Option<PkeyCtx>,
-    algname: &str,
-    e: Option<&Engine>,
-    do_param: bool,
-) -> bool {
-    if pctx.is_some() {
-        eprintf!("Algorithm already set!\n");
-        return false;
-    }
-    let pkey_id = pkey::legacy_pkey_id(algname, e);
-    let ctx = if pkey_id != 0 {
-        PkeyCtx::new_id(pkey_id, e)
-    } else {
-        let lc = app_libctx::libctx();
-        let pq = app_libctx::propq();
-        PkeyCtx::from_name(lc.as_deref(), algname, pq.as_deref())
-    };
-    let ok = ctx.as_ref().is_some_and(|c| {
-        if do_param {
-            c.paramgen_init() > 0
-        } else {
-            c.keygen_init() > 0
-        }
-    });
-    if !ok {
-        eprintf!("Error initializing {algname} context\n");
-        io::print_errors();
-        return false;
-    }
-    *pctx = ctx;
-    true
-}
-
-/// `app_keygen`.
-pub fn app_keygen(ctx: &PkeyCtx, alg: Option<&str>, bits: c_int, verbose: bool) -> Option<Pkey> {
-    if verbose && let Some(a) = alg {
-        eprintf!("Generating {a} key");
-        if bits > 0 {
-            eprintf!(" with {bits} bits\n");
-        } else {
-            eprintf!("\n");
-        }
-    }
-    if !rand::status() {
-        eprintf!(
-            "Warning: generating random key material may take a long time\nif the system has a poor entropy source\n"
-        );
-    }
-    let (r, k) = ctx.keygen();
-    if r <= 0 {
-        eprintf!(
-            "{}: Error generating {} key\n",
-            prog(),
-            alg.unwrap_or("asymmetric")
-        );
-    }
-    k
-}
-
-/// `app_paramgen`.
-pub fn app_paramgen(ctx: &PkeyCtx, alg: Option<&str>) -> Option<Pkey> {
-    if !rand::status() {
-        eprintf!(
-            "Warning: generating random key parameters may take a long time\nif the system has a poor entropy source\n"
-        );
-    }
-    let (r, k) = ctx.paramgen();
-    if r <= 0 {
-        eprintf!(
-            "{}: Generating {} key parameters failed\n",
-            prog(),
-            alg.unwrap_or("asymmetric")
-        );
-    }
-    k
-}
 
 /// `mem_bio_to_file`: what the memory `BIO` holds, to `filename`.
 pub fn mem_bio_to_file(input: &Bio, filename: Option<&str>, fmt: i32, private: bool) -> bool {
@@ -287,7 +207,14 @@ pub fn main(argv: &[String]) -> i32 {
         return fail();
     }
     if let Some(a) = &algname
-        && !init_gen_str(&mut ctx, a, e.as_ref(), do_param)
+        && !keygen::init_gen_str(
+            &mut ctx,
+            a,
+            e.as_ref(),
+            do_param,
+            app_libctx::libctx().as_deref(),
+            app_libctx::propq().as_deref(),
+        )
     {
         return fail();
     }
@@ -334,9 +261,9 @@ pub fn main(argv: &[String]) -> i32 {
         ctx.set_app_bio(b);
     }
     let pkey = if do_param {
-        app_paramgen(&ctx, algname.as_deref())
+        keygen::app_paramgen(&ctx, algname.as_deref())
     } else {
-        app_keygen(&ctx, algname.as_deref(), 0, false)
+        keygen::app_keygen(&ctx, algname.as_deref(), 0, false)
     };
     let Some(pkey) = pkey else {
         return fail();

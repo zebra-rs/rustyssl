@@ -3,9 +3,9 @@
 use rustyssl_ossl::abi::OPENSSL_DSA_MAX_MODULUS_BITS;
 use rustyssl_ossl::pkey::PkeyCtx;
 
-use super::genpkey::{app_keygen, app_paramgen};
 use crate::generated::options::dsaparam::{OPTIONS, Opt};
 use crate::lib::apps::{bio_open_owner, load_keyparams};
+use crate::lib::keygen;
 use crate::lib::opt::{self, Parser, eprintf, fmt_flags, format};
 use crate::lib::{app_libctx, app_rand, engine, io};
 
@@ -124,7 +124,7 @@ fn run(argv: &[String]) -> i32 {
             eprintf!("Error, DSA key generation setting subprime bit length failed\n");
             return 1;
         }
-        app_paramgen(&ctx, Some("DSA"))
+        keygen::app_paramgen(&ctx, Some("DSA"))
     } else {
         load_keyparams(
             infile.as_deref(),
@@ -167,7 +167,7 @@ fn run(argv: &[String]) -> i32 {
             eprintf!("Error, unable to initialise for key generation\n");
             return 1;
         }
-        let Some(pkey) = app_keygen(&ctx, Some("DSA"), numbits, verbose) else {
+        let Some(pkey) = keygen::app_keygen(&ctx, Some("DSA"), numbits, verbose) else {
             return 1;
         };
         if outformat == format::ASN1 {

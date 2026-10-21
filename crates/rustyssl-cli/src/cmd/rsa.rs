@@ -11,7 +11,8 @@ use rustyssl_ossl::pkey::{Pkey, PkeyCtx};
 
 use super::pkey::opt_cipher;
 use crate::generated::options::rsa::{OPTIONS, Opt};
-use crate::lib::apps::{app_passwd, bio_open_owner, load_key, load_pubkey, strerror};
+use crate::lib::apps::perror;
+use crate::lib::apps::{app_passwd, bio_open_owner, load_key, load_pubkey};
 use crate::lib::opt::{self, Parser, eprintf, fmt_flags, format};
 use crate::lib::{app_libctx, engine, io};
 
@@ -20,15 +21,6 @@ const DEFAULT_PVK_ENCR_STRENGTH: i32 = 2;
 
 /// The PVK encoder's parameter.
 pub const PVK_ENCRYPT_LEVEL: &std::ffi::CStr = c"encrypt-level";
-
-/// C's `perror(s)`: `s: ` (when given) and `strerror(errno)`.
-pub fn perror(s: Option<&str>) {
-    let reason = strerror(std::io::Error::last_os_error().raw_os_error().unwrap_or(0));
-    match s {
-        Some(s) if !s.is_empty() => eprintf!("{s}: {reason}\n"),
-        _ => eprintf!("{reason}\n"),
-    };
-}
 
 /// `try_legacy_encoding`.
 fn try_legacy_encoding(pkey: &Pkey, outformat: i32, pubout: u8, out: &rustyssl_ossl::Bio) -> bool {

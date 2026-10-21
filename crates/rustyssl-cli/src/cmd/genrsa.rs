@@ -3,10 +3,10 @@
 use rustyssl_ossl::abi::{OPENSSL_RSA_MAX_MODULUS_BITS, RSA_3, RSA_F4};
 use rustyssl_ossl::bn::Bn;
 
-use super::genpkey::{app_keygen, init_gen_str};
 use super::pkey::opt_cipher;
 use crate::generated::options::genrsa::{OPTIONS, Opt};
 use crate::lib::apps::{app_passwd, bio_open_owner};
+use crate::lib::keygen;
 use crate::lib::opt::{self, Parser, eprintf, format};
 use crate::lib::{app_libctx, app_rand, engine, io};
 
@@ -90,7 +90,14 @@ fn run(argv: &[String]) -> i32 {
         return 1;
     };
     let mut ctx = None;
-    if !init_gen_str(&mut ctx, "RSA", eng.as_ref(), false) {
+    if !keygen::init_gen_str(
+        &mut ctx,
+        "RSA",
+        eng.as_ref(),
+        false,
+        app_libctx::libctx().as_deref(),
+        app_libctx::propq().as_deref(),
+    ) {
         return 1;
     }
     let Some(ctx) = ctx else {
@@ -119,7 +126,7 @@ fn run(argv: &[String]) -> i32 {
         eprintf!("Error setting number of primes\n");
         return 1;
     }
-    let Some(pkey) = app_keygen(&ctx, Some("RSA"), num, verbose) else {
+    let Some(pkey) = keygen::app_keygen(&ctx, Some("RSA"), num, verbose) else {
         return 1;
     };
     if verbose {

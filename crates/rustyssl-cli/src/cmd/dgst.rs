@@ -2,18 +2,18 @@
 
 use std::io::Write;
 
-use rustyssl_ossl::abi::{EVP_PKEY_HMAC, NID_undef, OBJ_NAME_TYPE_MD_METH, SN_sha256};
+use rustyssl_ossl::Bio;
+use rustyssl_ossl::abi::{EVP_PKEY_HMAC, OBJ_NAME_TYPE_MD_METH, SN_sha256};
 use rustyssl_ossl::evp::{self, Md, MdCtxRef};
-use rustyssl_ossl::pkey::{self, MdCtx, Pkey, PkeyCtx};
-use rustyssl_ossl::provider::LibCtx;
-use rustyssl_ossl::{Bio, rand};
+use rustyssl_ossl::pkey::{MdCtx, Pkey};
 
 use crate::generated::options::dgst::{OPTIONS, Opt};
 use crate::lib::apps::{
     app_passwd, bio_open_default, bio_to_mem, load_key, load_pubkey, pkey_ctrl_string, strerror,
 };
 use crate::lib::engine::{Engine, setup_engine};
-use crate::lib::opt::{self, Parser, eprintf, fmt_flags, format, prog};
+use crate::lib::keygen;
+use crate::lib::opt::{self, Parser, eprintf, fmt_flags, format};
 use crate::lib::{app_libctx, app_rand, io};
 
 /// `BUFSIZE`: the I/O buffer.
@@ -21,68 +21,6 @@ const BUFSIZE: usize = 1024 * 8;
 
 /// The key of the OpenSSL-FIPS fingerprint (`-fips-fingerprint`).
 const FIPS_FINGERPRINT_KEY: &str = "etaonrishdlcupfm";
-
-/// `init_gen_str` of `apps/genpkey.c` (shared with `genpkey`, `genrsa`, `speed`; kept here
-/// until it moves to `src/lib/`): a key (or parameter) generation context for `algname`.
-pub(crate) fn init_gen_str(
-    algname: &str,
-    e: Option<&Engine>,
-    do_param: bool,
-    libctx: Option<&LibCtx>,
-    propq: Option<&str>,
-) -> Option<PkeyCtx> {
-    let id = pkey::legacy_pkey_id(algname, e);
-    let ctx = if id != NID_undef {
-        PkeyCtx::new_id(id, e)
-    } else {
-        PkeyCtx::from_name(libctx, algname, propq)
-    };
-    let ok = ctx.as_ref().is_some_and(|c| {
-        if do_param {
-            c.paramgen_init() > 0
-        } else {
-            c.keygen_init() > 0
-        }
-    });
-    if !ok {
-        eprintf!("Error initializing {algname} context\n");
-        io::print_errors();
-        return None;
-    }
-    ctx
-}
-
-/// `app_keygen` of `apps/lib/apps.c` (shared with `genpkey` and others; kept here until it
-/// moves to `src/lib/`).
-pub(crate) fn app_keygen(
-    ctx: &PkeyCtx,
-    alg: Option<&str>,
-    bits: i32,
-    verbose: bool,
-) -> Option<Pkey> {
-    if verbose && let Some(alg) = alg {
-        if bits > 0 {
-            eprintf!("Generating {alg} key with {bits} bits\n");
-        } else {
-            eprintf!("Generating {alg} key\n");
-        }
-    }
-    if !rand::status() {
-        eprintf!(
-            "Warning: generating random key material may take a long time\n\
-             if the system has a poor entropy source\n"
-        );
-    }
-    let (r, key) = ctx.keygen();
-    if r <= 0 {
-        eprintf!(
-            "{}: Error generating {} key\n",
-            prog(),
-            alg.unwrap_or("asymmetric")
-        );
-    }
-    key
-}
 
 /// `show_digests`: one `-list` entry per usable digest, three to a line.
 fn show_digests(out: &mut String, n: &mut i32) {
@@ -300,7 +238,11 @@ fn run(argv: &[String]) -> i32 {
     }
 
     if let Some(mac_name) = &mac_name {
-        let Some(mac_ctx) = init_gen_str(mac_name, impl_, false, None, None) else {
+        let mut mac_ctx = None;
+        if !keygen::init_gen_str(&mut mac_ctx, mac_name, impl_, false, None, None) {
+            return fail();
+        }
+        let Some(mac_ctx) = mac_ctx else {
             return fail();
         };
         for macopt in &macopts {
@@ -311,7 +253,7 @@ fn run(argv: &[String]) -> i32 {
             }
         }
         // Not verbose: the output would break gost-engine's external tests.
-        sigkey = app_keygen(&mac_ctx, Some(mac_name), 0, false);
+        sigkey = keygen::app_keygen(&mac_ctx, Some(mac_name), 0, false);
         drop(mac_ctx);
         if sigkey.is_none() {
             return fail();

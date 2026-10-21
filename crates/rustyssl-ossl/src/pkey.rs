@@ -1020,80 +1020,7 @@ impl Pkey {
     }
 }
 
-crate::handle!(
-    /// An owned `EVP_PKEY_CTX` for generating a key (`req -newkey`).
-    KeygenCtx, EVP_PKEY_CTX, EVP_PKEY_CTX_free
-);
-
-/// The keygen progress callback (`EVP_PKEY_gen_cb`), in Rust: it gets
-/// `EVP_PKEY_CTX_get_keygen_info(ctx, 0)`.
-pub type ProgressCb = fn(core::ffi::c_int);
-
-static PROGRESS_CB: std::sync::Mutex<Option<ProgressCb>> = std::sync::Mutex::new(None);
-
-unsafe extern "C" fn progress_trampoline(ctx: *mut EVP_PKEY_CTX) -> core::ffi::c_int {
-    let cb = PROGRESS_CB.lock().map(|g| *g).unwrap_or(None);
-    if let Some(cb) = cb {
-        // SAFETY: the library passes its live context.
-        let p = unsafe { ffi::EVP_PKEY_CTX_get_keygen_info(ctx, 0) };
-        let _ = std::panic::catch_unwind(|| cb(p));
-    }
-    1
-}
-
-impl KeygenCtx {
-    /// `EVP_PKEY_CTX_new_from_name(libctx, name, propq)`.
-    pub fn from_name(libctx: Option<&LibCtx>, name: &str, propq: Option<&str>) -> Option<Self> {
-        let n = cstring(name)?;
-        let pq = match propq {
-            Some(p) => Some(cstring(p)?),
-            None => None,
-        };
-        let ctx = libctx.map_or(core::ptr::null_mut(), LibCtx::as_ptr);
-        // SAFETY: ctx is NULL or live; the strings are valid or NULL.
-        Self::from_ptr(unsafe {
-            ffi::EVP_PKEY_CTX_new_from_name(
-                ctx,
-                n.as_ptr(),
-                pq.as_ref().map_or(core::ptr::null(), |p| p.as_ptr()),
-            )
-        })
-    }
-
-    /// `EVP_PKEY_CTX_new_from_pkey(libctx, pkey, propq)`.
-    pub fn from_pkey(libctx: Option<&LibCtx>, pkey: &Pkey, propq: Option<&str>) -> Option<Self> {
-        let pq = match propq {
-            Some(p) => Some(cstring(p)?),
-            None => None,
-        };
-        let ctx = libctx.map_or(core::ptr::null_mut(), LibCtx::as_ptr);
-        // SAFETY: all are live or NULL.
-        Self::from_ptr(unsafe {
-            ffi::EVP_PKEY_CTX_new_from_pkey(
-                ctx,
-                pkey.as_ptr(),
-                pq.as_ref().map_or(core::ptr::null(), |p| p.as_ptr()),
-            )
-        })
-    }
-
-    /// `EVP_PKEY_CTX_new(pkey, e)`.
-    pub fn with_engine(pkey: &Pkey, e: &crate::engine::Engine) -> Option<Self> {
-        // SAFETY: both are live.
-        Self::from_ptr(unsafe { ffi::EVP_PKEY_CTX_new(pkey.as_ptr(), e.as_ptr()) })
-    }
-
-    /// `EVP_PKEY_CTX_new_id(id, e)`.
-    pub fn from_id(id: core::ffi::c_int, e: &crate::engine::Engine) -> Option<Self> {
-        // SAFETY: the engine is live.
-        Self::from_ptr(unsafe { ffi::EVP_PKEY_CTX_new_id(id, e.as_ptr()) })
-    }
-
-    /// The context, borrowed (for `pkey_ctrl_string`).
-    pub fn as_ref(&self) -> PkeyCtxRef<'_> {
-        PkeyCtxRef(self.as_ptr(), core::marker::PhantomData)
-    }
-
+impl PkeyCtx {
     /// `EVP_PKEY_CTX_is_a`.
     pub fn is_a(&self, name: &str) -> bool {
         let Some(n) = cstring(name) else {
@@ -1101,12 +1028,6 @@ impl KeygenCtx {
         };
         // SAFETY: the context is live; n is a valid C string.
         unsafe { ffi::EVP_PKEY_CTX_is_a(self.as_ptr(), n.as_ptr()) == 1 }
-    }
-
-    /// `EVP_PKEY_keygen_init`: what it returns.
-    pub fn keygen_init(&self) -> core::ffi::c_int {
-        // SAFETY: the context is live.
-        unsafe { ffi::EVP_PKEY_keygen_init(self.as_ptr()) }
     }
 
     /// `EVP_PKEY_CTX_set_params` with `OSSL_PKEY_PARAM_BITS` (a `size_t`): what it returns.
@@ -1121,24 +1042,6 @@ impl KeygenCtx {
         let params = [first, end];
         // SAFETY: the context is live; params is a terminated array.
         unsafe { ffi::EVP_PKEY_CTX_set_params(self.as_ptr(), params.as_ptr()) }
-    }
-
-    /// `EVP_PKEY_CTX_set_cb(ctx, progress)`, with `cb` the Rust callback (one per program).
-    pub fn set_progress_cb(&self, cb: ProgressCb) {
-        if let Ok(mut g) = PROGRESS_CB.lock() {
-            *g = Some(cb);
-        }
-        // SAFETY: the context is live; the trampoline has the callback's C type.
-        unsafe { ffi::EVP_PKEY_CTX_set_cb(self.as_ptr(), Some(progress_trampoline)) };
-    }
-
-    /// `EVP_PKEY_keygen`: the key, if it worked.
-    pub fn keygen(&self) -> Option<Pkey> {
-        let mut k: *mut EVP_PKEY = core::ptr::null_mut();
-        // SAFETY: the context is live; k is a valid out-pointer.
-        let r = unsafe { ffi::EVP_PKEY_keygen(self.as_ptr(), &mut k) };
-        let key = Pkey::from_raw(k);
-        if r <= 0 { None } else { key }
     }
 }
 
@@ -1179,12 +1082,6 @@ impl Pkey {
             )
         }
     }
-}
-
-/// `RAND_status()`.
-pub fn rand_status() -> bool {
-    // SAFETY: no arguments.
-    unsafe { ffi::RAND_status() == 1 }
 }
 
 /// A C `int` for a length the C API takes as one; `None` if it doesn't fit.

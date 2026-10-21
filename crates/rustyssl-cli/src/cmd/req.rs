@@ -11,7 +11,7 @@ use rustyssl_ossl::abi::{
 use rustyssl_ossl::conf::Conf;
 use rustyssl_ossl::engine::{self, Engine};
 use rustyssl_ossl::evp::Cipher;
-use rustyssl_ossl::pkey::{self, KeygenCtx, Pkey};
+use rustyssl_ossl::pkey::{Pkey, PkeyCtx};
 use rustyssl_ossl::x509::{self, Cert, Integer, Name, Req, V3Ctx};
 use rustyssl_ossl::{Bio, err};
 
@@ -29,6 +29,7 @@ use crate::lib::apps::{
 use crate::lib::ca_db::rand_serial;
 use crate::lib::engine::setup_engine;
 use crate::lib::io;
+use crate::lib::keygen;
 use crate::lib::opt::{self, Parser, eprintf, fmt_flags, format};
 
 const BITS: &str = "default_bits";
@@ -58,46 +59,6 @@ pub fn main(argv: &[String]) -> i32 {
         io::print_errors();
     }
     ret
-}
-
-/// `progress_cb` of `s_cb.c`: one character per keygen step, to standard error.
-fn progress_cb(p: core::ffi::c_int) {
-    const SYMBOLS: &[u8] = b".+*\n";
-    let c = usize::try_from(p)
-        .ok()
-        .and_then(|i| SYMBOLS.get(i))
-        .copied()
-        .unwrap_or(b'?');
-    if let Some(b) = io::bio_err() {
-        let _ = b.write_all(&[c]);
-        b.flush();
-    }
-}
-
-/// `app_keygen`.
-fn app_keygen(ctx: &KeygenCtx, alg: Option<&str>, bits: i32, verbose: bool) -> Option<Pkey> {
-    if verbose && let Some(a) = alg {
-        eprintf!("Generating {a} key");
-        if bits > 0 {
-            eprintf!(" with {bits} bits\n");
-        } else {
-            eprintf!("\n");
-        }
-    }
-    if !pkey::rand_status() {
-        eprintf!(
-            "Warning: generating random key material may take a long time\nif the system has a poor entropy source\n"
-        );
-    }
-    let k = ctx.keygen();
-    if k.is_none() {
-        eprintf!(
-            "{}: Error generating {} key\n",
-            opt::prog(),
-            alg.unwrap_or("asymmetric")
-        );
-    }
-    k
 }
 
 /// `duplicated`: whether the `-addext` key is already given: `Ok(false)` if unique,
@@ -144,7 +105,7 @@ fn set_keygen_ctx(
     gstr: Option<&str>,
     pkeylen: &mut i64,
     keygen_engine: Option<&Engine>,
-) -> Option<(KeygenCtx, String)> {
+) -> Option<(PkeyCtx, String)> {
     let mut keylen: i64 = -1;
     let mut keytype: Option<String> = None;
     let mut expect_paramfile = false;
@@ -219,8 +180,8 @@ fn set_keygen_ctx(
             return None;
         }
         let g = match keygen_engine {
-            Some(e) => KeygenCtx::with_engine(p, e),
-            None => KeygenCtx::from_pkey(lc.as_deref(), p, pq.as_deref()),
+            Some(e) => PkeyCtx::new(p, Some(e)),
+            None => PkeyCtx::from_pkey(lc.as_deref(), Some(p), pq.as_deref()),
         };
         *pkeylen = i64::from(p.bits());
         g
@@ -229,12 +190,12 @@ fn set_keygen_ctx(
             Some(e) => {
                 let id = engine::legacy_pkey_id(&keytype, Some(e));
                 if id != 0 {
-                    KeygenCtx::from_id(id, e)
+                    PkeyCtx::new_id(id, Some(e))
                 } else {
                     None
                 }
             }
-            None => KeygenCtx::from_name(lc.as_deref(), &keytype, pq.as_deref()),
+            None => PkeyCtx::from_name(lc.as_deref(), &keytype, pq.as_deref()),
         }
     };
     let Some(gctx) = gctx else {
@@ -940,17 +901,20 @@ fn run(argv: &[String]) -> i32 {
             );
         }
         for genopt in &pkeyopts {
-            if pkey_ctrl_string(genctx.as_ref(), genopt) <= 0 {
+            if pkey_ctrl_string(genctx.borrow(), genopt) <= 0 {
                 eprintf!("Key parameter error \"{genopt}\"\n");
                 return 1;
             }
         }
+        if let Some(b) = io::bio_err() {
+            genctx.set_app_bio(b);
+        }
         if progress {
-            genctx.set_progress_cb(progress_cb);
+            genctx.set_progress_cb();
         }
         // C passes the long to an int.
         let bits = i32::try_from(newkey_len).unwrap_or(i32::MAX);
-        pkey = app_keygen(&genctx, Some(&keyalgstr), bits, verbose);
+        pkey = keygen::app_keygen(&genctx, Some(&keyalgstr), bits, verbose);
         if pkey.is_none() {
             return 1;
         }

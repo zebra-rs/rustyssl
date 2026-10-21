@@ -28,12 +28,13 @@ use rustyssl_ossl::abi::{
 use rustyssl_ossl::async_job::{self, Failure, Jobs};
 use rustyssl_ossl::evp::{self, Cipher, CipherCtx, Mac, MacCtx, Signature};
 use rustyssl_ossl::params::ParamValues;
-use rustyssl_ossl::pkey::{self, MdCtx, Pkey, PkeyCtx};
+use rustyssl_ossl::pkey::{MdCtx, Pkey, PkeyCtx};
 use rustyssl_ossl::{crypto, err, os, rand};
 
 use crate::generated::options::speed::{OPTIONS, Opt};
 use crate::lib::apps::{ConfigFile, app_bail_out, app_load_config_modules};
 use crate::lib::engine::{self, Engine};
+use crate::lib::keygen;
 use crate::lib::opt::{self, Parser, eprintf};
 use crate::lib::{app_libctx, app_rand, io};
 
@@ -1636,25 +1637,6 @@ fn stop_it(doit: &mut [u8], test_num: usize) {
     }
 }
 
-/// `init_gen_str(&genctx, algname, NULL, 0, NULL, NULL)` of `genpkey.c` (a key generation
-/// context, with its message on failure); shared with `genpkey` and `req` upstream.
-fn init_gen_str(algname: &str) -> Option<PkeyCtx> {
-    let id = pkey::legacy_pkey_id(algname, None);
-    let ctx = if id != rustyssl_ossl::abi::NID_undef {
-        PkeyCtx::new_id(id, None)
-    } else {
-        PkeyCtx::from_name(None, algname, None)
-    };
-    match ctx {
-        Some(c) if c.keygen_init() > 0 => Some(c),
-        _ => {
-            eprintf!("Error initializing {algname} context\n");
-            io::print_errors();
-            None
-        }
-    }
-}
-
 /// Writes to standard output (`printf`).
 fn out(text: &str) {
     let _ = io::out().write_all(text.as_bytes());
@@ -3215,7 +3197,12 @@ fn asymmetric(
         let bits = at(&RSA_BITS, t);
         let rsa_key = if primes > RSA_DEFAULT_PRIME_NUM {
             // Multi-prime keys, generated.
-            init_gen_str("RSA").and_then(|genctx| {
+            {
+                let mut genctx = None;
+                keygen::init_gen_str(&mut genctx, "RSA", None, false, None, None);
+                genctx
+            }
+            .and_then(|genctx| {
                 if genctx.set_rsa_keygen_bits(i32::try_from(bits).unwrap_or(i32::MAX)) > 0
                     && genctx
                         .set1_rsa_keygen_pubexp_word(

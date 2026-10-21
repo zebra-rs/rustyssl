@@ -7,8 +7,9 @@ use rustyssl_ossl::encoder::Encoder;
 use rustyssl_ossl::params::ParamList;
 
 use super::pkey::opt_cipher;
-use super::rsa::{PVK_ENCRYPT_LEVEL, perror};
+use super::rsa::PVK_ENCRYPT_LEVEL;
 use crate::generated::options::dsa::{OPTIONS, Opt};
+use crate::lib::apps::perror;
 use crate::lib::apps::{app_passwd, bio_open_owner, load_key, load_pubkey};
 use crate::lib::opt::{self, Parser, eprintf, fmt_flags, format};
 use crate::lib::{app_libctx, engine, io};
