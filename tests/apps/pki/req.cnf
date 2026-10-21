@@ -1,0 +1,101 @@
+# Configurations for the req corpus. [req] doesn't prompt; [ask] prompts (answers on standard
+# input, or the _value entries); [bad] has a broken extension section.
+oid_section = new_oids
+
+[ new_oids ]
+myOID = 1.2.3.4.5
+
+[ req ]
+prompt = no
+distinguished_name = dn
+attributes = attrs
+x509_extensions = v3_ca
+req_extensions = v3_req
+default_md = sha256
+string_mask = utf8only
+
+[ dn ]
+C = JP
+O = rustyssl
+1.OU = One
+2.OU = Two
++CN = multi
+CN = req.example
+emailAddress = req@example.com
+
+[ attrs ]
+challengePassword = secret
+unstructuredName = An Org
+
+[ v3_req ]
+basicConstraints = CA:FALSE
+keyUsage = digitalSignature, keyEncipherment
+subjectAltName = DNS:req.example
+
+[ v3_ca ]
+basicConstraints = critical, CA:TRUE
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always, issuer
+keyUsage = keyCertSign, cRLSign
+
+[ ask ]
+distinguished_name = ask_dn
+attributes = ask_attrs
+input_password = 12345
+encrypt_key = no
+
+[ ask_dn ]
+countryName = Country Name (2 letter code)
+countryName_default = AU
+countryName_min = 2
+countryName_max = 2
+organizationName = Organization Name (eg, company)
+organizationName_default = Internet Widgits Pty Ltd
+0.organizationalUnitName = Organizational Unit Name (eg, section)
+commonName = Common Name (e.g. server FQDN or YOUR name)
+commonName_max = 64
+emailAddress = Email Address
+emailAddress_value = fixed@example.com
+nosuchfield = Ignored
+myOID = My OID
+
+[ ask_attrs ]
+challengePassword = A challenge password
+challengePassword_min = 4
+challengePassword_max = 20
+unstructuredName = An optional company name
+
+[ empty ]
+distinguished_name = empty_dn
+prompt = no
+
+[ empty_dn ]
+
+[ nodn ]
+prompt = no
+distinguished_name = missing_section
+
+[ bad ]
+prompt = no
+distinguished_name = dn
+x509_extensions = bad_ext
+req_extensions = bad_ext
+
+[ bad_ext ]
+basicConstraints = nonsense
+
+[ mask ]
+prompt = no
+distinguished_name = dn
+string_mask = nonsense
+
+[ utf8 ]
+prompt = no
+utf8 = yes
+distinguished_name = dn_utf8
+
+[ dn_utf8 ]
+CN = Ünïcødé
+
+[ params ]
+default_bits = 1024

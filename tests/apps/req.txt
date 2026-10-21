@@ -1,0 +1,133 @@
+# `openssl req` (cargo xtask test-apps: upstream's tool on the reference, then ours on rustyssl
+# and on the reference). Requests and certificates are signed with RSA keys (deterministic),
+# with fixed dates and serials; new keys are generated with -quiet and written to files, so
+# what is printed is the same. pki/req.cnf holds the configurations; prompts read standard
+# input (pki/req-answers*.txt).
+req -help
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -text
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -text -noout -reqopt no_pubkey,no_sigdump
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -text -noout -reqopt nosuchopt
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -noout -subject -nameopt RFC2253
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -noout -subject -nameopt bad
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -noout -pubkey -modulus
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/server-ecdsa-key.pem -noout -modulus -subject
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -newhdr
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -outform DER -out {dir}/req.der
+req -config {tests}/pki/req.cnf -in {dir}/req.der -inform DER -noout -subject -verify
+req -config {tests}/pki/req.cnf -in {dir}/req.der -noout -subject
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -outform XYZ
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -sha512 -noout -text -reqopt no_pubkey
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -nosuchdigest
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -sigopt rsa_padding_mode:pss -noout -text -reqopt no_pubkey,no_sigdump
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -sigopt bad:value
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -subj /CN=override/O=x -noout -subject
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -subj /CN=a+OU=b -multivalue-rdn -noout -subject
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -subj CN=noslash
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -subj /CN=Ünï -utf8 -noout -subject
+req -config {tests}/pki/req.cnf -section utf8 -new -key {src}/test/certs/ee-key.pem -noout -subject
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -extensions v3_ca -noout -text -reqopt no_pubkey,no_sigdump
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -reqexts v3_req -addext subjectAltName=DNS:extra.example -noout -text
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -addext keyUsage=critical,digitalSignature -addext " extendedKeyUsage = serverAuth" -noout -text -reqopt no_pubkey,no_sigdump
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -addext keyUsage=digitalSignature -addext "keyUsage =nonRepudiation"
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -addext keyUsage
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -addext =x
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -addext basicConstraints=nonsense
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -extensions nosuchsection
+req -config {tests}/pki/req.cnf -section bad -new -key {src}/test/certs/ee-key.pem
+req -config {tests}/pki/req.cnf -section bad -x509 -key {src}/test/certs/ee-key.pem
+req -config {tests}/pki/req.cnf -section mask -new -key {src}/test/certs/ee-key.pem
+req -config {tests}/pki/req.cnf -section empty -new -key {src}/test/certs/ee-key.pem
+req -config {tests}/pki/req.cnf -section nodn -new -key {src}/test/certs/ee-key.pem
+req -config {tests}/pki/req.cnf -section nosuch -new -key {src}/test/certs/ee-key.pem
+req -config {tests}/pki/req.cnf -section ask -new -key {src}/test/certs/ee-key.pem -noout -subject -text -reqopt no_pubkey,no_sigdump < {tests}/pki/req-answers.txt
+req -config {tests}/pki/req.cnf -section ask -new -key {src}/test/certs/ee-key.pem -noout -subject < {tests}/pki/req-answers2.txt
+req -config {tests}/pki/req.cnf -section ask -new -key {src}/test/certs/ee-key.pem -noout -subject < {tests}/pki/req-answers3.txt
+req -config {tests}/pki/req.cnf -section ask -new -key {src}/test/certs/ee-key.pem -noout -subject
+req -config {tests}/pki/req.cnf -section ask -new -key {src}/test/certs/ee-key.pem -batch -noout -subject -text -reqopt no_pubkey,no_sigdump
+req -config {tests}/pki/req.cnf -section ask -x509 -key {src}/test/certs/ee-key.pem -batch -noout -subject -set_serial 1 -not_before 20250101000000Z -not_after 20350101000000Z
+req -config {tests}/pki/req.cnf -section ask -new -key {src}/test/certs/key-pass-12345.pem -batch -noout -subject
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/key-pass-12345.pem -passin pass:12345 -noout -subject
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/key-pass-12345.pem -passin pass:wrong
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/key-pass-12345.pem -passin bad
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -keyform PEM -noout -subject
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -keyform XYZ
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/nonexistent.pem
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -keyout {dir}/req-key.pem -noenc -noout -subject
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -keyout {dir}/req-key.pem -passout pass:secret -cipher aes-128-cbc -noout
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -keyout {dir}/req-key.pem -passout pass:secret -cipher nosuchcipher
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -keyout {dir}/req-key.pem -verbose -nodes -noout
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -keyout {dir}/samefile.pem -out {dir}/samefile.pem -nodes
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -keyout {dir}/nonexistent/k.pem -nodes
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -keyout -
+req -config {tests}/pki/req.cnf -newkey rsa:1024 -quiet -keyout {dir}/rsa.key -noenc -noout -subject
+req -config {tests}/pki/req.cnf -newkey 1024 -quiet -keyout {dir}/rsa.key -noenc -noout -subject
+req -config {tests}/pki/req.cnf -new -quiet -keyout {dir}/rsa.key -noenc -noout -subject -section params
+req -config {tests}/pki/req.cnf -newkey rsa:256 -quiet -keyout {dir}/rsa.key -noenc
+req -config {tests}/pki/req.cnf -newkey ec:{tests}/pki/p256.param -quiet -keyout {dir}/ec.key -noenc -noout -subject
+req -config {tests}/pki/req.cnf -newkey param:{tests}/pki/p256.param -quiet -keyout {dir}/ec.key -noenc -noout -subject
+req -config {tests}/pki/req.cnf -newkey param:{src}/test/certs/server-ecdsa-cert.pem -quiet -keyout {dir}/ec.key -noenc -noout -subject
+req -config {tests}/pki/req.cnf -newkey param -quiet
+req -config {tests}/pki/req.cnf -newkey rsa:{tests}/pki/p256.param -quiet
+req -config {tests}/pki/req.cnf -newkey ec:{dir}/nonexistent.param -quiet
+req -config {tests}/pki/req.cnf -newkey ed25519 -quiet -keyout {dir}/ed.key -noenc -noout -subject
+req -config {tests}/pki/req.cnf -newkey ed25519 -quiet -keyout {dir}/ed.key -noenc -verbose -noout -subject
+req -config {tests}/pki/req.cnf -newkey nosuchalg -quiet
+req -config {tests}/pki/req.cnf -newkey ec -pkeyopt ec_paramgen_curve:P-384 -quiet -keyout {dir}/ec.key -noenc -noout -subject
+req -config {tests}/pki/req.cnf -newkey ec -pkeyopt nosuch:1 -quiet
+req -config {tests}/pki/req.cnf -newkey rsa:1024 -key {src}/test/certs/ee-key.pem -noout -subject
+req -config {tests}/pki/req.cnf -new -keyout {dir}/rsa.key -newkey rsa:1024 -quiet -noenc -precert -noout -subject
+req -config {tests}/pki/req.cnf -x509 -key {src}/test/certs/ee-key.pem -set_serial 1 -not_before 20250101000000Z -not_after 20350101000000Z
+req -config {tests}/pki/req.cnf -x509 -key {src}/test/certs/ee-key.pem -set_serial 1 -not_before 20250101000000Z -not_after 20350101000000Z -text -noout
+req -config {tests}/pki/req.cnf -x509 -key {src}/test/certs/ee-key.pem -set_serial 1 -not_before 20250101000000Z -not_after 20350101000000Z -precert -text -noout -reqopt no_pubkey,no_sigdump
+req -config {tests}/pki/req.cnf -x509v1 -key {src}/test/certs/ee-key.pem -set_serial 1 -not_before 20250101000000Z -not_after 20350101000000Z -text -noout -reqopt no_pubkey,no_sigdump
+req -config {tests}/pki/req.cnf -x509 -key {src}/test/certs/ee-key.pem -set_serial 1 -not_before 20250101000000Z -not_after 20350101000000Z -outform DER -noout -subject -modulus -pubkey
+req -config {tests}/pki/req.cnf -x509 -key {src}/test/certs/ee-key.pem -set_serial 1 -not_before 20250101000000Z -not_after 20350101000000Z -addext subjectAltName=DNS:x.example -extensions v3_req -text -noout -reqopt no_pubkey,no_sigdump
+req -config {tests}/pki/req.cnf -x509 -key {src}/test/certs/ee-key.pem -set_serial 1 -days 10 -not_after 20350101000000Z -not_before 20250101000000Z -noout -subject
+req -config {tests}/pki/req.cnf -x509 -key {src}/test/certs/ee-key.pem -set_serial 1 -not_before 20350101000000Z -not_after 20250101000000Z
+req -config {tests}/pki/req.cnf -x509 -key {src}/test/certs/ee-key.pem -set_serial 1 -not_before bad
+req -config {tests}/pki/req.cnf -x509 -key {src}/test/certs/ee-key.pem -days -5
+req -config {tests}/pki/req.cnf -x509 -key {src}/test/certs/ee-key.pem -days 0
+req -config {tests}/pki/req.cnf -x509 -key {src}/test/certs/ee-key.pem -set_serial 1 -set_serial 2
+req -config {tests}/pki/req.cnf -x509 -key {src}/test/certs/ee-key.pem -set_serial zz
+req -config {tests}/pki/req.cnf -x509 -key {src}/test/certs/ee-key.pem -not_before 20250101000000Z -not_after 20350101000000Z -noout -subject -text -certopt no_serial
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -days 3 -not_before 20250101000000Z -not_after 20350101000000Z -copy_extensions none -noout -subject
+req -config {tests}/pki/req.cnf -x509 -in {tests}/pki/ee.csr -key {src}/test/certs/ee-key.pem -set_serial 9 -not_before 20250101000000Z -not_after 20350101000000Z -text -noout -reqopt no_pubkey,no_sigdump
+req -config {tests}/pki/req.cnf -x509 -in {tests}/pki/ee.csr -key {src}/test/certs/ee-key.pem -set_serial 9 -not_before 20250101000000Z -not_after 20350101000000Z -copy_extensions copyall -text -noout -reqopt no_pubkey,no_sigdump
+req -config {tests}/pki/req.cnf -x509 -in {tests}/pki/ee.csr -key {src}/test/certs/ee-key.pem -set_serial 9 -copy_extensions bad
+req -config {tests}/pki/req.cnf -x509 -in {tests}/pki/ee.csr -CA {src}/test/certs/ca-cert.pem -CAkey {src}/test/certs/ca-key.pem -set_serial 9 -not_before 20250101000000Z -not_after 20350101000000Z -copy_extensions copy -text
+req -config {tests}/pki/req.cnf -in {tests}/pki/ee.csr -CA {src}/test/certs/ca-cert.pem -CAkey {src}/test/certs/ca-key.pem -key {src}/test/certs/ee-key.pem -set_serial 9 -not_before 20250101000000Z -not_after 20350101000000Z -noout -subject
+req -config {tests}/pki/req.cnf -in {tests}/pki/ee.csr -CA {src}/test/certs/ca-cert.pem -CAkey {src}/test/certs/root-key.pem
+req -config {tests}/pki/req.cnf -in {tests}/pki/ee.csr -CA {src}/test/certs/ca-cert.pem
+req -config {tests}/pki/req.cnf -in {tests}/pki/ee.csr -CAkey {src}/test/certs/ca-key.pem -noout -subject
+req -config {tests}/pki/req.cnf -x509 -in {tests}/pki/ee.csr -set_serial 9
+req -config {tests}/pki/req.cnf -in {tests}/pki/ee.csr -noout -text -verify
+req -config {tests}/pki/req.cnf -in {tests}/pki/ee.csr -verify -key {src}/test/certs/root-key.pem -noout
+req -config {tests}/pki/req.cnf -in {tests}/pki/ee.csr -subj /CN=changed -noout -subject -verify
+req -config {tests}/pki/req.cnf -in {tests}/pki/ee.csr -subj /CN=changed -verbose -noout -subject
+req -config {tests}/pki/req.cnf -in {tests}/pki/ee.csr -new -key {src}/test/certs/ee-key.pem -noout -subject
+req -config {tests}/pki/req.cnf -in {src}/test/certs/sm2-csr.pem -vfyopt distid:1234567812345678 -verify -noout
+req -config {tests}/pki/req.cnf -in {src}/test/certs/sm2-csr.pem -verify -noout
+req -config {tests}/pki/req.cnf -in {src}/test/certs/x509-check.csr -noout -text
+req -config {tests}/pki/req.cnf -in {src}/test/testreq2.pem -noout -text
+req -config {tests}/pki/req.cnf -in {src}/test/certs/ee-cert.pem
+req -config {tests}/pki/req.cnf -in {dir}/nonexistent.csr
+req -config {tests}/pki/req.cnf -noout -subject < {tests}/pki/ee.csr
+req -config {tests}/pki/req.cnf -in {tests}/pki/ee.csr -pubkey -noout
+req -config {tests}/pki/req.cnf -in {tests}/pki/ee.csr -out {dir}/copy.csr
+req -config {tests}/pki/req.cnf -in {tests}/pki/ee.csr -outform DER -out {dir}/copy.der
+req -config {dir}/nonexistent.cnf -new -key {src}/test/certs/ee-key.pem
+req -config {txt} -new -key {src}/test/certs/ee-key.pem
+req -new -key {src}/test/certs/ee-key.pem
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -rand {txt} -writerand {dir}/req.rnd -noout -subject
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -provider default -propquery provider=default -noout -subject
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -provider-path {dir} -provider default -noout -subject
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem extra
+req -nosuchoption
+req -keyout
+# Key generation with progress output, or the new key printed: random, so only success counts.
+~req -config {tests}/pki/req.cnf -newkey rsa:1024 -keyout {dir}/rsa.key -noenc -noout -subject
+~req -config {tests}/pki/req.cnf -newkey rsa:1024 -noenc -verbose
+~req -config {tests}/pki/req.cnf -newkey rsa:1024 -passout pass:pw -x509 -days 1
+~req -config {tests}/pki/req.cnf -newkey ec:{tests}/pki/p256.param -nodes -x509 -CA {src}/test/certs/ca-cert.pem -CAkey {src}/test/certs/ca-key.pem
+~req -config {tests}/pki/req.cnf -section ask -newkey ed25519 -batch

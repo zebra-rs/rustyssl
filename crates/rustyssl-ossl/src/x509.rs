@@ -1916,3 +1916,129 @@ impl Integer {
         (ok == 1).then_some(ai)
     }
 }
+
+impl Req {
+    /// `X509_REQ_new_ex(libctx, propq)`.
+    pub fn new_ex(libctx: Option<&LibCtx>, propq: Option<&str>) -> Option<Self> {
+        let pq = opt_cstring(propq)?;
+        let ctx = libctx.map_or(core::ptr::null_mut(), LibCtx::as_ptr);
+        // SAFETY: ctx is NULL or live; pq NULL or a valid C string.
+        Self::from_ptr(unsafe { ffi::X509_REQ_new_ex(ctx, opt_ptr(&pq)) })
+    }
+
+    /// `X509_REQ_set_version`.
+    pub fn set_version(&self, v: c_long) -> bool {
+        // SAFETY: the request is live.
+        unsafe { ffi::X509_REQ_set_version(self.as_ptr(), v) == 1 }
+    }
+
+    /// `X509_REQ_set_subject_name`.
+    pub fn set_subject_name(&self, nm: NameRef<'_>) -> bool {
+        // SAFETY: both are live; the request copies the name.
+        unsafe { ffi::X509_REQ_set_subject_name(self.as_ptr(), nm.0) == 1 }
+    }
+
+    /// `X509_REQ_set_pubkey` (NULL allowed, which fails).
+    pub fn set_pubkey(&self, pkey: Option<&Pkey>) -> bool {
+        // SAFETY: the request is live; the key live or NULL.
+        unsafe {
+            ffi::X509_REQ_set_pubkey(
+                self.as_ptr(),
+                pkey.map_or(core::ptr::null_mut(), Pkey::as_ptr),
+            ) == 1
+        }
+    }
+
+    /// `X509_NAME_add_entry_by_txt(X509_REQ_get_subject_name(req), type, chtype, value, -1,
+    /// -1, set)`.
+    pub fn add_subject_entry_by_txt(
+        &self,
+        field: &str,
+        chtype: c_int,
+        value: &str,
+        set: c_int,
+    ) -> bool {
+        let (Some(f), Some(v)) = (cstring(field), cstring(value)) else {
+            return false;
+        };
+        // SAFETY: the request is live; its name is owned by it.
+        let nm = unsafe { ffi::X509_REQ_get_subject_name(self.as_ptr()) };
+        // SAFETY: nm is live; the strings are valid and NUL-terminated (length -1).
+        unsafe {
+            ffi::X509_NAME_add_entry_by_txt(nm, f.as_ptr(), chtype, v.as_ptr().cast(), -1, -1, set)
+                == 1
+        }
+    }
+
+    /// `X509_NAME_add_entry_by_NID(X509_REQ_get_subject_name(req), nid, chtype, value, -1,
+    /// -1, set)`.
+    pub fn add_subject_entry_by_nid(
+        &self,
+        nid: c_int,
+        chtype: c_int,
+        value: &[u8],
+        set: c_int,
+    ) -> bool {
+        let Ok(len) = c_int::try_from(value.len()) else {
+            return false;
+        };
+        // SAFETY: the request is live; its name is owned by it.
+        let nm = unsafe { ffi::X509_REQ_get_subject_name(self.as_ptr()) };
+        // SAFETY: nm is live; value is valid for len bytes.
+        unsafe {
+            ffi::X509_NAME_add_entry_by_NID(nm, nid, chtype, value.as_ptr(), len, -1, set) == 1
+        }
+    }
+
+    /// `X509_REQ_add1_attr_by_txt(req, name, chtype, value, -1)`.
+    pub fn add1_attr_by_txt(&self, name: &str, chtype: c_int, value: &str) -> bool {
+        let (Some(n), Some(v)) = (cstring(name), cstring(value)) else {
+            return false;
+        };
+        // SAFETY: the request is live; the strings are valid (length -1: strlen).
+        unsafe {
+            ffi::X509_REQ_add1_attr_by_txt(self.as_ptr(), n.as_ptr(), chtype, v.as_ptr().cast(), -1)
+                == 1
+        }
+    }
+
+    /// `X509_REQ_add1_attr_by_NID(req, nid, chtype, value, len)`.
+    pub fn add1_attr_by_nid(&self, nid: c_int, chtype: c_int, value: &[u8]) -> bool {
+        let Ok(len) = c_int::try_from(value.len()) else {
+            return false;
+        };
+        // SAFETY: the request is live; value is valid for len bytes.
+        unsafe {
+            ffi::X509_REQ_add1_attr_by_NID(self.as_ptr(), nid, chtype, value.as_ptr(), len) == 1
+        }
+    }
+
+    /// `PEM_write_bio_X509_REQ_NEW`.
+    pub fn write_pem_new(&self, bio: &Bio) -> c_int {
+        // SAFETY: both are live.
+        unsafe { ffi::PEM_write_bio_X509_REQ_NEW(bio.as_ptr(), self.as_ptr()) }
+    }
+}
+
+impl Cert {
+    /// `X509_add1_ext_i2d(x, nid, NULL, crit, 0)`: a NULL-valued extension (the CT poison).
+    pub fn add1_ext_null(&self, nid: c_int, crit: c_int) -> c_int {
+        // SAFETY: the certificate is live; a NULL value is the poison's.
+        unsafe { ffi::X509_add1_ext_i2d(self.as_ptr(), nid, core::ptr::null_mut(), crit, 0) }
+    }
+}
+
+/// `OBJ_create_objects(bio)`.
+pub fn obj_create_objects(bio: &Bio) -> c_int {
+    // SAFETY: the BIO is live.
+    unsafe { ffi::OBJ_create_objects(bio.as_ptr()) }
+}
+
+/// `ASN1_STRING_set_default_mask_asc(p)`.
+pub fn set_default_mask_asc(p: &str) -> bool {
+    let Some(c) = cstring(p) else {
+        return false;
+    };
+    // SAFETY: a valid C string.
+    unsafe { ffi::ASN1_STRING_set_default_mask_asc(c.as_ptr()) == 1 }
+}

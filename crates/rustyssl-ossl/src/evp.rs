@@ -113,3 +113,11 @@ impl Md {
         crate::util::string_at(unsafe { ffi::EVP_MD_get0_name(self.as_ptr()) }).unwrap_or_default()
     }
 }
+
+impl Cipher {
+    /// `EVP_aes_256_cbc()` (static).
+    pub fn aes_256_cbc() -> Option<Self> {
+        // SAFETY: no arguments; a static cipher.
+        Self::from_ptr(unsafe { ffi::EVP_aes_256_cbc() }.cast_mut())
+    }
+}

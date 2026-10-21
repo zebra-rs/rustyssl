@@ -43,7 +43,7 @@ pub mod crl2pkcs7;
 // pub mod prime;
 // pub mod rand;
 // pub mod rehash;
-// pub mod req;
+pub mod req;
 // pub mod rsa;
 // pub mod rsautl;
 // pub mod s_client;
@@ -102,7 +102,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "prime" => prime::main,
         // "rand" => rand::main,
         // "rehash" => rehash::main,
-        // "req" => req::main,
+        "req" => req::main,
         // "rsa" => rsa::main,
         // "rsautl" => rsautl::main,
         // "s_client" => s_client::main,
