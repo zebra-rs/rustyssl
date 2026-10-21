@@ -117,9 +117,16 @@ fn masked(text: &str) -> String {
                 }
                 l = mask_location(&l);
                 l = mask_libdir(&l);
+                // dlopen's message is the platform's (macOS's lists every path dyld tried, and
+                // past ERR_MAX_DATA_SIZE the data is dropped), so only its place is compared.
+                if let Some(at) = l.find(":dlfcn_load:")
+                    && let Some(end) = l[at..].find(":FILE:LINE:")
+                {
+                    l.truncate(at + end + ":FILE:LINE:".len());
+                }
             }
-            for dir in OPENSSLDIRS.get().into_iter().flatten() {
-                l = l.replace(dir.as_str(), "OPENSSLDIR/");
+            for (dir, name) in OPENSSLDIRS.get().into_iter().flatten() {
+                l = l.replace(dir.as_str(), name);
             }
             l
         })
@@ -127,9 +134,10 @@ fn masked(text: &str) -> String {
         .join("\n")
 }
 
-/// Both libraries' OPENSSLDIRs (with a trailing `/`), set once the libraries are found: a
-/// default file's path (`cert.pem`, `openssl.cnf`, ...) is `OPENSSLDIR/<file>` in the output.
-static OPENSSLDIRS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+/// Both libraries' OPENSSLDIR, ENGINESDIR and MODULESDIR (each with a trailing `/`) and the
+/// name each is masked as, set once the libraries are found: a default file's path
+/// (`cert.pem`, an engine's module, ...) is `OPENSSLDIR/<file>` and so on in the output.
+static OPENSSLDIRS: std::sync::OnceLock<Vec<(String, String)>> = std::sync::OnceLock::new();
 
 /// The libraries' own directory as `LIBDIR/`: macOS's `dlopen` errors list the paths dyld
 /// tried, the library's directory first (`target/ref/openssl-<version>/lib/` on the reference,
@@ -511,22 +519,19 @@ pub fn run(args: &[String]) -> Result {
     // default), masked wherever an output names a file in it.
     let mut dirs = Vec::new();
     for lib in [&setup.ref_lib, &setup.our_lib] {
-        let out = run_tool(
-            &setup.upstream,
-            lib,
-            &["version".to_owned(), "-d".to_owned()],
-            None,
-            &work,
-        )?;
-        let text = String::from_utf8_lossy(&out.stdout).into_owned();
-        if let Some(dir) = text
-            .trim()
-            .strip_prefix("OPENSSLDIR: \"")
-            .and_then(|d| d.strip_suffix('"'))
-        {
-            dirs.push(format!("{dir}/"));
+        let args = ["version", "-d", "-e", "-m"].map(str::to_owned);
+        let out = run_tool(&setup.upstream, lib, &args, None, &work)?;
+        for line in String::from_utf8_lossy(&out.stdout).lines() {
+            let Some((name, value)) = line.split_once(": ") else {
+                continue;
+            };
+            if let Some(dir) = value.strip_prefix('"').and_then(|d| d.strip_suffix('"')) {
+                dirs.push((format!("{dir}/"), format!("{name}/")));
+            }
         }
     }
+    // The longest first, so a directory inside another one is masked as itself.
+    dirs.sort_by_key(|(dir, _)| core::cmp::Reverse(dir.len()));
     let _ = OPENSSLDIRS.set(dirs);
 
     let mut lists: Vec<(String, PathBuf)> = Vec::new();
