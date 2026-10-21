@@ -8,7 +8,7 @@
 pub mod version;
 // pub mod asn1parse;
 // pub mod ca;
-// pub mod ciphers;
+pub mod ciphers;
 // pub mod cmp;
 // pub mod cms;
 // pub mod configutl;
@@ -67,7 +67,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         "version" => version::main,
         // "asn1parse" => asn1parse::main,
         // "ca" => ca::main,
-        // "ciphers" => ciphers::main,
+        "ciphers" => ciphers::main,
         // "cmp" => cmp::main,
         // "cms" => cms::main,
         // "configutl" => configutl::main,

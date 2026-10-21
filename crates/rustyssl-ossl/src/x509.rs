@@ -254,7 +254,7 @@ crate::handle!(
 pub struct NameRef<'a>(*const X509_NAME, core::marker::PhantomData<&'a ()>);
 
 impl NameRef<'_> {
-    fn new(p: *const X509_NAME) -> Self {
+    pub(crate) fn new(p: *const X509_NAME) -> Self {
         Self(p, core::marker::PhantomData)
     }
 }

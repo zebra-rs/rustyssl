@@ -1,0 +1,52 @@
+# `openssl ciphers` (cargo xtask test-apps: upstream's tool on the reference, then ours on
+# rustyssl and on the reference; every option, the error paths, and -help).
+ciphers
+ciphers ALL
+ciphers -v
+ciphers -v ALL:eNULL
+ciphers -V
+ciphers -V ALL:COMPLEMENTOFALL
+ciphers -stdname
+ciphers -stdname -V ECDHE
+ciphers -s
+ciphers -s -v
+ciphers -s ALL
+ciphers -s -V ALL:@SECLEVEL=0
+ciphers -s -tls1_2 DSS:@SECLEVEL=0
+ciphers -convert TLS_RSA_WITH_AES_128_CBC_SHA
+ciphers -convert TLS_AES_128_GCM_SHA256
+ciphers -convert bogus
+ciphers -ssl3
+ciphers -ssl3 -s
+ciphers -tls1 -s -v
+ciphers -tls1 -s -v DEFAULT@SECLEVEL=0
+ciphers -tls1_1 -s DEFAULT@SECLEVEL=0
+ciphers -tls1_2 -s
+ciphers -tls1_3 -s
+ciphers -tls1_3 -s -V
+ciphers -psk PSK
+ciphers -psk -s PSK
+ciphers -psk -s -tls1_2 PSK
+ciphers -srp SRP
+ciphers -srp -s SRP
+ciphers -srp -s -tls1_2
+ciphers -psk -srp -s -V ALL
+ciphers -ciphersuites TLS_AES_128_GCM_SHA256
+ciphers -ciphersuites TLS_AES_128_GCM_SHA256:TLS_CHACHA20_POLY1305_SHA256 -s -v
+ciphers -ciphersuites TLS_AES_256_GCM_SHA384 -s -stdname
+ciphers -ciphersuites bogus
+ciphers -ciphersuites bogus AES128-SHA
+ciphers bogus
+ciphers NULL
+ciphers HIGH:!aNULL
+ciphers -v EXPORT
+ciphers a b
+ciphers -x
+ciphers -convert
+ciphers -provider default -V AES128-SHA
+ciphers -provider legacy -provider default -V ALL
+ciphers -provider-path {dir} -provider default
+ciphers -propquery provider=default -s
+ciphers -propquery x=y -s
+ciphers -provparam bogus
+ciphers -help
