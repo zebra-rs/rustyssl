@@ -29,6 +29,7 @@ mod util;
 
 pub use bio::Bio;
 pub use util::cstring;
+pub mod cmp;
 pub mod cms;
 pub mod conf;
 pub mod engine;

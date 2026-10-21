@@ -709,3 +709,15 @@ impl Cert {
         Cert(self.0)
     }
 }
+
+impl NameRef<'_> {
+    /// The name at `p`, borrowed from its owner (NULL allowed, see [`NameRef`]).
+    pub(crate) fn from_raw(p: *const X509_NAME) -> Self {
+        Self::new(p)
+    }
+
+    /// The name, for the C API.
+    pub(crate) fn as_raw(self) -> *const X509_NAME {
+        self.0
+    }
+}

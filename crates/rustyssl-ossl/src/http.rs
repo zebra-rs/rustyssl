@@ -330,10 +330,10 @@ pub unsafe extern "C" fn app_http_tls_cb(
     if connect != 0 {
         // SAFETY: ssl_ctx is live; the store and its parameters are owned by it.
         let ts = unsafe { ffi::SSL_CTX_get_cert_store(ssl_ctx) };
-        // SAFETY: ts is NULL or live.
         let vpm = if ts.is_null() {
             core::ptr::null_mut()
         } else {
+            // SAFETY: ts is live.
             unsafe { ffi::X509_STORE_get0_param(ts) }
         };
         let host = if vpm.is_null() {
