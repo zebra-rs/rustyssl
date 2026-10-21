@@ -190,25 +190,20 @@ impl Pkey {
                     // SAFETY: bld and bn are live; the name is a static C string.
                     unsafe { ffi::OSSL_PARAM_BLD_push_BN(bld, name.as_ptr(), bn) == 1 }
                 });
-                // SAFETY: bld is live; the list is the caller's, freed below.
                 let params = if pushed {
+                    // SAFETY: bld is live; the list is the caller's, freed below.
                     unsafe { ffi::OSSL_PARAM_BLD_to_param(bld) }
                 } else {
                     core::ptr::null_mut()
                 };
                 if !params.is_null() {
                     let mut pkey: *mut EVP_PKEY = core::ptr::null_mut();
-                    // SAFETY: the context is live; params is a live list; pkey is an
-                    // out-pointer whose key becomes ours.
-                    let ok = unsafe {
-                        ffi::EVP_PKEY_fromdata_init(pctx.as_ptr()) > 0
-                            && ffi::EVP_PKEY_fromdata(
-                                pctx.as_ptr(),
-                                &mut pkey,
-                                EVP_PKEY_KEYPAIR,
-                                params,
-                            ) > 0
-                    };
+                    let ok = pctx.fromdata_init() > 0
+                        // SAFETY: the context is live; params is a live list; pkey is an
+                        // out-pointer whose key becomes ours.
+                        && unsafe {
+                            ffi::EVP_PKEY_fromdata(pctx.as_ptr(), &mut pkey, EVP_PKEY_KEYPAIR, params)
+                        } > 0;
                     key = if ok { Pkey::from_ptr(pkey) } else { None };
                     // SAFETY: the list from OSSL_PARAM_BLD_to_param, freed once.
                     unsafe { ffi::OSSL_PARAM_free(params) };
@@ -678,8 +673,8 @@ impl MdCtx {
 
     /// `EVP_DigestSignInit(ctx, NULL, md, NULL, pkey)`, `md` NULL or `EVP_sm3()`.
     pub fn sign_init(&self, sm3: bool, pkey: &Pkey) -> core::ffi::c_int {
-        // SAFETY: no arguments; a static digest.
         let md = if sm3 {
+            // SAFETY: no arguments; a static digest.
             unsafe { ffi::EVP_sm3() }
         } else {
             core::ptr::null()
@@ -712,8 +707,8 @@ impl MdCtx {
 
     /// `EVP_DigestVerifyInit(ctx, NULL, md, NULL, pkey)`, `md` NULL or `EVP_sm3()`.
     pub fn verify_init(&self, sm3: bool, pkey: &Pkey) -> core::ffi::c_int {
-        // SAFETY: as in sign_init.
         let md = if sm3 {
+            // SAFETY: as in sign_init.
             unsafe { ffi::EVP_sm3() }
         } else {
             core::ptr::null()

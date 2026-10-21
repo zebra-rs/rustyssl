@@ -46,13 +46,18 @@ pub fn times() -> (i64, i64) {
     };
     // SAFETY: t is a valid out-parameter.
     let now = unsafe { libc::times(&mut t) };
-    (i64::from(now), i64::from(t.tms_utime))
+    (to_i64(now), to_i64(t.tms_utime))
 }
 
 /// `sysconf(_SC_CLK_TCK)`: clock ticks per second.
 pub fn clock_ticks() -> i64 {
     // SAFETY: sysconf takes any name.
-    i64::from(unsafe { libc::sysconf(libc::_SC_CLK_TCK) })
+    to_i64(unsafe { libc::sysconf(libc::_SC_CLK_TCK) })
+}
+
+/// A C integer (`clock_t`, `long`: their types differ by platform) as an `i64`.
+fn to_i64<T: TryInto<i64>>(v: T) -> i64 {
+    v.try_into().unwrap_or(0)
 }
 
 /// `mlock(buf)`, whose result upstream ignores.
@@ -104,11 +109,10 @@ pub fn fork_to_pipe() -> Result<Forked, ForkError> {
             <std::fs::File as std::os::fd::FromRawFd>::from_raw_fd(rd)
         }));
     }
-    // SAFETY: closing and duplicating our own descriptors.
-    unsafe {
-        libc::close(rd);
-        libc::close(1);
-    }
+    // SAFETY: closing our own descriptors.
+    unsafe { libc::close(rd) };
+    // SAFETY: as above (standard output, replaced next).
+    unsafe { libc::close(1) };
     // SAFETY: as above.
     if unsafe { libc::dup(wr) } == -1 {
         return Err(ForkError::Dup);

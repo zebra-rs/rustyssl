@@ -256,20 +256,16 @@ impl CipherCtx {
         // The lengths the call will read: the cipher's when one is given, else the
         // context's (which a ctrl may have changed).
         let (kl, il) = match cipher {
-            // SAFETY: the cipher is live.
-            Some(c) => unsafe {
-                (
-                    ffi::EVP_CIPHER_get_key_length(c.as_ptr()),
-                    ffi::EVP_CIPHER_get_iv_length(c.as_ptr()),
-                )
-            },
-            // SAFETY: the context is live.
-            None => unsafe {
-                (
-                    ffi::EVP_CIPHER_CTX_get_key_length(self.as_ptr()),
-                    ffi::EVP_CIPHER_CTX_get_iv_length(self.as_ptr()),
-                )
-            },
+            Some(c) => (
+                c.key_length(),
+                // SAFETY: the cipher is live.
+                unsafe { ffi::EVP_CIPHER_get_iv_length(c.as_ptr()) },
+            ),
+            None => (
+                self.key_length(),
+                // SAFETY: the context is live.
+                unsafe { ffi::EVP_CIPHER_CTX_get_iv_length(self.as_ptr()) },
+            ),
         };
         if !need(key, kl) || !need(iv, il) {
             return false;
@@ -439,13 +435,12 @@ impl CipherCtx {
         inp: *const u8,
         inl: core::ffi::c_int,
     ) -> core::ffi::c_int {
-        // SAFETY: the callers pass buffers the call may use (see each).
-        unsafe {
-            if enc {
-                ffi::EVP_EncryptUpdate(self.as_ptr(), out, outl, inp, inl)
-            } else {
-                ffi::EVP_DecryptUpdate(self.as_ptr(), out, outl, inp, inl)
-            }
+        if enc {
+            // SAFETY: the callers pass buffers the call may use (see each).
+            unsafe { ffi::EVP_EncryptUpdate(self.as_ptr(), out, outl, inp, inl) }
+        } else {
+            // SAFETY: as above.
+            unsafe { ffi::EVP_DecryptUpdate(self.as_ptr(), out, outl, inp, inl) }
         }
     }
 
@@ -509,13 +504,12 @@ impl CipherCtx {
             return 0;
         }
         let mut outl = 0;
-        // SAFETY: the context is live; out holds a block, the most a final call writes.
-        unsafe {
-            if enc {
-                ffi::EVP_EncryptFinal_ex(self.as_ptr(), out.as_mut_ptr(), &mut outl)
-            } else {
-                ffi::EVP_DecryptFinal_ex(self.as_ptr(), out.as_mut_ptr(), &mut outl)
-            }
+        if enc {
+            // SAFETY: the context is live; out holds a block, the most a final call writes.
+            unsafe { ffi::EVP_EncryptFinal_ex(self.as_ptr(), out.as_mut_ptr(), &mut outl) }
+        } else {
+            // SAFETY: as above.
+            unsafe { ffi::EVP_DecryptFinal_ex(self.as_ptr(), out.as_mut_ptr(), &mut outl) }
         }
     }
 }

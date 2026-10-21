@@ -56,6 +56,8 @@ const MAX_SIG_NUM: usize = 256;
 const TAG_LEN: usize = 16;
 const AEAD_IVLEN: usize = 12;
 const AAD_LEN: usize = 13;
+const AEAD_IVLEN_C: i32 = 12;
+const TAG_LEN_C: i32 = 16;
 /// `SHA256_DIGEST_LENGTH`.
 const SHA256_DIGEST_LENGTH: usize = 32;
 /// Room past each buffer's end, for what a cipher may write beyond its input.
@@ -89,6 +91,12 @@ const D_EVP_CMAC: usize = 28;
 const D_KMAC128: usize = 29;
 const D_KMAC256: usize = 30;
 const ALGOR_NUM: usize = 31;
+// The table sizes as `strtoint`'s bounds.
+const ALGOR_NUM_I: i64 = 31;
+const ECDSA_NUM_I: i64 = 22;
+const EC_NUM_I: i64 = 24;
+const MAX_KEM_NUM_I: i64 = 111;
+const MAX_SIG_NUM_I: i64 = 256;
 
 /// `names`: what each algorithm is called.
 const NAMES: [&str; ALGOR_NUM] = [
@@ -498,6 +506,25 @@ fn atoi(s: &str) -> i32 {
     crate::lib::apps::atoi(s)
 }
 
+/// `a[i]`, or the default past the end.
+fn at<T: Copy + Default>(a: &[T], i: usize) -> T {
+    a.get(i).copied().unwrap_or_default()
+}
+
+/// `a[i] = v` (nothing past the end).
+fn set<T>(a: &mut [T], i: usize, v: T) {
+    if let Some(s) = a.get_mut(i) {
+        *s = v;
+    }
+}
+
+/// `a[i][j] = v` (nothing past the ends).
+fn set2<const N: usize>(a: &mut [[f64; N]], i: usize, j: usize, v: f64) {
+    if let Some(s) = a.get_mut(i).and_then(|r| r.get_mut(j)) {
+        *s = v;
+    }
+}
+
 /// `openssl_speed_sec_t`.
 #[derive(Clone, Copy)]
 struct Seconds {
@@ -628,6 +655,16 @@ impl State {
         }
     }
 
+    /// `names[alg]`.
+    fn name(&self, alg: usize) -> String {
+        self.names.get(alg).cloned().unwrap_or_default()
+    }
+
+    /// `lengths[t]`.
+    fn length(&self, t: usize) -> i32 {
+        at(&self.lengths, t)
+    }
+
     /// `lengths[testnum]`.
     fn len(&self) -> usize {
         self.lengths
@@ -746,19 +783,15 @@ fn run_benchmark(
             None => -1,
         };
     };
-    let mut failures = Vec::new();
-    let total = {
-        let state: &State = st;
-        let run = |i: usize| match loopargs.get(i) {
-            Some(l) => match l.try_borrow_mut() {
-                Ok(mut l) => f(state, &mut l),
-                Err(_) => -1,
-            },
-            None => -1,
-        };
-        jobs.run(&run, &mut |e| failures.push(e))
+    let state: &State = st;
+    let run = |i: usize| match loopargs.get(i) {
+        Some(l) => match l.try_borrow_mut() {
+            Ok(mut l) => f(state, &mut l),
+            Err(_) => -1,
+        },
+        None => -1,
     };
-    for e in failures {
+    let mut failed = |e: Failure| {
         match e {
             Failure::Job => eprintf!("Failure in the job\n"),
             Failure::TooManyFds => eprintf!("Too many fds in ASYNC_WAIT_CTX\n"),
@@ -768,9 +801,9 @@ fn run_benchmark(
             ),
             Failure::Select => eprintf!("Failure in the select\n"),
         };
-        st.dofail();
-    }
-    total
+        state.dofail();
+    };
+    jobs.run(&run, &mut failed)
 }
 
 /// `EVP_Digest_loop`.
@@ -959,13 +992,13 @@ fn update_loop_aead_enc(st: &State, a: &mut LoopArgs) -> i32 {
     let mut realcount = 0;
     let mut count = 0;
     while st.cond(count) {
-        if mode != EVP_CIPH_SIV_MODE && ctx.ctrl(EVP_CTRL_AEAD_SET_IVLEN, AEAD_IVLEN as i32) == 0 {
+        if mode != EVP_CIPH_SIV_MODE && ctx.ctrl(EVP_CTRL_AEAD_SET_IVLEN, AEAD_IVLEN_C) == 0 {
             aead_fail("\nFailed to set iv length\n");
         }
         if mode != EVP_CIPH_GCM_MODE
             && mode != EVP_CIPH_SIV_MODE
             && mode != EVP_CIPH_GCM_SIV_MODE
-            && ctx.ctrl(EVP_CTRL_AEAD_SET_TAG, TAG_LEN as i32) == 0
+            && ctx.ctrl(EVP_CTRL_AEAD_SET_TAG, TAG_LEN_C) == 0
         {
             aead_fail("\nFailed to set tag length\n");
         }
@@ -1003,13 +1036,13 @@ fn update_loop_aead_dec(st: &State, a: &mut LoopArgs) -> i32 {
     let mut realcount = 0;
     let mut count = 0;
     while st.cond(count) {
-        if mode != EVP_CIPH_SIV_MODE && ctx.ctrl(EVP_CTRL_AEAD_SET_IVLEN, AEAD_IVLEN as i32) == 0 {
+        if mode != EVP_CIPH_SIV_MODE && ctx.ctrl(EVP_CTRL_AEAD_SET_IVLEN, AEAD_IVLEN_C) == 0 {
             aead_fail("\nFailed to set iv length\n");
         }
         if mode != EVP_CIPH_SIV_MODE
             && mode != EVP_CIPH_GCM_MODE
             && mode != EVP_CIPH_GCM_SIV_MODE
-            && ctx.ctrl(EVP_CTRL_AEAD_SET_TAG, TAG_LEN as i32) == 0
+            && ctx.ctrl(EVP_CTRL_AEAD_SET_TAG, TAG_LEN_C) == 0
         {
             aead_fail("\nFailed to set tag length\n");
         }
@@ -1759,7 +1792,7 @@ impl Results {
         };
         if let Some(p) = buf.strip_prefix("+F:") {
             let f = fields(p);
-            if let Some(alg) = strtoint(f.first().map_or("", String::as_str), 0, ALGOR_NUM as i64) {
+            if let Some(alg) = strtoint(f.first().map_or("", String::as_str), 0, ALGOR_NUM_I) {
                 for j in 0..size_num {
                     if let Some(r) = self.sym.get_mut(alg).and_then(|r| r.get_mut(j)) {
                         *r += atof(f.get(2 + j).map_or("", String::as_str));
@@ -1784,14 +1817,14 @@ impl Results {
             }
         } else if let Some(p) = buf.strip_prefix("+F4:") {
             let f = fields(p);
-            if let Some(k) = strtoint(f.first().map_or("", String::as_str), 0, ECDSA_NUM as i64)
+            if let Some(k) = strtoint(f.first().map_or("", String::as_str), 0, ECDSA_NUM_I)
                 && let Some(r) = self.ecdsa.get_mut(k)
             {
                 add2(r, &f, 2);
             }
         } else if let Some(p) = buf.strip_prefix("+F5:") {
             let f = fields(p);
-            if let Some(k) = strtoint(f.first().map_or("", String::as_str), 0, EC_NUM as i64)
+            if let Some(k) = strtoint(f.first().map_or("", String::as_str), 0, EC_NUM_I)
                 && let Some(r) = self.ecdh.get_mut(k)
             {
                 *r += atof(f.get(2).map_or("", String::as_str));
@@ -1819,7 +1852,7 @@ impl Results {
             }
         } else if let Some(p) = buf.strip_prefix("+F9:") {
             let f = fields(p);
-            if let Some(k) = strtoint(f.first().map_or("", String::as_str), 0, MAX_KEM_NUM as i64) {
+            if let Some(k) = strtoint(f.first().map_or("", String::as_str), 0, MAX_KEM_NUM_I) {
                 if self.kems.len() <= k {
                     self.kems.resize(k + 1, [0.0; 3]);
                 }
@@ -1831,7 +1864,7 @@ impl Results {
             }
         } else if let Some(p) = buf.strip_prefix("+F10:") {
             let f = fields(p);
-            if let Some(k) = strtoint(f.first().map_or("", String::as_str), 0, MAX_SIG_NUM as i64) {
+            if let Some(k) = strtoint(f.first().map_or("", String::as_str), 0, MAX_SIG_NUM_I) {
                 if self.sigs.len() <= k {
                     self.sigs.resize(k + 1, [0.0; 3]);
                 }
@@ -1917,7 +1950,7 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
             }
             Opt::ELAPSED => st.usertime = false,
             Opt::EVP => {
-                if doit[D_EVP] != 0 {
+                if at(doit.as_slice(), D_EVP) != 0 {
                     eprintf!("{prog}: -evp option cannot be used more than once\n");
                     opterr(&prog);
                     return None;
@@ -1934,7 +1967,7 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
                     return None;
                 }
                 err::pop_to_mark();
-                doit[D_EVP] = 1;
+                set(doit.as_mut_slice(), D_EVP, 1);
             }
             Opt::HMAC => {
                 let arg = p.arg().to_owned();
@@ -1943,7 +1976,7 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
                     return None;
                 }
                 evp_mac_mdname = arg;
-                doit[D_HMAC] = 1;
+                set(doit.as_mut_slice(), D_HMAC, 1);
             }
             Opt::CMAC => {
                 let arg = p.arg().to_owned();
@@ -1952,7 +1985,7 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
                     return None;
                 }
                 evp_mac_ciphername = arg;
-                doit[D_EVP_CMAC] = 1;
+                set(doit.as_mut_slice(), D_EVP_CMAC, 1);
             }
             Opt::DECRYPT => st.decrypt = true,
             // The engine is set up later, after any fork.
@@ -1997,11 +2030,9 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
                 }
             }
             Opt::CONFIG => {
-                let c = app_load_config_modules(Some(&ConfigFile::Given(p.arg().to_owned())));
-                if c.is_none() {
-                    return None;
-                }
-                _conf = c;
+                _conf = Some(app_load_config_modules(Some(&ConfigFile::Given(
+                    p.arg().to_owned(),
+                )))?);
             }
             Opt::PRIMES => primes = p.int_arg(),
             Opt::SECONDS => {
@@ -2128,18 +2159,18 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
         let algo = algo.as_str();
         let mut algo_found = false;
         if let Some((_, i)) = DOIT_CHOICES.iter().find(|(n, _)| *n == algo) {
-            doit[*i] = 1;
+            set(doit.as_mut_slice(), *i, 1);
             algo_found = true;
         }
         if algo == "des" {
-            doit[D_CBC_DES] = 1;
-            doit[D_EDE3_DES] = 1;
+            set(doit.as_mut_slice(), D_CBC_DES, 1);
+            set(doit.as_mut_slice(), D_EDE3_DES, 1);
             algo_found = true;
         }
         if algo == "sha" {
-            doit[D_SHA1] = 1;
-            doit[D_SHA256] = 1;
-            doit[D_SHA512] = 1;
+            set(doit.as_mut_slice(), D_SHA1, 1);
+            set(doit.as_mut_slice(), D_SHA256, 1);
+            set(doit.as_mut_slice(), D_SHA512, 1);
             algo_found = true;
         }
         // Just for compatibility.
@@ -2152,7 +2183,7 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
                 algo_found = true;
             }
             if let Some(i) = found(&RSA_CHOICES, algo) {
-                rsa_doit[i] = 1;
+                set(rsa_doit.as_mut_slice(), i, 1);
                 algo_found = true;
             }
         }
@@ -2162,7 +2193,7 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
                 algo_found = true;
             }
             if let Some(i) = found(&FFDH_CHOICES, algo) {
-                ffdh_doit[i] = 2;
+                set(ffdh_doit.as_mut_slice(), i, 2);
                 algo_found = true;
             }
         }
@@ -2172,19 +2203,19 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
                 algo_found = true;
             }
             if let Some(i) = found(&DSA_CHOICES, algo) {
-                dsa_doit[i] = 2;
+                set(dsa_doit.as_mut_slice(), i, 2);
                 algo_found = true;
             }
         }
         if algo == "aes" {
             for i in 0..3 {
-                doit[D_CBC_128_AES + i] = 1;
+                set(doit.as_mut_slice(), D_CBC_128_AES + i, 1);
             }
             algo_found = true;
         }
         if algo == "camellia" {
             for i in 0..3 {
-                doit[D_CBC_128_CML + i] = 1;
+                set(doit.as_mut_slice(), D_CBC_128_CML + i, 1);
             }
             algo_found = true;
         }
@@ -2194,7 +2225,7 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
                 algo_found = true;
             }
             if let Some(i) = found(&ECDSA_CHOICES, algo) {
-                ecdsa_doit[i] = 2;
+                set(ecdsa_doit.as_mut_slice(), i, 2);
                 algo_found = true;
             }
         }
@@ -2204,7 +2235,7 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
                 algo_found = true;
             }
             if let Some(i) = found(&ECDH_CHOICES, algo) {
-                ecdh_doit[i] = 2;
+                set(ecdh_doit.as_mut_slice(), i, 2);
                 algo_found = true;
             }
         }
@@ -2213,7 +2244,7 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
             algo_found = true;
         }
         if let Some(i) = found(&EDDSA_CHOICES, algo) {
-            eddsa_doit[i] = 2;
+            set(eddsa_doit.as_mut_slice(), i, 2);
             algo_found = true;
         }
         if algo == "sm2" {
@@ -2221,26 +2252,30 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
             algo_found = true;
         }
         if let Some(i) = found(&SM2_CHOICES, algo) {
-            sm2_doit[i] = 2;
+            set(sm2_doit.as_mut_slice(), i, 2);
             algo_found = true;
         }
         if let Some(i) = kems_algname.iter().position(|n| n == algo) {
-            kems_doit[i] = kems_doit[i].wrapping_add(1);
+            if let Some(d) = kems_doit.get_mut(i) {
+                *d = d.wrapping_add(1);
+            }
             do_kems = true;
             algo_found = true;
         }
         if let Some(i) = sigs_algname.iter().position(|n| n == algo) {
-            sigs_doit[i] = sigs_doit[i].wrapping_add(1);
+            if let Some(d) = sigs_doit.get_mut(i) {
+                *d = d.wrapping_add(1);
+            }
             do_sigs = true;
             algo_found = true;
         }
         if algo == "kmac" {
-            doit[D_KMAC128] = 1;
-            doit[D_KMAC256] = 1;
+            set(doit.as_mut_slice(), D_KMAC128, 1);
+            set(doit.as_mut_slice(), D_KMAC256, 1);
             algo_found = true;
         }
         if algo == "cmac" {
-            doit[D_EVP_CMAC] = 1;
+            set(doit.as_mut_slice(), D_EVP_CMAC, 1);
             algo_found = true;
         }
         if !algo_found {
@@ -2399,31 +2434,31 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
 
         // No parameters: everything.
         if algos.is_empty()
-            && doit[D_EVP] == 0
-            && doit[D_HMAC] == 0
-            && doit[D_EVP_CMAC] == 0
+            && at(doit.as_slice(), D_EVP) == 0
+            && at(doit.as_slice(), D_HMAC) == 0
+            && at(doit.as_slice(), D_EVP_CMAC) == 0
             && !do_kems
             && !do_sigs
         {
             doit = [1; ALGOR_NUM];
-            doit[D_EVP] = 0;
-            doit[D_EVP_CMAC] = 0;
+            set(doit.as_mut_slice(), D_EVP, 0);
+            set(doit.as_mut_slice(), D_EVP_CMAC, 0);
             err::set_mark();
             for i in D_MD2..=D_WHIRLPOOL {
-                if !have_md(NAMES[i]) {
-                    doit[i] = 0;
+                if !have_md(NAMES.get(i).copied().unwrap_or_default()) {
+                    set(doit.as_mut_slice(), i, 0);
                 }
             }
             for i in D_CBC_DES..=D_CBC_256_CML {
-                if !have_cipher(NAMES[i]) {
-                    doit[i] = 0;
+                if !have_cipher(NAMES.get(i).copied().unwrap_or_default()) {
+                    set(doit.as_mut_slice(), i, 0);
                 }
             }
             if Mac::fetch(lc.as_deref(), "GMAC", pq.as_deref()).is_none() {
-                doit[D_GHASH] = 0;
+                set(doit.as_mut_slice(), D_GHASH, 0);
             }
             if Mac::fetch(lc.as_deref(), "HMAC", pq.as_deref()).is_none() {
-                doit[D_HMAC] = 0;
+                set(doit.as_mut_slice(), D_HMAC, 0);
             }
             err::pop_to_mark();
             rsa_doit = [1; 7];
@@ -2458,13 +2493,13 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
             (D_RMD160, rmd160_loop),
         ];
         for (alg, f) in digest_runs.drain(..) {
-            if doit[alg] == 0 {
+            if at(doit.as_slice(), alg) == 0 {
                 continue;
             }
             for t in 0..size_num {
                 st.testnum = t;
-                let name = st.names[alg].clone();
-                st.print_message(&name, st.lengths[t], seconds.sym);
+                let name = st.name(alg);
+                st.print_message(&name, st.length(t), seconds.sym);
                 st.time_start();
                 let count = run_benchmark(st, jobs.as_mut(), &loopargs, f);
                 let d = st.time_stop();
@@ -2475,15 +2510,13 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
             }
         }
 
-        if doit[D_HMAC] != 0 {
+        if at(doit.as_slice(), D_HMAC) != 0 {
             let hmac_key = b"This is a key...";
             st.names[D_HMAC] = format!("hmac({evp_mac_mdname})");
             let params = Params::new()
                 .utf8(s(OSSL_MAC_PARAM_DIGEST), &evp_mac_mdname)
                 .octets(s(OSSL_MAC_PARAM_KEY), hmac_key);
-            if mac_setup("HMAC", &params, &loopargs).is_none() {
-                return None;
-            }
+            mac_setup("HMAC", &params, &loopargs)?;
             mac_benchmark(
                 st,
                 jobs.as_mut(),
@@ -2519,15 +2552,15 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
                 st.testnum = t;
                 let first = loopargs.first().map(|l| l.borrow_mut().ctx.take());
                 let first = first.flatten();
-                let good = check_block_size(first.as_ref(), st.lengths[t]);
+                let good = check_block_size(first.as_ref(), st.length(t));
                 if let Some(l) = loopargs.first() {
                     l.borrow_mut().ctx = first;
                 }
                 if !good {
                     break;
                 }
-                let name = st.names[alg].clone();
-                st.print_message(&name, st.lengths[t], seconds.sym);
+                let name = st.name(alg);
+                st.print_message(&name, st.length(t), seconds.sym);
                 st.time_start();
                 let count = run_benchmark(st, jobs.as_mut(), &loopargs, cipher_loop);
                 let d = st.time_stop();
@@ -2537,41 +2570,53 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
                 l.borrow_mut().ctx = None;
             }
         };
-        if doit[D_CBC_DES] != 0 {
+        if at(doit.as_slice(), D_CBC_DES) != 0 {
             cipher_run(st, &mut jobs, D_CBC_DES, "des-cbc", &DESKEY, 8);
         }
-        if doit[D_EDE3_DES] != 0 {
+        if at(doit.as_slice(), D_EDE3_DES) != 0 {
             cipher_run(st, &mut jobs, D_EDE3_DES, "des-ede3-cbc", &DESKEY, 24);
         }
         for k in 0..3 {
             let alg = D_CBC_128_AES + k;
-            if doit[alg] != 0 {
-                let name = st.names[alg].clone();
-                cipher_run(st, &mut jobs, alg, &name, &KEY32, 16 + 8 * k as i32);
+            if at(doit.as_slice(), alg) != 0 {
+                let name = st.name(alg);
+                cipher_run(
+                    st,
+                    &mut jobs,
+                    alg,
+                    &name,
+                    &KEY32,
+                    16 + 8 * i32::try_from(k).unwrap_or(0),
+                );
             }
         }
         for k in 0..3 {
             let alg = D_CBC_128_CML + k;
-            if doit[alg] != 0 {
-                let name = st.names[alg].clone();
-                cipher_run(st, &mut jobs, alg, &name, &KEY32, 16 + 8 * k as i32);
+            if at(doit.as_slice(), alg) != 0 {
+                let name = st.name(alg);
+                cipher_run(
+                    st,
+                    &mut jobs,
+                    alg,
+                    &name,
+                    &KEY32,
+                    16 + 8 * i32::try_from(k).unwrap_or(0),
+                );
             }
         }
         for alg in D_RC4..=D_CBC_CAST {
-            if doit[alg] != 0 {
-                let name = st.names[alg].clone();
+            if at(doit.as_slice(), alg) != 0 {
+                let name = st.name(alg);
                 cipher_run(st, &mut jobs, alg, &name, &KEY32, 16);
             }
         }
 
-        if doit[D_GHASH] != 0 {
+        if at(doit.as_slice(), D_GHASH) != 0 {
             let params = Params::new()
                 .utf8(s(OSSL_ALG_PARAM_CIPHER), "aes-128-gcm")
                 .octets(s(OSSL_MAC_PARAM_IV), b"0123456789ab")
                 .octets(s(OSSL_MAC_PARAM_KEY), KEY32.get(..16).unwrap_or_default());
-            if mac_setup("GMAC", &params, &loopargs).is_none() {
-                return None;
-            }
+            mac_setup("GMAC", &params, &loopargs)?;
             // GHASH_loop only updates: the contexts are initialized here.
             for l in &loopargs {
                 if !l.borrow().mctx.as_ref().is_some_and(MacCtx::init) {
@@ -2590,10 +2635,10 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
             mac_teardown(&loopargs);
         }
 
-        if doit[D_RAND] != 0 {
+        if at(doit.as_slice(), D_RAND) != 0 {
             for t in 0..size_num {
                 st.testnum = t;
-                st.print_message(&st.names[D_RAND].clone(), st.lengths[t], seconds.sym);
+                st.print_message(&st.name(D_RAND), st.length(t), seconds.sym);
                 st.time_start();
                 let count = run_benchmark(st, jobs.as_mut(), &loopargs, rand_loop);
                 let d = st.time_stop();
@@ -2602,7 +2647,7 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
         }
 
         // EVP: authenticated encryption, with additional data or not, or neither.
-        if doit[D_EVP] != 0 {
+        if at(doit.as_slice(), D_EVP) != 0 {
             if let Some(cipher) = &evp_cipher {
                 if multiblock && has_flag(cipher, EVP_CIPH_FLAG_TLS1_1_MULTIBLOCK) {
                     multiblock_speed(st, cipher, lengths_single, &seconds);
@@ -2633,8 +2678,8 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
                 };
                 for t in 0..size_num {
                     st.testnum = t;
-                    let name = st.names[D_EVP].clone();
-                    st.print_message(&name, st.lengths[t], seconds.sym);
+                    let name = st.name(D_EVP);
+                    st.print_message(&name, st.length(t), seconds.sym);
                     for l in &loopargs {
                         evp_setup(st, cipher, &mut l.borrow_mut(), ae_mode);
                     }
@@ -2652,8 +2697,8 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
                 st.names[D_EVP] = md;
                 for t in 0..size_num {
                     st.testnum = t;
-                    let name = st.names[D_EVP].clone();
-                    st.print_message(&name, st.lengths[t], seconds.sym);
+                    let name = st.name(D_EVP);
+                    st.print_message(&name, st.length(t), seconds.sym);
                     st.time_start();
                     let count = run_benchmark(st, jobs.as_mut(), &loopargs, evp_digest_md_loop);
                     let d = st.time_stop();
@@ -2665,11 +2710,11 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
             }
         }
 
-        if doit[D_EVP_CMAC] != 0 {
+        if at(doit.as_slice(), D_EVP_CMAC) != 0 {
             let cipher = opt::cipher(&evp_mac_ciphername)?;
             let keylen = cipher.key_length();
             drop(cipher);
-            if keylen <= 0 || keylen > KEY32.len() as i32 {
+            if keylen <= 0 || usize::try_from(keylen).is_ok_and(|k| k > KEY32.len()) {
                 eprintf!("\nRequested CMAC cipher with unsupported key length.\n");
                 return None;
             }
@@ -2682,9 +2727,7 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
                         .get(..usize::try_from(keylen).unwrap_or(0))
                         .unwrap_or_default(),
                 );
-            if mac_setup("CMAC", &params, &loopargs).is_none() {
-                return None;
-            }
+            mac_setup("CMAC", &params, &loopargs)?;
             mac_benchmark(
                 st,
                 jobs.as_mut(),
@@ -2698,16 +2741,14 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
         }
 
         for (alg, mac, keylen) in [(D_KMAC128, "KMAC-128", 16), (D_KMAC256, "KMAC-256", 32)] {
-            if doit[alg] == 0 {
+            if at(doit.as_slice(), alg) == 0 {
                 continue;
             }
             let params = Params::new().octets(
                 s(OSSL_MAC_PARAM_KEY),
                 KEY32.get(..keylen).unwrap_or_default(),
             );
-            if mac_setup(mac, &params, &loopargs).is_none() {
-                return None;
-            }
+            mac_setup(mac, &params, &loopargs)?;
             mac_benchmark(
                 st,
                 jobs.as_mut(),
@@ -2787,7 +2828,7 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
         out(&t);
     }
     for k in 0..ALGOR_NUM {
-        if doit[k] == 0 {
+        if at(doit.as_slice(), k) == 0 {
             continue;
         }
         let alg_name = if k == D_EVP {
@@ -2799,14 +2840,14 @@ fn run(argv: &[String], st: &mut State, o: &mut Outcome) -> Option<i32> {
                 },
             }
         } else {
-            st.names[k].clone()
+            st.name(k)
         };
         let mut t = if st.mr {
             format!("+F:{k}:{alg_name}")
         } else {
             format!("{alg_name:<13}")
         };
-        for r in st.results[k].iter().take(size_num) {
+        for r in st.results.get(k).into_iter().flatten().take(size_num) {
             if *r > 10000.0 && !st.mr {
                 t.push_str(&format!(" {}k", cf(r / 1e3, 11, 2)));
             } else if st.mr {
@@ -2896,8 +2937,8 @@ fn mac_benchmark(
 ) {
     for t in 0..size_num {
         st.testnum = t;
-        let name = st.names[alg].clone();
-        st.print_message(&name, st.lengths[t], tm);
+        let name = st.name(alg);
+        st.print_message(&name, st.length(t), tm);
         st.time_start();
         let count = run_benchmark(st, jobs.as_deref_mut(), loopargs, f);
         let d = st.time_stop();
@@ -2936,13 +2977,13 @@ fn evp_setup(st: &State, cipher: &Cipher, a: &mut LoopArgs, ae_mode: bool) {
         ctx.ctrl(EVP_CTRL_SET_SPEED, 1);
     }
     if ae_mode && st.decrypt {
-        if mode != EVP_CIPH_SIV_MODE && ctx.ctrl(EVP_CTRL_AEAD_SET_IVLEN, AEAD_IVLEN as i32) == 0 {
+        if mode != EVP_CIPH_SIV_MODE && ctx.ctrl(EVP_CTRL_AEAD_SET_IVLEN, AEAD_IVLEN_C) == 0 {
             aead_fail("\nFailed to set iv length\n");
         }
         if mode != EVP_CIPH_GCM_MODE
             && mode != EVP_CIPH_SIV_MODE
             && mode != EVP_CIPH_GCM_SIV_MODE
-            && ctx.ctrl(EVP_CTRL_AEAD_SET_TAG, TAG_LEN as i32) == 0
+            && ctx.ctrl(EVP_CTRL_AEAD_SET_TAG, TAG_LEN_C) == 0
         {
             aead_fail("\nFailed to set tag length\n");
         }
@@ -3050,8 +3091,9 @@ fn multiblock_speed(st: &mut State, cipher: &Cipher, lengths_single: i32, second
                     app_bail_out("error setting random bytes\n");
                 }
                 len += 16;
-                aad[11] = (len >> 8) as u8;
-                aad[12] = len as u8;
+                let [.., hi, lo] = len.to_be_bytes();
+                aad[11] = hi;
+                aad[12] = lo;
                 let pad = ctx.ctrl_buf(EVP_CTRL_AEAD_TLS1_AAD, aad);
                 let total =
                     usize::try_from(i64::try_from(len).unwrap_or(0) + i64::from(pad)).unwrap_or(0);
@@ -3068,7 +3110,12 @@ fn multiblock_speed(st: &mut State, cipher: &Cipher, lengths_single: i32, second
         if ciph_success <= 0 && !st.mr {
             eprintf!("Error performing cipher op\n");
         }
-        st.results[D_EVP][j] = f64::from(count) / d * f64::from(mbl);
+        set2(
+            &mut st.results,
+            D_EVP,
+            j,
+            f64::from(count) / d * f64::from(mbl),
+        );
     }
     let mut t = String::new();
     if st.mr {
@@ -3078,8 +3125,14 @@ fn multiblock_speed(st: &mut State, cipher: &Cipher, lengths_single: i32, second
         }
         t.push('\n');
         t.push_str(&format!("+F:{D_EVP}:{alg_name}"));
-        for j in 0..mblengths.len() {
-            t.push_str(&format!(":{}", cf(st.results[D_EVP][j], 0, 2)));
+        for r in st
+            .results
+            .get(D_EVP)
+            .into_iter()
+            .flatten()
+            .take(mblengths.len())
+        {
+            t.push_str(&format!(":{}", cf(*r, 0, 2)));
         }
         t.push('\n');
     } else {
@@ -3090,8 +3143,13 @@ fn multiblock_speed(st: &mut State, cipher: &Cipher, lengths_single: i32, second
         }
         t.push('\n');
         t.push_str(&format!("{alg_name:<24}"));
-        for j in 0..mblengths.len() {
-            let r = st.results[D_EVP][j];
+        for &r in st
+            .results
+            .get(D_EVP)
+            .into_iter()
+            .flatten()
+            .take(mblengths.len())
+        {
             if r > 10000.0 {
                 t.push_str(&format!(" {}k", cf(r / 1e3, 11, 2)));
             } else {
@@ -3150,15 +3208,15 @@ fn asymmetric(
     let rsa_keys = c_arrays(TESTRSA_H);
 
     for t in 0..7 {
-        if rsa_doit[t] == 0 {
+        if at(rsa_doit.as_slice(), t) == 0 {
             continue;
         }
         st.testnum = t;
-        let bits = RSA_BITS[t];
+        let bits = at(&RSA_BITS, t);
         let rsa_key = if primes > RSA_DEFAULT_PRIME_NUM {
             // Multi-prime keys, generated.
             init_gen_str("RSA").and_then(|genctx| {
-                if genctx.set_rsa_keygen_bits(bits as i32) > 0
+                if genctx.set_rsa_keygen_bits(i32::try_from(bits).unwrap_or(i32::MAX)) > 0
                     && genctx
                         .set1_rsa_keygen_pubexp(
                             core::ffi::c_ulong::try_from(RSA_F4).unwrap_or(0x10001),
@@ -3198,7 +3256,7 @@ fn asymmetric(
                     r > 0
                 }
             });
-            l.rsa_sign_ctx[t] = ctx;
+            set(&mut l.rsa_sign_ctx, t, ctx);
             ok = good;
         }
         if !ok {
@@ -3223,7 +3281,7 @@ fn asymmetric(
                     }
                 },
             );
-            res.rsa[t][0] = f64::from(count) / d;
+            set2(&mut res.rsa, t, 0, f64::from(count) / d);
             op_count = i64::from(count);
         }
         // Verify.
@@ -3242,13 +3300,13 @@ fn asymmetric(
                         buf.get(..36).unwrap_or_default(),
                     ) > 0
             });
-            l.rsa_verify_ctx[t] = ctx;
+            set(&mut l.rsa_verify_ctx, t, ctx);
             ok = good;
         }
         if !ok {
             eprintf!("RSA verify setup failure.  No RSA verify will be done.\n");
             st.dofail();
-            rsa_doit[t] = 0;
+            set(rsa_doit.as_mut_slice(), t, 0);
         } else {
             let (count, d) = timed(
                 st,
@@ -3267,7 +3325,7 @@ fn asymmetric(
                     }
                 },
             );
-            res.rsa[t][1] = f64::from(count) / d;
+            set2(&mut res.rsa, t, 1, f64::from(count) / d);
         }
         // Encrypt.
         for l in loopargs {
@@ -3289,7 +3347,7 @@ fn asymmetric(
                     r > 0
                 }
             });
-            l.rsa_encrypt_ctx[t] = ctx;
+            set(&mut l.rsa_encrypt_ctx, t, ctx);
             ok = good;
         }
         if !ok {
@@ -3314,7 +3372,7 @@ fn asymmetric(
                     }
                 },
             );
-            res.rsa[t][2] = f64::from(count) / d;
+            set2(&mut res.rsa, t, 2, f64::from(count) / d);
             op_count = i64::from(count);
         }
         // Decrypt.
@@ -3336,7 +3394,7 @@ fn asymmetric(
                         .0
                         > 0
             });
-            l.rsa_decrypt_ctx[t] = ctx;
+            set(&mut l.rsa_decrypt_ctx, t, ctx);
             ok = good;
         }
         if !ok {
@@ -3361,7 +3419,7 @@ fn asymmetric(
                     }
                 },
             );
-            res.rsa[t][3] = f64::from(count) / d;
+            set2(&mut res.rsa, t, 3, f64::from(count) / d);
             op_count = i64::from(count);
         }
         if op_count <= 1 {
@@ -3371,11 +3429,11 @@ fn asymmetric(
     }
 
     for t in 0..2 {
-        if dsa_doit[t] == 0 {
+        if at(dsa_doit.as_slice(), t) == 0 {
             continue;
         }
         st.testnum = t;
-        let bits = DSA_BITS[t];
+        let bits = at(&DSA_BITS, t);
         let dsa_key = get_dsa(bits);
         let mut ok = dsa_key.is_some();
         for l in loopargs {
@@ -3397,7 +3455,7 @@ fn asymmetric(
                     r > 0
                 }
             });
-            l.dsa_sign_ctx[t] = ctx;
+            set(&mut l.dsa_sign_ctx, t, ctx);
             ok = good;
         }
         if !ok {
@@ -3419,7 +3477,7 @@ fn asymmetric(
                     }
                 },
             );
-            res.dsa[t][0] = f64::from(count) / d;
+            set2(&mut res.dsa, t, 0, f64::from(count) / d);
             op_count = i64::from(count);
         }
         for l in loopargs {
@@ -3438,13 +3496,13 @@ fn asymmetric(
                         buf.get(..36).unwrap_or_default(),
                     ) > 0
             });
-            l.dsa_verify_ctx[t] = ctx;
+            set(&mut l.dsa_verify_ctx, t, ctx);
             ok = good;
         }
         if !ok {
             eprintf!("DSA verify setup failure.  No DSA verify will be done.\n");
             st.dofail();
-            dsa_doit[t] = 0;
+            set(dsa_doit.as_mut_slice(), t, 0);
         } else {
             let (count, d) = timed(
                 st,
@@ -3460,7 +3518,7 @@ fn asymmetric(
                     }
                 },
             );
-            res.dsa[t][1] = f64::from(count) / d;
+            set2(&mut res.dsa, t, 1, f64::from(count) / d);
         }
         if op_count <= 1 {
             stop_it(dsa_doit, t);
@@ -3468,11 +3526,13 @@ fn asymmetric(
     }
 
     for t in 0..ECDSA_NUM {
-        if ecdsa_doit[t] == 0 {
+        if at(ecdsa_doit.as_slice(), t) == 0 {
             continue;
         }
         st.testnum = t;
-        let curve = &EC_CURVES[t];
+        let Some(curve) = EC_CURVES.get(t) else {
+            continue;
+        };
         let bits = curve.bits;
         let key = get_ecdsa(st, curve);
         let mut ok = key.is_some();
@@ -3495,7 +3555,7 @@ fn asymmetric(
                     r > 0
                 }
             });
-            l.ecdsa_sign_ctx[t] = ctx;
+            set(&mut l.ecdsa_sign_ctx, t, ctx);
             ok = good;
         }
         if !ok {
@@ -3517,7 +3577,7 @@ fn asymmetric(
                     }
                 },
             );
-            res.ecdsa[t][0] = f64::from(count) / d;
+            set2(&mut res.ecdsa, t, 0, f64::from(count) / d);
             op_count = i64::from(count);
         }
         for l in loopargs {
@@ -3535,13 +3595,13 @@ fn asymmetric(
                         buf.get(..20).unwrap_or_default(),
                     ) > 0
             });
-            l.ecdsa_verify_ctx[t] = ctx;
+            set(&mut l.ecdsa_verify_ctx, t, ctx);
             ok = good;
         }
         if !ok {
             eprintf!("ECDSA verify setup failure.  No ECDSA verify will be done.\n");
             st.dofail();
-            ecdsa_doit[t] = 0;
+            set(ecdsa_doit.as_mut_slice(), t, 0);
         } else {
             let (count, d) = timed(
                 st,
@@ -3557,7 +3617,7 @@ fn asymmetric(
                     }
                 },
             );
-            res.ecdsa[t][1] = f64::from(count) / d;
+            set2(&mut res.ecdsa, t, 1, f64::from(count) / d);
         }
         if op_count <= 1 {
             stop_it(ecdsa_doit, t);
@@ -3565,11 +3625,13 @@ fn asymmetric(
     }
 
     for t in 0..EC_NUM {
-        if ecdh_doit[t] == 0 {
+        if at(ecdh_doit.as_slice(), t) == 0 {
             continue;
         }
         st.testnum = t;
-        let curve = &EC_CURVES[t];
+        let Some(curve) = EC_CURVES.get(t) else {
+            continue;
+        };
         let mut checks = true;
         for l in loopargs {
             let key_a = get_ecdsa(st, curve);
@@ -3628,8 +3690,8 @@ fn asymmetric(
                 checks = false;
                 break;
             }
-            l.ecdh_ctx[t] = Some(ctx);
-            l.outlen[t] = outlen;
+            set(&mut l.ecdh_ctx, t, Some(ctx));
+            set(&mut l.outlen, t, outlen);
         }
         if checks {
             let bits = curve.bits;
@@ -3647,7 +3709,7 @@ fn asymmetric(
                     }
                 },
             );
-            res.ecdh[t] = f64::from(count) / d;
+            set(&mut res.ecdh, t, f64::from(count) / d);
             op_count = i64::from(count);
         }
         if op_count <= 1 {
@@ -3656,11 +3718,13 @@ fn asymmetric(
     }
 
     for t in 0..2 {
-        if eddsa_doit[t] == 0 {
+        if at(eddsa_doit.as_slice(), t) == 0 {
             continue;
         }
         st.testnum = t;
-        let curve = &ED_CURVES[t];
+        let Some(curve) = ED_CURVES.get(t) else {
+            continue;
+        };
         let mut ok = true;
         for l in loopargs {
             let mut l = l.borrow_mut();
@@ -3678,14 +3742,14 @@ fn asymmetric(
                 }
             });
             let Some(key) = key else {
-                l.eddsa_ctx[t] = Some(c1);
-                l.eddsa_ctx2[t] = Some(c2);
+                set(&mut l.eddsa_ctx, t, Some(c1));
+                set(&mut l.eddsa_ctx2, t, Some(c2));
                 ok = false;
                 break;
             };
             let good = c1.sign_init(false, &key) != 0 && c2.verify_init(false, &key) != 0;
-            l.eddsa_ctx[t] = Some(c1);
-            l.eddsa_ctx2[t] = Some(c2);
+            set(&mut l.eddsa_ctx, t, Some(c1));
+            set(&mut l.eddsa_ctx2, t, Some(c2));
             if !good {
                 ok = false;
                 break;
@@ -3702,14 +3766,14 @@ fn asymmetric(
             let mut l = l.borrow_mut();
             l.sigsize = curve.sigsize;
             let n = l.sigsize;
-            let Some(ctx) = l.eddsa_ctx[t].take() else {
+            let Some(ctx) = l.eddsa_ctx.get_mut(t).and_then(Option::take) else {
                 signed = false;
                 break;
             };
             let (buf, buf2) = l.bufs();
             let (r, len) = ctx.sign(buf2, n, buf.get(..20).unwrap_or_default());
             l.sigsize = len;
-            l.eddsa_ctx[t] = Some(ctx);
+            set(&mut l.eddsa_ctx, t, Some(ctx));
             if r == 0 {
                 signed = false;
                 break;
@@ -3736,14 +3800,14 @@ fn asymmetric(
                     }
                 },
             );
-            res.eddsa[t][0] = f64::from(count) / d;
+            set2(&mut res.eddsa, t, 0, f64::from(count) / d);
             op_count = i64::from(count);
         }
         let mut verified = true;
         for l in loopargs {
             let mut l = l.borrow_mut();
             let n = l.sigsize;
-            let Some(ctx) = l.eddsa_ctx2[t].take() else {
+            let Some(ctx) = l.eddsa_ctx2.get_mut(t).and_then(Option::take) else {
                 verified = false;
                 break;
             };
@@ -3752,7 +3816,7 @@ fn asymmetric(
                 buf2.get(..n).unwrap_or_default(),
                 buf.get(..20).unwrap_or_default(),
             );
-            l.eddsa_ctx2[t] = Some(ctx);
+            set(&mut l.eddsa_ctx2, t, Some(ctx));
             if r != 1 {
                 verified = false;
                 break;
@@ -3761,7 +3825,7 @@ fn asymmetric(
         if !verified {
             eprintf!("EdDSA verify failure.  No EdDSA verify will be done.\n");
             st.dofail();
-            eddsa_doit[t] = 0;
+            set(eddsa_doit.as_mut_slice(), t, 0);
         } else {
             let (count, d) = timed(
                 st,
@@ -3780,7 +3844,7 @@ fn asymmetric(
                     }
                 },
             );
-            res.eddsa[t][1] = f64::from(count) / d;
+            set2(&mut res.eddsa, t, 1, f64::from(count) / d);
         }
         if op_count <= 1 {
             stop_it(eddsa_doit, t);
@@ -3788,11 +3852,13 @@ fn asymmetric(
     }
 
     for t in 0..1 {
-        if sm2_doit[t] == 0 {
+        if at(sm2_doit.as_slice(), t) == 0 {
             continue;
         }
         st.testnum = t;
-        let curve = &SM2_CURVES[t];
+        let Some(curve) = SM2_CURVES.get(t) else {
+            continue;
+        };
         let mut ok = false;
         for l in loopargs {
             ok = false;
@@ -3829,7 +3895,7 @@ fn asymmetric(
                 && sm2.vfy_pctx.set1_id(SM2_ID) == 1
                 && sm2.ctx.sign_init(true, &sm2.pkey) != 0
                 && sm2.vfy_ctx.verify_init(true, &sm2.pkey) != 0;
-            l.sm2[t] = Some(sm2);
+            set(&mut l.sm2, t, Some(sm2));
             if !good {
                 break;
             }
@@ -3845,14 +3911,14 @@ fn asymmetric(
         for l in loopargs {
             let mut l = l.borrow_mut();
             let n = l.sigsize;
-            let Some(sm2) = l.sm2[t].take() else {
+            let Some(sm2) = l.sm2.get_mut(t).and_then(Option::take) else {
                 signed = false;
                 break;
             };
             let (buf, buf2) = l.bufs();
             let (r, len) = sm2.ctx.sign(buf2, n, buf.get(..20).unwrap_or_default());
             l.sigsize = len;
-            l.sm2[t] = Some(sm2);
+            set(&mut l.sm2, t, Some(sm2));
             if r == 0 {
                 signed = false;
                 break;
@@ -3878,14 +3944,14 @@ fn asymmetric(
                     }
                 },
             );
-            res.sm2[t][0] = f64::from(count) / d;
+            set2(&mut res.sm2, t, 0, f64::from(count) / d);
             op_count = i64::from(count);
         }
         let mut verified = true;
         for l in loopargs {
             let mut l = l.borrow_mut();
             let n = l.sigsize;
-            let Some(sm2) = l.sm2[t].take() else {
+            let Some(sm2) = l.sm2.get_mut(t).and_then(Option::take) else {
                 verified = false;
                 break;
             };
@@ -3894,7 +3960,7 @@ fn asymmetric(
                 buf2.get(..n).unwrap_or_default(),
                 buf.get(..20).unwrap_or_default(),
             );
-            l.sm2[t] = Some(sm2);
+            set(&mut l.sm2, t, Some(sm2));
             if r != 1 {
                 verified = false;
                 break;
@@ -3903,7 +3969,7 @@ fn asymmetric(
         if !verified {
             eprintf!("SM2 verify failure.  No SM2 verify will be done.\n");
             st.dofail();
-            sm2_doit[t] = 0;
+            set(sm2_doit.as_mut_slice(), t, 0);
         } else {
             let (count, d) = timed(
                 st,
@@ -3922,7 +3988,7 @@ fn asymmetric(
                     }
                 },
             );
-            res.sm2[t][1] = f64::from(count) / d;
+            set2(&mut res.sm2, t, 1, f64::from(count) / d);
         }
         if op_count <= 1 {
             stop_it(sm2_doit, t + 1);
@@ -3930,11 +3996,13 @@ fn asymmetric(
     }
 
     for t in 0..5 {
-        if ffdh_doit[t] == 0 {
+        if at(ffdh_doit.as_slice(), t) == 0 {
             continue;
         }
         st.testnum = t;
-        let (_, nid, bits) = FFDH_PARAMS[t];
+        let Some(&(_, nid, bits)) = FFDH_PARAMS.get(t) else {
+            continue;
+        };
         let mut checks = true;
         for l in loopargs {
             if err::peek_error() != 0 {
@@ -3943,7 +4011,7 @@ fn asymmetric(
             }
             let mut l = l.borrow_mut();
             match ffdh_setup(st, nid, &mut l) {
-                Ok(ctx) => l.ffdh_ctx[t] = Some(ctx),
+                Ok(ctx) => set(&mut l.ffdh_ctx, t, Some(ctx)),
                 Err(()) => {
                     op_count = 1;
                     checks = false;
@@ -3966,7 +4034,7 @@ fn asymmetric(
                     }
                 },
             );
-            res.ffdh[t] = f64::from(count) / d;
+            set(&mut res.ffdh, t, f64::from(count) / d);
             op_count = i64::from(count);
         }
         if op_count <= 1 {
@@ -4070,7 +4138,7 @@ fn kems_and_sigs(
     let pq = app_libctx::propq();
     let mut op_count: i64 = 1;
     for (t, kem_name) in kems_algname.iter().enumerate() {
-        if kems_doit[t] == 0 || !do_kems {
+        if at(kems_doit.as_slice(), t) == 0 || !do_kems {
             continue;
         }
         st.testnum = t;
@@ -4115,9 +4183,7 @@ fn kems_and_sigs(
                         }
                     },
                 );
-                if let Some(r) = res.kems.get_mut(t) {
-                    r[i] = f64::from(count) / d;
-                }
+                set2(&mut res.kems, t, i, f64::from(count) / d);
                 op_count = i64::from(count);
             }
         }
@@ -4127,7 +4193,7 @@ fn kems_and_sigs(
     }
 
     for (t, sig_name) in sigs_algname.iter().enumerate() {
-        if sigs_doit[t] == 0 || !do_sigs {
+        if at(sigs_doit.as_slice(), t) == 0 || !do_sigs {
             continue;
         }
         st.testnum = t;
@@ -4175,9 +4241,7 @@ fn kems_and_sigs(
                         }
                     },
                 );
-                if let Some(r) = res.sigs.get_mut(t) {
-                    r[i] = f64::from(count) / d;
-                }
+                set2(&mut res.sigs, t, i, f64::from(count) / d);
                 op_count = i64::from(count);
             }
         }
@@ -4286,14 +4350,14 @@ fn kem_setup(
     {
         return Err(format!("Decaps error for {kem_name}.\n"));
     }
-    l.kem_gen_ctx[t] = Some(genctx);
-    l.kem_encaps_ctx[t] = Some(encaps);
-    l.kem_decaps_ctx[t] = Some(decaps);
-    l.kem_out_len[t] = out_len;
-    l.kem_secret_len[t] = secret_len;
-    l.kem_out[t] = out;
-    l.kem_send_secret[t] = send_secret;
-    l.kem_rcv_secret[t] = rcv_secret;
+    set(&mut l.kem_gen_ctx, t, Some(genctx));
+    set(&mut l.kem_encaps_ctx, t, Some(encaps));
+    set(&mut l.kem_decaps_ctx, t, Some(decaps));
+    set(&mut l.kem_out_len, t, out_len);
+    set(&mut l.kem_secret_len, t, secret_len);
+    set(&mut l.kem_out, t, out);
+    set(&mut l.kem_send_secret, t, send_secret);
+    set(&mut l.kem_rcv_secret, t, rcv_secret);
     Ok(())
 }
 
@@ -4402,12 +4466,12 @@ fn sig_setup(
     if verify.verify(signature, &md) <= 0 {
         return Err(format!("Verify 2 error for {sig_name}.\n"));
     }
-    l.sig_gen_ctx[t] = Some(genctx);
-    l.sig_sign_ctx[t] = Some(sign);
-    l.sig_verify_ctx[t] = Some(verify);
-    l.sig_max_sig_len[t] = max_sig_len;
-    l.sig_act_sig_len[t] = sig_len;
-    l.sig_sig[t] = sig;
+    set(&mut l.sig_gen_ctx, t, Some(genctx));
+    set(&mut l.sig_sign_ctx, t, Some(sign));
+    set(&mut l.sig_verify_ctx, t, Some(verify));
+    set(&mut l.sig_max_sig_len, t, max_sig_len);
+    set(&mut l.sig_act_sig_len, t, sig_len);
+    set(&mut l.sig_sig, t, sig);
     Ok(())
 }
 
@@ -4428,7 +4492,7 @@ fn print_asymmetric(
     let mut t = String::new();
     let mut first = true;
     for k in 0..7 {
-        if rsa_doit[k] == 0 {
+        if at(rsa_doit.as_slice(), k) == 0 {
             continue;
         }
         if first && !mr {
@@ -4438,11 +4502,11 @@ fn print_asymmetric(
             ));
             first = false;
         }
-        let r = res.rsa[k];
+        let r = res.rsa.get(k).copied().unwrap_or_default();
         if mr {
             t.push_str(&format!(
                 "+F2:{k}:{}:{}:{}:{}:{}\n",
-                RSA_BITS[k],
+                at(&RSA_BITS, k),
                 f6(r[0]),
                 f6(r[1]),
                 f6(r[2]),
@@ -4451,7 +4515,7 @@ fn print_asymmetric(
         } else {
             t.push_str(&format!(
                 "rsa {:5} bits {}s {}s {}s {}s {} {} {} {}\n",
-                RSA_BITS[k],
+                at(&RSA_BITS, k),
                 cf(1.0 / r[0], 8, 6),
                 cf(1.0 / r[1], 8, 6),
                 cf(1.0 / r[2], 8, 6),
@@ -4465,25 +4529,25 @@ fn print_asymmetric(
     }
     let mut first = true;
     for k in 0..2 {
-        if dsa_doit[k] == 0 {
+        if at(dsa_doit.as_slice(), k) == 0 {
             continue;
         }
         if first && !mr {
             t.push_str(&format!("{:18}sign    verify    sign/s verify/s\n", " "));
             first = false;
         }
-        let r = res.dsa[k];
+        let r = res.dsa.get(k).copied().unwrap_or_default();
         if mr {
             t.push_str(&format!(
                 "+F3:{k}:{}:{}:{}\n",
-                DSA_BITS[k],
+                at(&DSA_BITS, k),
                 f6(r[0]),
                 f6(r[1])
             ));
         } else {
             t.push_str(&format!(
                 "dsa {:4} bits {}s {}s {} {}\n",
-                DSA_BITS[k],
+                at(&DSA_BITS, k),
                 cf(1.0 / r[0], 8, 6),
                 cf(1.0 / r[1], 8, 6),
                 cf(r[0], 8, 1),
@@ -4493,15 +4557,17 @@ fn print_asymmetric(
     }
     let mut first = true;
     for k in 0..ECDSA_NUM {
-        if ecdsa_doit[k] == 0 {
+        if at(ecdsa_doit.as_slice(), k) == 0 {
             continue;
         }
         if first && !mr {
             t.push_str(&format!("{:30}sign    verify    sign/s verify/s\n", " "));
             first = false;
         }
-        let r = res.ecdsa[k];
-        let c = &EC_CURVES[k];
+        let r = res.ecdsa.get(k).copied().unwrap_or_default();
+        let Some(c) = EC_CURVES.get(k) else {
+            continue;
+        };
         if mr {
             t.push_str(&format!("+F4:{k}:{}:{}:{}\n", c.bits, f6(r[0]), f6(r[1])));
         } else {
@@ -4518,15 +4584,17 @@ fn print_asymmetric(
     }
     let mut first = true;
     for k in 0..EC_NUM {
-        if ecdh_doit[k] == 0 {
+        if at(ecdh_doit.as_slice(), k) == 0 {
             continue;
         }
         if first && !mr {
             t.push_str(&format!("{:30}op      op/s\n", " "));
             first = false;
         }
-        let r = res.ecdh[k];
-        let c = &EC_CURVES[k];
+        let r = at(&res.ecdh, k);
+        let Some(c) = EC_CURVES.get(k) else {
+            continue;
+        };
         if mr {
             t.push_str(&format!("+F5:{k}:{}:{}:{}\n", c.bits, f6(r), f6(1.0 / r)));
         } else {
@@ -4541,15 +4609,17 @@ fn print_asymmetric(
     }
     let mut first = true;
     for k in 0..2 {
-        if eddsa_doit[k] == 0 {
+        if at(eddsa_doit.as_slice(), k) == 0 {
             continue;
         }
         if first && !mr {
             t.push_str(&format!("{:30}sign    verify    sign/s verify/s\n", " "));
             first = false;
         }
-        let r = res.eddsa[k];
-        let c = &ED_CURVES[k];
+        let r = res.eddsa.get(k).copied().unwrap_or_default();
+        let Some(c) = ED_CURVES.get(k) else {
+            continue;
+        };
         if mr {
             t.push_str(&format!(
                 "+F6:{k}:{}:{}:{}:{}\n",
@@ -4572,15 +4642,17 @@ fn print_asymmetric(
     }
     let mut first = true;
     for k in 0..1 {
-        if sm2_doit[k] == 0 {
+        if at(sm2_doit.as_slice(), k) == 0 {
             continue;
         }
         if first && !mr {
             t.push_str(&format!("{:30}sign    verify    sign/s verify/s\n", " "));
             first = false;
         }
-        let r = res.sm2[k];
-        let c = &SM2_CURVES[k];
+        let r = res.sm2.get(k).copied().unwrap_or_default();
+        let Some(c) = SM2_CURVES.get(k) else {
+            continue;
+        };
         if mr {
             t.push_str(&format!(
                 "+F7:{k}:{}:{}:{}:{}\n",
@@ -4603,15 +4675,15 @@ fn print_asymmetric(
     }
     let mut first = true;
     for k in 0..5 {
-        if ffdh_doit[k] == 0 {
+        if at(ffdh_doit.as_slice(), k) == 0 {
             continue;
         }
         if first && !mr {
             t.push_str(&format!("{:23}op     op/s\n", " "));
             first = false;
         }
-        let r = res.ffdh[k];
-        let bits = FFDH_PARAMS[k].2;
+        let r = at(&res.ffdh, k);
+        let bits = FFDH_PARAMS.get(k).map_or(0, |p| p.2);
         if mr {
             t.push_str(&format!("+F8:{k}:{bits}:{}:{}\n", f6(r), f6(1.0 / r)));
         } else {

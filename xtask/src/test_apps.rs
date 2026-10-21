@@ -148,10 +148,10 @@ fn masked_timings(text: &str) -> String {
         let c: Vec<char> = line.chars().collect();
         let mut l = String::new();
         let mut i = 0;
-        while i < c.len() {
-            let word_start = i == 0 || !c[i - 1].is_ascii_alphabetic();
-            let sign = usize::from(c[i] == '-');
-            let rest = &c[(i + sign).min(c.len())..];
+        while let Some(&here) = c.get(i) {
+            let word_start = i == 0 || !c.get(i - 1).is_some_and(char::is_ascii_alphabetic);
+            let sign = usize::from(here == '-');
+            let rest = c.get(i + sign..).unwrap_or_default();
             let num = rest
                 .iter()
                 .take_while(|c| c.is_ascii_digit() || **c == '.')
@@ -160,7 +160,7 @@ fn masked_timings(text: &str) -> String {
             let alpha = |j: usize| rest.get(j).is_some_and(char::is_ascii_alphabetic);
             let ends = !alpha(3) || (rest.get(3) == Some(&'k') && !alpha(4));
             let starts = |w: &str| ends && rest.iter().take(3).copied().eq(w.chars());
-            let len = if num > 0 && rest[..num].iter().any(char::is_ascii_digit) {
+            let len = if rest.iter().take(num).any(char::is_ascii_digit) {
                 num
             } else if word_start && (starts("inf") || starts("nan")) {
                 3
@@ -168,7 +168,7 @@ fn masked_timings(text: &str) -> String {
                 0
             };
             if len == 0 {
-                l.push(c[i]);
+                l.push(here);
                 i += 1;
                 continue;
             }
