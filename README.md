@@ -278,15 +278,15 @@ cargo fmt --all --check
 cargo deny check && cargo vet                # supply-chain gates
 cargo xtask vendor 3.5.9                     # fetch, verify (PGP + SHA-256), and vendor a release into abi/
 cargo xtask codegen                          # regenerate bindings, export lists, stubs, error and object tables
-cargo xtask dist                             # build lib{crypto,ssl}.so.3 with soname + symbol versions, and bin/openssl-rs, into target/dist/
+cargo xtask dist                             # build lib{crypto,ssl}.so.3 with soname + symbol versions, and bin/openssl (ours), into target/dist/
 cargo xtask ref-openssl [3.5.9]              # build the reference OpenSSL (default: the vendored version) into target/ref/
 cargo xtask abi-check [check...]             # L3: exports+versions, metadata, signatures, layouts, constants, linking, headers, compat35
 cargo xtask coverage [--list PREFIX...]      # implemented exports per library and header -> docs/coverage.md
 cargo xtask usage-scan [--jobs N] [--limit N]  # rank exports by how many distro packages import them -> docs/symbol-usage.md
 cargo xtask test-c                           # tests/c/*.c, each run on the reference and on target/dist; output must match
-cargo xtask test-apps [--bless] [list...]    # openssl tools: upstream's on both libraries (tests/apps/commands.txt); ours (target/dist/bin/openssl-rs) on both, against upstream's on the reference (tests/apps/<command>.txt); the CLI's live_* helper tests on both
+cargo xtask test-apps [--bless] [list...]    # openssl tools: upstream's on both libraries (tests/apps/commands.txt); ours (target/dist/bin/openssl) on both, against upstream's on the reference (tests/apps/<command>.txt); the CLI's live_* helper tests on both
 cargo xtask test-interop [case...]           # the reference's s_server/s_client in four library pairings (tests/interop/cases.txt)
-cargo xtask test-interop --cli ours [case...]  # the same, with our s_server/s_client (target/dist/bin/openssl-rs) on the rustyssl side
+cargo xtask test-interop --cli ours [case...]  # the same, with our s_server/s_client (target/dist/bin/openssl) on the rustyssl side
 cargo xtask test-interop --seed S [case...]  # the DTLS +faults cases' drop/duplicate/reorder schedule from seed S (default 1)
 cargo xtask test-interop --peer gnutls [case...]  # s_server/s_client on each library against gnutls-cli/gnutls-serv (tests/interop/gnutls.txt)
 cargo xtask test-differential [--random N] [--seed S]  # probe corpus + N random sessions, reference vs ours

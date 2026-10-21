@@ -40,7 +40,7 @@
 //! The server's report of the client (its certificate, the ALPN list and the host name it
 //! sent) joins the summary.
 //!
-//! `--cli ours` runs our `openssl` tool (`target/dist/bin/openssl-rs`) on the rustyssl side of
+//! `--cli ours` runs our `openssl` tool (`target/dist/bin/openssl`) on the rustyssl side of
 //! each pairing, so the cases check our `s_server` and `s_client` too (Phase 11).
 
 use std::fs;

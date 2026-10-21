@@ -9,11 +9,12 @@
 //!   lib/libcrypto.a, lib/libssl.a
 //!   lib/pkgconfig/{libcrypto,libssl,openssl}.pc
 //!   lib/ossl-modules/legacy.so              (macOS: legacy.dylib, a bundle) the legacy provider
-//!   bin/openssl-rs                          the `openssl` tool in Rust (crates/rustyssl-cli)
+//!   bin/openssl                             the `openssl` tool in Rust (crates/rustyssl-cli)
 //! ```
 //!
-//! The Rust `openssl` tool is installed as `openssl-rs` until Phase 11.1 is complete (ADR 0007,
-//! decision 3). It links neither library: it loads them at start-up, from `LD_LIBRARY_PATH`
+//! The Rust `openssl` tool replaced upstream's when Phase 11.1 was complete (ADR 0007, decision
+//! 3); the drivers that need upstream's tool run the reference's, `target/ref/bin/openssl`. It
+//! links neither library: it loads them at start-up, from `LD_LIBRARY_PATH`
 //! (`DYLD_LIBRARY_PATH`) when set, else from `../lib` next to itself.
 //!
 //! Cargo builds each library as a static archive, and this links the shared library from it
@@ -127,9 +128,9 @@ pub fn run(args: &[String]) -> Result {
 }
 
 /// The name `cargo xtask dist` installs the Rust `openssl` tool under, in `bin/`.
-pub const CLI_NAME: &str = "openssl-rs";
+pub const CLI_NAME: &str = "openssl";
 
-/// Builds `rustyssl-cli` and installs its binary as `bin/openssl-rs`.
+/// Builds `rustyssl-cli` and installs its binary as `bin/openssl`.
 fn install_cli(root: &Path, release: &Path, dist: &Path) -> Result {
     let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
     run_output(

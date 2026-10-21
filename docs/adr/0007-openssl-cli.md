@@ -38,7 +38,7 @@ Rule 1 says `unsafe` belongs only in `rustyssl-capi` and the `libs/*` shims, so 
 ## 2. Packaging
 
 - **Crates:** `crates/rustyssl-cli` builds the binary `openssl`; `crates/rustyssl-ossl` is its bindings. Both are workspace members.
-- **dist:** `cargo xtask dist` also builds the binary and installs it (as `target/dist/bin/openssl-rs` until 11.1 is complete, decision 3; then as `openssl`).
+- **dist:** `cargo xtask dist` also builds the binary and installs it (as `target/dist/bin/openssl-rs` until 11.1 was complete, decision 3; since 11.2, as `openssl`).
 - **Linking (decided while building F0):** `rustyssl-ossl` loads `libcrypto` and `libssl` when the binary starts, by soname (`libcrypto.so.3`, `libssl.so.3`) or install name (`libcrypto.3.dylib`, ...), and resolves each export it calls once, rather than linking them when it is built. A build-time link would make `cargo build` and `cargo test --workspace` need `target/dist` (or the reference) first, which the gates and a fresh checkout don't have.
   - **Search order, as a linked binary's `RUNPATH` would give:** the platform's library path variable when it is set (`LD_LIBRARY_PATH`, `DYLD_LIBRARY_PATH`), so the same binary runs on our libraries or the reference's exactly as upstream's binary does; otherwise `../lib` next to the binary (the dist layout); otherwise the system's default search.
   - **Fail closed:** a library that can't be loaded, or an export missing from it, stops the command with a message and exit code 1. Nothing falls back to another implementation.
@@ -114,6 +114,8 @@ Everything else depends on it.
    `cargo xtask codegen` generates the option tables from them.
 3. **The switch happens when 11.1 is complete.** Until then our binary is installed as
    `target/dist/bin/openssl-rs` and tested alongside upstream's; `target/dist/bin/openssl`, what
-   `test-apps` and the recipes use by default, stays upstream's relinked binary.
+   `test-apps` and the recipes use by default, stays upstream's relinked binary. (Done in 11.2:
+   dist installs ours as `bin/openssl`, with no `openssl-rs` alias; the drivers run upstream's
+   tool from the reference, `target/ref/bin/openssl`.)
 4. **The exclusions stand:** timings, interactive sessions, and TTY prompts aren't
    byte-compared, but their runs must succeed with the same exit codes and behavior.
