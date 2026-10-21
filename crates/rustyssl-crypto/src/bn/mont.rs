@@ -124,6 +124,11 @@ impl Montgomery {
         &self.rr
     }
 
+    /// `n0 = -N^-1 mod 2^64`.
+    pub fn n0(&self) -> Limb {
+        self.n0
+    }
+
     /// The modulus's length in limbs (`nl`), 0 for an unset context.
     pub fn limbs(&self) -> usize {
         self.n.top()
@@ -214,11 +219,6 @@ impl Montgomery {
     fn exp_consttime_dit(&self, base: &BigNum, exp: &[Limb]) -> BigNum {
         let nl = self.limbs();
         let np = self.n.limbs();
-        // One limb more than the modulus for the product's top, as REDC's input is 2 nl.
-        let ct_mul = |x: &[Limb], y: &[Limb]| -> Vec<Limb> {
-            let t = mul_fixed(x, y);
-            self.redc(&t)
-        };
         let pad = |v: &BigNum| -> Vec<Limb> {
             let mut l = v.limbs().to_vec();
             l.resize(nl, 0);
@@ -230,32 +230,45 @@ impl Montgomery {
         let bits = exp.len().saturating_mul(LIMB_BITS);
         let window = window_ct(bits);
         let size = 1usize << window;
-        let mut table: Vec<Vec<Limb>> = Vec::with_capacity(size);
-        table.push(one.clone());
-        table.push(b.clone());
-        for i in 2..size {
-            let prev = table.get(i.wrapping_sub(1)).cloned().unwrap_or_default();
-            table.push(ct_mul(&prev, &b));
+        // The table of b^0 .. b^(size - 1), one entry of `nl` limbs after another, and the
+        // buffers every product reuses: nothing is allocated in the loop.
+        let mut table = vec![0; size.saturating_mul(nl)];
+        let mut scratch = vec![0; nl.saturating_add(2)];
+        let mut prod = vec![0; nl];
+        let mut entry = vec![0; nl];
+        let mut acc = one.clone();
+        for (i, slot) in table.chunks_exact_mut(nl.max(1)).enumerate() {
+            match i {
+                0 => slot.copy_from_slice(&one),
+                1 => slot.copy_from_slice(&b),
+                _ => {
+                    self.mul_into(&mut prod, &acc, &b, &mut scratch);
+                    slot.copy_from_slice(&prod);
+                }
+            }
+            acc.copy_from_slice(slot);
         }
-        let mut acc = one;
+        acc.copy_from_slice(&one);
         let mut pos = bits;
         // The windows from the top; the first may be shorter.
         let first = bits.checked_rem(window).unwrap_or(0);
         let mut step = if first == 0 { window } else { first };
         while pos > 0 {
             for _ in 0..step {
-                acc = ct_mul(&acc, &acc);
+                self.mul_into(&mut prod, &acc, &acc, &mut scratch);
+                core::mem::swap(&mut acc, &mut prod);
             }
             pos = pos.saturating_sub(step);
             let w = bits_at(exp, pos, step);
-            let mut entry = vec![0; nl];
-            for (i, t) in table.iter().enumerate() {
+            entry.fill(0);
+            for (i, t) in table.chunks_exact(nl.max(1)).enumerate() {
                 let m = barrier(eq_mask(i, w));
                 for (e, &x) in entry.iter_mut().zip(t) {
                     *e |= x & m;
                 }
             }
-            acc = ct_mul(&acc, &entry);
+            self.mul_into(&mut prod, &acc, &entry, &mut scratch);
+            core::mem::swap(&mut acc, &mut prod);
             step = window;
         }
         let out = self.redc(&acc);
@@ -267,6 +280,123 @@ impl Montgomery {
             *r = (keep & o) | (!keep & *r);
         }
         BigNum::from_limbs(false, reduced).unwrap_or_default()
+    }
+
+    /// `a * b / R mod N` into `out`, for `a` and `b` of `nl` limbs: the same value as
+    /// [`Montgomery::redc`] of [`mul_fixed`]'s product (both are `(ab + qN) / R` for the one `q`
+    /// that makes it whole, with `N` subtracted at most once), with the product and the
+    /// reduction interleaved (Montgomery's CIOS) in `t`, `nl + 2` limbs of scratch. No
+    /// allocation, and no branch or index on the values.
+    pub fn mul_into(&self, out: &mut [Limb], a: &[Limb], b: &[Limb], t: &mut [Limb]) {
+        let np = self.n.limbs();
+        let nl = np.len();
+        t.fill(0);
+        let Some(lo_t) = t.get_mut(..nl.saturating_add(2)) else {
+            return;
+        };
+        for &bi in b.iter().take(nl) {
+            // t += a * b_i
+            let mut c: Limb = 0;
+            for (tj, &aj) in lo_t.iter_mut().zip(a.iter().take(nl)) {
+                let v = u128::from(aj)
+                    .wrapping_mul(u128::from(bi))
+                    .wrapping_add(u128::from(*tj))
+                    .wrapping_add(u128::from(c));
+                *tj = lo(v);
+                c = hi(v);
+            }
+            if let [.., top, over] = lo_t {
+                let (s, carry) = top.overflowing_add(c);
+                *top = s;
+                *over = Limb::from(carry);
+            }
+            // t = (t + m N) / 2^64, with m making the low limb zero.
+            let m = lo_t.first().copied().unwrap_or(0).wrapping_mul(self.n0);
+            let mut c: Limb = 0;
+            for j in 0..nl {
+                let tj = lo_t.get(j).copied().unwrap_or(0);
+                let nj = np.get(j).copied().unwrap_or(0);
+                let v = u128::from(m)
+                    .wrapping_mul(u128::from(nj))
+                    .wrapping_add(u128::from(tj))
+                    .wrapping_add(u128::from(c));
+                if let Some(prev) = j.checked_sub(1).and_then(|k| lo_t.get_mut(k)) {
+                    *prev = lo(v);
+                }
+                c = hi(v);
+            }
+            let top = lo_t.get(nl).copied().unwrap_or(0);
+            let over = lo_t.get(nl.saturating_add(1)).copied().unwrap_or(0);
+            let (s, carry) = top.overflowing_add(c);
+            if let Some(x) = nl.checked_sub(1).and_then(|k| lo_t.get_mut(k)) {
+                *x = s;
+            }
+            if let Some(x) = lo_t.get_mut(nl) {
+                *x = over.wrapping_add(Limb::from(carry));
+            }
+        }
+        // One masked subtraction of N.
+        let top = lo_t.get(nl).copied().unwrap_or(0);
+        let low = lo_t.get(..nl).unwrap_or(&[]);
+        let borrow = sub_into(out, low, np);
+        let keep = barrier(mask(top == 0) & mask(borrow));
+        for (o, &x) in out.iter_mut().zip(low) {
+            *o = (keep & x) | (!keep & *o);
+        }
+    }
+}
+
+/// [`Montgomery::mul_into`] for a modulus of exactly `N` limbs, with arrays the compiler can
+/// unroll: the same value, the same constant-time steps.
+pub fn mul_n<const N: usize>(
+    out: &mut [Limb; N],
+    a: &[Limb; N],
+    b: &[Limb; N],
+    n: &[Limb; N],
+    n0: Limb,
+) {
+    let mut t = [0 as Limb; N];
+    let mut top: Limb = 0;
+    for &bi in b {
+        // t += a * b_i, then (t + m N) / 2^64.
+        let mut c: Limb = 0;
+        for (tj, &aj) in t.iter_mut().zip(a) {
+            let v = u128::from(aj)
+                .wrapping_mul(u128::from(bi))
+                .wrapping_add(u128::from(*tj))
+                .wrapping_add(u128::from(c));
+            *tj = lo(v);
+            c = hi(v);
+        }
+        let (s1, over) = top.overflowing_add(c);
+        let t0 = t.first().copied().unwrap_or(0);
+        let m = t0.wrapping_mul(n0);
+        let v = u128::from(m)
+            .wrapping_mul(u128::from(n.first().copied().unwrap_or(0)))
+            .wrapping_add(u128::from(t0));
+        let mut c = hi(v);
+        let mut u = [0 as Limb; N];
+        for ((&tj, &nj), uj) in t.iter().zip(n).skip(1).zip(u.iter_mut()) {
+            let v = u128::from(m)
+                .wrapping_mul(u128::from(nj))
+                .wrapping_add(u128::from(tj))
+                .wrapping_add(u128::from(c));
+            *uj = lo(v);
+            c = hi(v);
+        }
+        let (s2, carry) = s1.overflowing_add(c);
+        if let Some(last) = u.last_mut() {
+            *last = s2;
+        }
+        t = u;
+        top = Limb::from(over).wrapping_add(Limb::from(carry));
+    }
+    // One masked subtraction of N.
+    let mut d = [0 as Limb; N];
+    let borrow = sub_into(&mut d, &t, n);
+    let keep = barrier(mask(top == 0) & mask(borrow));
+    for ((o, &x), &y) in out.iter_mut().zip(&t).zip(&d) {
+        *o = (keep & x) | (!keep & y);
     }
 }
 
