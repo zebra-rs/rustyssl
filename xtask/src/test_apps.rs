@@ -334,8 +334,8 @@ fn mask_location(line: &str) -> String {
 }
 
 /// The output with what varies from run to run masked too: each number (`12`, `0.25s`,
-/// `1234.50k`, `inf`, `-nan`) as `N`, runs of spaces as one, and the lines that name how the
-/// library was built.
+/// `1234.50k`, `inf`, `-nan`) as `N`, runs of spaces as one, trailing spaces, and the lines
+/// that name how the library was built.
 fn masked_timings(text: &str) -> String {
     let mut out = Vec::new();
     for line in masked(text).lines() {
@@ -385,7 +385,9 @@ fn masked_timings(text: &str) -> String {
                 collapsed.push(c);
             }
         }
-        out.push(collapsed);
+        // A line-final number prints as `12.00 ` or `1234.50k`/`infk` by its size, so the
+        // line's trailing space depends on the timing too.
+        out.push(collapsed.trim_end_matches(' ').to_owned());
     }
     out.join("\n")
 }
@@ -1105,7 +1107,11 @@ mod tests {
         );
         assert_eq!(
             masked_timings("sha256           1234.50k        infk     -nan       12.00 "),
-            "shaN N N N N "
+            "shaN N N N N"
+        );
+        assert_eq!(
+            masked_timings("AES-128-GCM       6400.00 "),
+            masked_timings("AES-128-GCM           infk")
         );
         assert_eq!(masked_timings("+F:6:sha256:inf:0.50"), "+F:N:shaN:N:N");
         assert_eq!(

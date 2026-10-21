@@ -6251,8 +6251,24 @@ ported, and `cargo xtask dist` installs ours as `target/dist/bin/openssl` (decis
   x86_64 Linux.
 - **Left:** the gaps listed above (tickets' length, `-starttls` against real servers, the
   security-callback trace, `ocsp -multi`, some `cmp` paths, `speed -mb` with `-async_jobs`,
-  `engine` with an unknown ID); x86_64 Linux runs of test-apps and the recipes with our tool
-  (CI runs the gates there).
+  `engine` with an unknown ID).
+
+**Linux (2026-10-21, Docker `rust:1.99.0-slim-trixie`; linux/amd64 emulated on the Mac).**
+- `cargo xtask test-apps`: 4342 command lines behave the same on linux/arm64 and on
+  linux/amd64 (exit 0, after the timing mask's trailing-space fix below);
+  `test-interop --cli ours`: 65 of 65 cases in all four pairings on both.
+- `cargo xtask test-openssl-suite --all`, with and without `--cli ours`: on linux/arm64 4376 of
+  4376 eligible subtests pass (exit 0), on linux/amd64 4377 of 4377 (exit 0). The eligible
+  counts differ from macOS's 4334: on Linux the tree's programs that need the libraries'
+  internal functions don't link against the shared libraries (`make -k`), so their 97 subtests
+  fail on the reference and aren't eligible, where macOS finds those programs as internal.
+- Found and fixed: the AES-CBC-HMAC composites (offered on x86_64 with AES-NI) refused
+  `tls-version`, so upstream's `evpciph_aes_stitched.txt` failed (it now runs under
+  `test-openssl-suite` too); `sslapitest` links on Linux (its internal import is weak) and its
+  tests that read private structures crash it, so `test_sslapi` #1 is listed as internal there
+  (`--ssl` runs its tests one by one: on linux/arm64, 627 of 646 pass, the other 19 the listed
+  internal ones); `speed`'s line-final number may print with a trailing space when the timer
+  crosses a tick, which the timing mask now ignores.
 
 The CLI's gaps closed (2026-10-21, local, branch `cli-gaps`, macOS arm64):
 - **`ocsp -multi`, the request timeout and the index reload** (`HTTP_DAEMON`, as upstream

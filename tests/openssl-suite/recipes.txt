@@ -9,6 +9,7 @@
 # recipe runs its program as one subtest, so the program's other tests can't count either here;
 # test-openssl-suite --ssl runs them one by one.
 internal test_sslbuffers #1 sslbuffertest's test_func reads the private SSL_CONNECTION's record buffers (and crashes on another layout)
+internal test_sslapi #1 sslapitest's tests that read the private SSL_CONNECTION (ssl.txt's internal sslapitest lines; test_cleanse_plaintext, test_tlsext_status_type_multi, ...), and it crashes on another layout. On macOS the program imports the internal ossl_quic_obj_get0_handshake_layer and is found as internal; on Linux that import is weak, so it links and runs. test-openssl-suite --ssl runs its tests one by one
 internal test_dtls_mtu #1 dtls_mtu_test's run_mtu_tests reads the private SSL_CONNECTION's DTLS state
 internal test_ssl_new #26 26-tls13_client_auth's post-handshake-auth iterations: ssl_test's handshake.c takes the server's private SSL_CONNECTION (SSL_CONNECTION_FROM_SSL_ONLY, and sets its post_handshake_auth); its other iterations pass under test-openssl-suite --ssl
 skip test_tls13secrets tls13secretstest compiles its own copy of ssl/tls13_enc.c over libssl's private SSL_CONNECTION
