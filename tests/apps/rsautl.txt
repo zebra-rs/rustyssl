@@ -1,0 +1,47 @@
+# `openssl rsautl` (deprecated). PKCS#1 v1.5 signatures are deterministic; encryption is
+# random, so it goes through `| check` (decrypted by upstream's tool on the reference).
+rsautl -help
+rsautl -sign -inkey {src}/test/testrsa.pem -in {txt}
+rsautl -sign -inkey {src}/test/testrsa.pem -in {txt} -hexdump
+rsautl -sign -inkey {src}/test/testrsa.pem -in {txt} -out {dir}/rsautl.sig
+rsautl -verify -inkey {src}/test/testrsa.pem -in {dir}/rsautl.sig
+rsautl -inkey {src}/test/testrsa.pem -in {dir}/rsautl.sig -hexdump
+rsautl -verify -pubin -inkey {src}/test/testrsapub.pem -in {dir}/rsautl.sig
+rsautl -verify -certin -inkey {src}/test/certs/ee-cert.pem -in {dir}/rsautl.sig
+rsautl -verify -inkey {src}/test/testrsa.pem -in {dir}/rsautl.sig -raw -hexdump
+rsautl -verify -inkey {src}/test/testrsa.pem -in {txt}
+rsautl -sign -inkey {src}/test/testrsa.pem -in {txt} -rev -hexdump
+rsautl -verify -inkey {src}/test/testrsa.pem -in {dir}/rsautl.sig -rev
+rsautl -sign -inkey {src}/test/testrsa.pem -in {txt} -x931
+rsautl -sign -inkey {src}/test/testrsa.pem -in {txt} -oaep
+rsautl -sign -inkey {src}/test/testrsa.pem -in {txt} -raw
+rsautl -sign -inkey {src}/test/testrsa.pem -in {bin}
+rsautl -sign -pubin -inkey {src}/test/testrsapub.pem -in {txt}
+rsautl -decrypt -certin -inkey {src}/test/certs/ee-cert.pem -in {txt}
+rsautl -encrypt -inkey {src}/test/testrsa.pem -in {txt} | rsautl -decrypt -inkey {src}/test/testrsa.pem
+rsautl -encrypt -pubin -inkey {src}/test/testrsapub.pem -in {txt} | rsautl -decrypt -inkey {src}/test/testrsa.pem
+rsautl -encrypt -oaep -pubin -inkey {src}/test/testrsapub.pem -in {txt} | rsautl -decrypt -oaep -inkey {src}/test/testrsa.pem
+rsautl -encrypt -pkcs -inkey {src}/test/testrsa.pem -in {txt} -out {dir}/rsautl.enc | rsautl -decrypt -inkey {src}/test/testrsa.pem -in {dir}/rsautl.enc -hexdump
+rsautl -decrypt -inkey {src}/test/testrsa.pem -in {txt}
+rsautl -sign -inkey {src}/test/certs/ee-key.pem -in {src}/test/certs/ee-key.pem -asn1parse
+rsautl -sign -inkey {src}/test/testrsa.pem -in {txt} -asn1parse
+rsautl -sign -inkey {src}/test/testrsa.pem -in {src}/test/certs/key-pass-12345.pem
+rsautl -sign -inkey {src}/test/certs/key-pass-12345.pem -passin pass:12345 -in {txt} -hexdump
+rsautl -sign -inkey {src}/test/certs/key-pass-12345.pem -passin pass:wrong -in {txt}
+rsautl -sign -inkey {src}/test/certs/key-pass-12345.pem -passin nosuch:x -in {txt}
+rsautl -sign -inkey {src}/test/testec-p256.pem -in {txt}
+rsautl -sign -inkey /nonexistent/key.pem -in {txt}
+rsautl -sign -inkey {src}/test/testrsa.pem -in /nonexistent/in.bin
+rsautl -sign -inkey {src}/test/testrsa.pem -in {txt} -out /nonexistent/dir/out.bin
+rsautl -sign -in {txt}
+rsautl -sign -inkey {src}/test/testrsa.pem -keyform DER -in {txt}
+rsautl -sign -inkey {src}/test/testrsa.pem -keyform XYZ -in {txt}
+rsautl -sign -inkey {src}/test/testrsa.pem -hexdump < {txt}
+rsautl -sign -inkey {src}/test/testrsa.pem -in {txt} -engine /nonexistent/eng.so -hexdump
+rsautl -sign -inkey {src}/test/testrsa.pem -in {txt} -provider default -hexdump
+rsautl -sign -inkey {src}/test/testrsa.pem -in {txt} -provider /nonexistent/prov.so
+rsautl -sign -inkey {src}/test/testrsa.pem -in {txt} -propquery provider=nosuch
+rsautl -sign -inkey {src}/test/testrsa.pem -in {txt} -rand {bin} -writerand {dir}/rsautl.rnd -hexdump
+rsautl -sign -inkey {src}/test/testrsa.pem extra
+rsautl -nosuchoption
+rsautl -inkey

@@ -45,7 +45,7 @@ pub mod pkeyparam;
 // pub mod rehash;
 // pub mod req;
 pub mod rsa;
-// pub mod rsautl;
+pub mod rsautl;
 // pub mod s_client;
 // pub mod s_server;
 // pub mod s_time;
@@ -104,7 +104,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "rehash" => rehash::main,
         // "req" => req::main,
         "rsa" => rsa::main,
-        // "rsautl" => rsautl::main,
+        "rsautl" => rsautl::main,
         // "s_client" => s_client::main,
         // "s_server" => s_server::main,
         // "s_time" => s_time::main,
