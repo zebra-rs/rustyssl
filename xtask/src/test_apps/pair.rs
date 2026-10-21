@@ -245,6 +245,86 @@ fn run(
     })
 }
 
+/// Marks a line [`mask`] took out of a ticket's dump; [`tickets_last`] keeps it where the
+/// ticket's block was.
+const STRAY: &str = "\u{1}stray:";
+
+/// The text after a `BIO_dump` line cut short, where a raw write of the peer's data landed:
+/// after a byte and its space (`    0530 - 95 f6 5a olleh`), right after a byte (`5aolleh`),
+/// or within one (`5 olleh` cut to `5olleh`: the half byte isn't the peer's). `None` for a
+/// whole line (its text column follows the bytes after spaces) or one with nothing after.
+fn stray_text(line: &str) -> Option<&str> {
+    let t = line.trim_start();
+    let (offset, mut rest) = t.split_once(" - ")?;
+    if offset.len() != 4 || !offset.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    let hex = |c: Option<&u8>| c.is_some_and(u8::is_ascii_hexdigit);
+    loop {
+        let b = rest.as_bytes();
+        if hex(b.first()) && hex(b.get(1)) {
+            rest = rest.get(2..)?;
+            match rest.as_bytes().first() {
+                None => return None,
+                Some(b' ' | b'-') => rest = rest.get(1..)?,
+                Some(_) => return Some(rest),
+            }
+        } else if hex(b.first()) && b.get(1).is_some_and(|c| *c != b' ') {
+            return rest.get(1..);
+        } else if rest.is_empty() || rest.starts_with(' ') {
+            return None;
+        } else {
+            return Some(rest);
+        }
+    }
+}
+
+/// A client's text with each TLS 1.3 session ticket's block (`---`, `Post-Handshake New
+/// Session Ticket arrived:` ... `---`, and a following `read R BLOCK`) moved to the end, in
+/// order: the server's tickets and its reply race to the client, so where the reply's line
+/// falls among them depends on scheduling, on the reference as on rustyssl (measured on macOS).
+fn tickets_last(text: &str) -> String {
+    let lines: Vec<&str> = text.lines().collect();
+    let (mut rest, mut tickets): (Vec<&str>, Vec<&str>) = (Vec::new(), Vec::new());
+    let mut i = 0;
+    while let Some(&l) = lines.get(i) {
+        let starts =
+            l == "---" && lines.get(i + 1) == Some(&"Post-Handshake New Session Ticket arrived:");
+        if !starts {
+            rest.push(l);
+            i += 1;
+            continue;
+        }
+        // The block ends at its own closing `---` (the first after its header).
+        let mut j = i + 2;
+        while lines.get(j).is_some_and(|l| *l != "---") {
+            j += 1;
+        }
+        let mut end = (j + 1).min(lines.len());
+        if lines.get(end) == Some(&"read R BLOCK") {
+            end += 1;
+        }
+        for l in lines.get(i..end).unwrap_or_default() {
+            match l.strip_prefix(STRAY) {
+                Some(stray) => rest.push(stray),
+                None => tickets.push(l),
+            }
+        }
+        i = end;
+    }
+    rest.extend(tickets);
+    // A stray line outside a ticket's block (the reply cut a dump that isn't a ticket's).
+    let rest: Vec<&str> = rest
+        .into_iter()
+        .map(|l| l.strip_prefix(STRAY).unwrap_or(l))
+        .collect();
+    let mut out = rest.join("\n");
+    if text.ends_with('\n') {
+        out.push('\n');
+    }
+    out
+}
+
 /// A run's text with what is random by design masked.
 pub fn mask(text: &str, port: &str) -> String {
     let mut out = Vec::new();
@@ -264,6 +344,10 @@ pub fn mask(text: &str, port: &str) -> String {
             } else {
                 if out.last().is_none_or(|p: &String| p != "HEX") {
                     out.push("HEX".to_owned());
+                }
+                // The peer's data written into a dump line the buffer cut short.
+                if let Some(stray) = stray_text(&l) {
+                    out.push(format!("{STRAY}{stray}"));
                 }
                 continue;
             }
@@ -429,7 +513,7 @@ pub fn check(
     ];
     let (es, ec) = (
         mask(&expected.server, &expected.port),
-        mask(&expected.client, &expected.port),
+        tickets_last(&mask(&expected.client, &expected.port)),
     );
     for (name, server, client) in runs {
         let got = run(setup, pair, server, client, !compare)?;
@@ -439,7 +523,10 @@ pub fn check(
             }
             continue;
         }
-        let (gs, gc) = (mask(&got.server, &got.port), mask(&got.client, &got.port));
+        let (gs, gc) = (
+            mask(&got.server, &got.port),
+            tickets_last(&mask(&got.client, &got.port)),
+        );
         if gc != ec {
             save(setup, label, name, "client", &ec, &gc);
             return Ok(Err(format!("{name}: client {}", first_diff(&ec, &gc))));
@@ -495,6 +582,29 @@ mod tests {
         );
         assert_eq!(mask("x 43210", "4321"), "x 43210");
         assert_eq!(mask("    Session-ID: ABCD", ""), "    Session-ID: MASKED");
+        assert_eq!(
+            stray_text("    0530 - 95 f6 5a ba 2b 7e 07 olleh"),
+            Some("olleh")
+        );
+        assert_eq!(
+            stray_text("    01a0 - e1 9c fb 69 38 7a dolleh"),
+            Some("olleh")
+        );
+        assert_eq!(
+            stray_text("    01a0 - e1 9c fb 69 38 7aolleh"),
+            Some("olleh")
+        );
+        assert_eq!(stray_text("    01a0 - e1 9c fb"), None);
+        assert_eq!(
+            stray_text("    0000 - 16 03 01 00 2a 01 00 00-26 03 03 01 02 03 04 05   ...."),
+            None
+        );
+        assert_eq!(
+            tickets_last(
+                "a\n---\nPost-Handshake New Session Ticket arrived:\nt\n---\nread R BLOCK\nolleh\nz\n"
+            ),
+            "a\nolleh\nz\n---\nPost-Handshake New Session Ticket arrived:\nt\n---\nread R BLOCK\n"
+        );
         assert_eq!(mask("0000 - 16 03 01 00 2a   ....\n0010 - 01", ""), "HEX");
         assert_eq!(mask("    16 03 01\n    0a", ""), "HEX");
         assert_eq!(
