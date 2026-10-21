@@ -13,7 +13,7 @@
 //! Every run must print the same and exit the same as (1), after masking what differs by
 //! design: the library's version metadata (`+rustyssl...`), the directories it was built with
 //! (OPENSSLDIR, ENGINESDIR, MODULESDIR, the libraries' own), errors' thread id and file and
-//! line, dlopen's message, and every `PID=n`.
+//! line, dlopen's message, every `PID=n`, and `ocsp -multi`'s `child process: n`.
 //!
 //! In a line, `{bin}` is 100,000 octets of fixed data, `{txt}` a line of text, `{dir}` the work
 //! directory, `{src}` the reference's source tree (its `test/certs/`, ...), and `{tests}`
@@ -25,7 +25,8 @@
 //!   (`built on:`, `compiler:`, `CPUINFO:`) (`speed`);
 //! - `&`: a server (`ocsp -port`, `cmp -port`): it starts in the background, the next line runs
 //!   once it has printed its `ACCEPT` line, and then both outputs are compared (the server must
-//!   exit by itself, as with `-nrequest 1`);
+//!   exit by itself, as with `-nrequest 1`; an `ocsp -multi` server, which runs until a signal,
+//!   gets `SIGTERM` in its process group half a second after the client ends);
 //! - `^`: the times within a few days of now (a reply made now) are masked.
 //!
 //! `{fresh:NAME}` in an argument is `fresh/NAME` in the work directory, a pristine copy of the
@@ -208,13 +209,19 @@ fn mask_apps_line(line: &str) -> String {
     out
 }
 
-/// `PID=<digits>` as `PID=PID` (a server's `ACCEPT` line).
+/// `PID=<digits>` as `PID=PID` (a server's `ACCEPT` line), and the process ID of an `ocsp
+/// -multi` responder's log (`child process: <digits>,`) as `PID`.
 fn mask_pid(line: &str) -> String {
+    mask_digits_after(&mask_digits_after(line, "PID="), "child process: ")
+}
+
+/// The digits after each `marker` in `line` as `PID`.
+fn mask_digits_after(line: &str, marker: &str) -> String {
     let mut out = String::new();
     let mut rest = line;
-    while let Some((before, after)) = rest.split_once("PID=") {
+    while let Some((before, after)) = rest.split_once(marker) {
         out.push_str(before);
-        out.push_str("PID=");
+        out.push_str(marker);
         let n = after.bytes().take_while(u8::is_ascii_digit).count();
         if n > 0 {
             out.push_str("PID");
@@ -730,6 +737,14 @@ fn run_pair(
         }
     }
     let got = run_tool(tool, lib, &client.args, client.stdin.as_deref(), work)?;
+    if server.args.iter().any(|a| a == "-multi") {
+        // Its responders run in the process group `spawn_loop` made (the server's process ID);
+        // the parent, in waitpid (restarted after a signal), ends once a child has.
+        std::thread::sleep(Duration::from_millis(500));
+        let _ = Command::new("kill")
+            .args(["-TERM", "--", &format!("-{}", child.id())])
+            .status();
+    }
     let deadline = Instant::now() + Duration::from_secs(20);
     let status = loop {
         if let Some(s) = child.try_wait()? {
@@ -1116,6 +1131,10 @@ mod tests {
         assert_eq!(
             masked("ACCEPT [::]:8888 PID=4242"),
             "ACCEPT [::]:8888 PID=PID"
+        );
+        assert_eq!(
+            masked("ocsp: child process: 4242, term signal 15"),
+            "ocsp: child process: PID, term signal 15"
         );
         assert_eq!(
             masked("opt_str:apps/cmp.c:2853:CMP warning: x"),
