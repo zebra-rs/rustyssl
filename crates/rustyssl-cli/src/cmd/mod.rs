@@ -32,7 +32,7 @@ pub mod cms;
 // pub mod list;
 // pub mod mac;
 // pub mod nseq;
-// pub mod ocsp;
+pub mod ocsp;
 // pub mod passwd;
 pub mod pkcs12;
 pub mod pkcs7;
@@ -91,7 +91,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "list" => list::main,
         // "mac" => mac::main,
         // "nseq" => nseq::main,
-        // "ocsp" => ocsp::main,
+        "ocsp" => ocsp::main,
         // "passwd" => passwd::main,
         "pkcs12" => pkcs12::main,
         "pkcs7" => pkcs7::main,

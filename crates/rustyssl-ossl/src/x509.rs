@@ -700,3 +700,12 @@ impl Cert {
         unsafe { ffi::X509_cmp_timeframe(v, nb, na) }
     }
 }
+
+impl Cert {
+    /// A new reference to the same certificate (`X509_up_ref`).
+    pub fn clone_ref(&self) -> Cert {
+        // SAFETY: the certificate is live; the new reference is owned by the result.
+        unsafe { ffi::X509_up_ref(self.as_ptr()) };
+        Cert(self.0)
+    }
+}

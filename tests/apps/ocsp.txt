@@ -1,0 +1,139 @@
+# `openssl ocsp` (apps/ocsp.c): run with upstream's tool on the reference, then ours on
+# rustyssl and on the reference (cargo xtask test-apps); output and exit codes must match.
+# Fixed responses (data/ocsp/) are byte-compared; responses made now carry the current time
+# and a new signature, so those lines (`@`) mask the times and don't print signatures.
+# Servers (`&`) run on loopback for the following line.
+#
+# Responses: upstream's vectors.
+ocsp -respin {tests}/data/ocsp/ND1.der -partial_chain -attime 1355875200 -CAfile {src}/test/ocsp-tests/ND1_Issuer_ICA.pem -verify_other {src}/test/ocsp-tests/ND1_Issuer_ICA.pem -no-CApath -no-CAstore
+ocsp -respin {tests}/data/ocsp/ND2.der -partial_chain -attime 1355875200 -CAfile {src}/test/ocsp-tests/ND2_Issuer_Root.pem -verify_other {src}/test/ocsp-tests/ND2_Issuer_Root.pem -no-CApath -no-CAstore
+ocsp -respin {tests}/data/ocsp/ND3.der -partial_chain -attime 1355875200 -CAfile {src}/test/ocsp-tests/ND3_Issuer_Root.pem -verify_other {src}/test/ocsp-tests/ND3_Issuer_Root.pem -no-CApath -no-CAstore
+ocsp -respin {tests}/data/ocsp/ND1.der -partial_chain -attime 1355875200 -CAfile {src}/test/ocsp-tests/ND1_Cross_Root.pem -verify_other {src}/test/ocsp-tests/ND1_Issuer_ICA-Cross.pem -no-CApath -no-CAstore
+ocsp -respin {tests}/data/ocsp/D1.der -partial_chain -attime 1355875200 -CAfile {src}/test/ocsp-tests/D1_Issuer_ICA.pem -verify_other {src}/test/ocsp-tests/D1_Issuer_ICA.pem -no-CApath -no-CAstore
+ocsp -respin {tests}/data/ocsp/D2.der -partial_chain -attime 1355875200 -CAfile {src}/test/ocsp-tests/D2_Issuer_Root.pem -verify_other {src}/test/ocsp-tests/D2_Issuer_Root.pem -no-CApath -no-CAstore
+ocsp -respin {tests}/data/ocsp/D3.der -partial_chain -attime 1355875200 -CAfile {src}/test/ocsp-tests/D3_Issuer_Root.pem -verify_other {src}/test/ocsp-tests/D3_Issuer_Root.pem -no-CApath -no-CAstore
+ocsp -respin {tests}/data/ocsp/ISOP_ND1.der -partial_chain -attime 1355875200 -CAfile {src}/test/ocsp-tests/ND1_Issuer_ICA.pem -verify_other {src}/test/ocsp-tests/ND1_Issuer_ICA.pem -no-CApath -no-CAstore
+ocsp -respin {tests}/data/ocsp/ISOP_D1.der -partial_chain -attime 1355875200 -CAfile {src}/test/ocsp-tests/D1_Issuer_ICA.pem -verify_other {src}/test/ocsp-tests/D1_Issuer_ICA.pem -no-CApath -no-CAstore
+ocsp -respin {tests}/data/ocsp/WRID_ND1.der -partial_chain -attime 1355875200 -CAfile {src}/test/ocsp-tests/ND1_Issuer_ICA.pem -verify_other {src}/test/ocsp-tests/ND1_Issuer_ICA.pem -no-CApath -no-CAstore
+ocsp -respin {tests}/data/ocsp/WINH_ND1.der -partial_chain -attime 1355875200 -CAfile {src}/test/ocsp-tests/ND1_Issuer_ICA.pem -verify_other {src}/test/ocsp-tests/ND1_Issuer_ICA.pem -no-CApath -no-CAstore
+ocsp -respin {tests}/data/ocsp/WIKH_D1.der -partial_chain -attime 1355875200 -CAfile {src}/test/ocsp-tests/D1_Issuer_ICA.pem -verify_other {src}/test/ocsp-tests/D1_Issuer_ICA.pem -no-CApath -no-CAstore
+ocsp -respin {tests}/data/ocsp/WKDOSC_D1.der -partial_chain -attime 1355875200 -CAfile {src}/test/ocsp-tests/D1_Issuer_ICA.pem -verify_other {src}/test/ocsp-tests/D1_Issuer_ICA.pem -no-CApath -no-CAstore
+ocsp -respin {tests}/data/ocsp/ISDOSC_D1.der -partial_chain -attime 1355875200 -CAfile {src}/test/ocsp-tests/D1_Issuer_ICA.pem -verify_other {src}/test/ocsp-tests/D1_Issuer_ICA.pem -no-CApath -no-CAstore
+ocsp -respin {tests}/data/ocsp/ISDOSC_D1.der -partial_chain -attime 1355875200 -CAfile {src}/test/ocsp-tests/D1_Issuer_ICA.pem -verify_other {src}/test/ocsp-tests/D1_Issuer_ICA.pem -no-CApath -no-CAstore -no_cert_checks
+ocsp -respin {tests}/data/ocsp/ND1.der -partial_chain -attime 1355875200 -CAfile {src}/test/ocsp-tests/WSNIC_ND1_Issuer_ICA.pem -verify_other {src}/test/ocsp-tests/WSNIC_ND1_Issuer_ICA.pem -no-CApath -no-CAstore
+ocsp -respin {tests}/data/ocsp/ND1.der -partial_chain -attime 1355875200 -CAfile {src}/test/ocsp-tests/ISIC_ND1_Issuer_ICA.pem -verify_other {src}/test/ocsp-tests/ISIC_ND1_Issuer_ICA.pem -no-CApath -no-CAstore
+ocsp -respin {tests}/data/ocsp/ND1.der -partial_chain -attime 1355875200 -CAfile {src}/test/ocsp-tests/ND1_Cross_Root.pem -issuer {src}/test/ocsp-tests/ND1_Issuer_ICA-Cross.pem -no-CApath -no-CAstore
+ocsp -respin {tests}/data/ocsp/ND1.der -partial_chain -attime 1355875200 -CAfile {src}/test/ocsp-tests/ND1_Issuer_ICA.pem -VAfile {src}/test/ocsp-tests/ND1_Issuer_ICA.pem -no-CApath -no-CAstore
+ocsp -respin {tests}/data/ocsp/ND1.der -resp_text -noverify
+ocsp -respin {tests}/data/ocsp/D1.der -text -noverify
+ocsp -respin {tests}/data/ocsp/ND1.der -noverify -respout {dir}/nd1-copy.der
+ocsp -respin {dir}/nd1-copy.der -resp_text -noverify
+ocsp -respin {tests}/data/ocsp/ND1.der -CAfile {src}/test/ocsp-tests/ND1_Issuer_ICA.pem -no_signature_verify -no_cert_verify -no_chain -no_explicit -trust_other -no_intern -no-CApath -no-CAstore
+ocsp -respin {tests}/data/ocsp/ND1.der -CAfile {src}/test/ocsp-tests/ND1_Issuer_ICA.pem -no-CApath -no-CAstore -validity_period 1 -status_age 1
+ocsp -respin {tests}/data/ocsp/ND1.der -CApath {dir} -CAstore file:{src}/test/ocsp-tests/ND1_Issuer_ICA.pem -no-CAfile -attime 1355875200 -partial_chain
+ocsp -respin {tests}/data/ocsp/ND1.der -CAfile {dir}/nonexistent.pem
+ocsp -respin {tests}/data/ocsp/ND1.der -noverify -out {dir}/nd1.txt -resp_text
+ocsp -respin {tests}/data/ocsp/req.der -noverify
+ocsp -respin {dir}/nonexistent.der -noverify
+ocsp -respin {tests}/data/ocsp/ND1.der -noverify -respout {dir}/nonexistent/x.der
+ocsp -respin {tests}/data/ocsp/ND1.der -noverify -out {dir}/nonexistent/x.txt
+#
+# Responses: the responder's fixtures, with the requests' summaries.
+ocsp -respin {tests}/data/ocsp/resp.der -resp_text -noverify
+ocsp -respin {tests}/data/ocsp/resp.der -CAfile {src}/test/ocsp-tests/root-cert.pem -no-CApath -no-CAstore
+ocsp -reqin {tests}/data/ocsp/req.der -respin {tests}/data/ocsp/resp.der -CAfile {src}/test/ocsp-tests/root-cert.pem -no-CApath -no-CAstore
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -serial 1 -serial 2 -serial 3 -serial 4 -serial 5 -serial 6 -serial 10 -serial 12 -serial 13 -serial 14 -serial 99 -respin {tests}/data/ocsp/resp.der -CAfile {src}/test/ocsp-tests/root-cert.pem -no-CApath -no-CAstore -no_nonce
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -serial 77 -respin {tests}/data/ocsp/resp.der -CAfile {src}/test/ocsp-tests/root-cert.pem -no-CApath -no-CAstore -no_nonce
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -respin {tests}/data/ocsp/resp.der -CAfile {src}/test/ocsp-tests/root-cert.pem -no-CApath -no-CAstore
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -respin {tests}/data/ocsp/resp.der -noverify -no_nonce
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -respin {tests}/data/ocsp/resp.der -no_nonce -CAfile {src}/test/ocsp-tests/intermediate-cert.pem -partial_chain -no-CApath -no-CAstore
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -respin {tests}/data/ocsp/resp-nonce.der -CAfile {src}/test/ocsp-tests/root-cert.pem -no-CApath -no-CAstore -nonce
+ocsp -reqin {tests}/data/ocsp/req-nonce.der -respin {tests}/data/ocsp/resp-nonce.der -CAfile {src}/test/ocsp-tests/root-cert.pem -no-CApath -no-CAstore
+ocsp -reqin {tests}/data/ocsp/req-nonce.der -respin {tests}/data/ocsp/resp-nonce.der -CAfile {src}/test/ocsp-tests/root-cert.pem -no-CApath -no-CAstore -req_text -resp_text
+#
+# Requests.
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -no_nonce -req_text
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -serial 0x1234 -serial 4660 -no_nonce -req_text
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -sha256 -cert {src}/test/ocsp-tests/server-cert.pem -sha512 -serial 5 -no_nonce -req_text
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -issuer {src}/test/ocsp-tests/root-cert.pem -cert {src}/test/ocsp-tests/intermediate-cert.pem -no_nonce -req_text
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -no_nonce -reqout {dir}/r1.der
+ocsp -reqin {dir}/r1.der -req_text
+ocsp -reqin {dir}/r1.der -reqout {dir}/r1b.der
+ocsp -reqin {dir}/r1b.der -req_text -no_nonce
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -no_nonce -signer {src}/test/smime-certs/smrsa1.pem -req_text
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -no_nonce -signer {src}/test/smime-certs/smrsa3-cert.pem -signkey {src}/test/smime-certs/smrsa3-key.pem -sign_other {src}/test/smime-certs/smroot.pem -req_text
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -no_nonce -signer {src}/test/smime-certs/smrsa1.pem -no_certs -req_text
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -no_nonce -signer {src}/test/ocsp-tests/server.pem -reqout {dir}/signed.der
+ocsp -reqin {dir}/signed.der -req_text -no_nonce
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -no_nonce -signer {dir}/nonexistent.pem
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -no_nonce -signer {src}/test/ocsp-tests/server-cert.pem -signkey {src}/test/ocsp-tests/root-key.pem
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -no_nonce -signer {src}/test/ocsp-tests/server.pem -sign_other {dir}/nonexistent.pem
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -reqout {dir}/r2.der
+ocsp -reqin {dir}/r2.der -reqout {dir}/r2b.der
+ocsp -cert {src}/test/ocsp-tests/server-cert.pem
+ocsp -serial 1
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -serial nothex
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {dir}/nonexistent.pem
+ocsp -issuer {dir}/nonexistent.pem
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -sha256
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -sha256 -sha512 -cert {src}/test/ocsp-tests/server-cert.pem
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -nosuchdigest -cert {src}/test/ocsp-tests/server-cert.pem
+ocsp -reqin {dir}/nonexistent.der
+ocsp -reqin {tests}/data/ocsp/resp.der
+ocsp -reqin {dir}/r1.der -reqout {dir}/nonexistent/x.der
+ocsp -signer {src}/test/ocsp-tests/server.pem -respin {tests}/data/ocsp/resp.der
+#
+# The responder, on fixed requests (its responses are made now).
+@ocsp -index {tests}/data/ocsp/index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -CA {src}/test/ocsp-tests/intermediate-cert.pem -reqin {tests}/data/ocsp/req.der -respout {dir}/x1.der
+@ocsp -respin {dir}/x1.der -reqin {tests}/data/ocsp/req.der -CAfile {src}/test/ocsp-tests/root-cert.pem -no-CApath -no-CAstore
+@ocsp -index {tests}/data/ocsp/index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -CA {src}/test/ocsp-tests/intermediate-cert.pem -reqin {tests}/data/ocsp/req.der -ndays 2 -nmin 30 -respout {dir}/x2.der
+@ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -serial 1 -serial 2 -serial 3 -serial 4 -serial 5 -serial 6 -serial 10 -serial 12 -serial 13 -serial 14 -serial 99 -respin {dir}/x2.der -CAfile {src}/test/ocsp-tests/root-cert.pem -no-CApath -no-CAstore -no_nonce
+@ocsp -index {tests}/data/ocsp/index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -CA {src}/test/ocsp-tests/intermediate-cert.pem -reqin {tests}/data/ocsp/req-nonce.der -nmin 5 -resp_key_id -resp_no_certs -respout {dir}/x3.der
+@ocsp -reqin {tests}/data/ocsp/req-nonce.der -respin {dir}/x3.der -CAfile {src}/test/ocsp-tests/root-cert.pem -no-CApath -no-CAstore -verify_other {src}/test/ocsp-tests/ocsp.pem
+@ocsp -index {tests}/data/ocsp/index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -rkey {src}/test/ocsp-tests/ocsp.pem -CA {src}/test/ocsp-tests/intermediate-cert.pem -rother {src}/test/ocsp-tests/root-cert.pem -rmd sha384 -rcid sha256 -reqin {tests}/data/ocsp/req-nonce.der -respout {dir}/x4.der
+@ocsp -respin {dir}/x4.der -CAfile {src}/test/ocsp-tests/root-cert.pem -no-CApath -no-CAstore -noverify -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -no_nonce
+@ocsp -index {tests}/data/ocsp/index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -CA {src}/test/ocsp-tests/intermediate-cert.pem -rsigopt rsa_padding_mode:pss -rsigopt rsa_pss_saltlen:20 -reqin {tests}/data/ocsp/req-nonce.der -respout {dir}/x5.der
+@ocsp -reqin {tests}/data/ocsp/req-nonce.der -respin {dir}/x5.der -CAfile {src}/test/ocsp-tests/root-cert.pem -no-CApath -no-CAstore
+ocsp -index {tests}/data/ocsp/index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -CA {src}/test/ocsp-tests/intermediate-cert.pem -rsigopt nosuchopt:1 -reqin {tests}/data/ocsp/req-nonce.der
+@ocsp -index {tests}/data/ocsp/index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -CA {src}/test/ocsp-tests/intermediate-cert.pem -reqin {tests}/data/ocsp/req-nonce.der -badsig -respout {dir}/x6.der
+@ocsp -reqin {tests}/data/ocsp/req-nonce.der -respin {dir}/x6.der -CAfile {src}/test/ocsp-tests/root-cert.pem -no-CApath -no-CAstore
+@ocsp -index {tests}/data/ocsp/index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -CA {src}/test/ocsp-tests/root-cert.pem -reqin {tests}/data/ocsp/req-nonce.der -respout {dir}/x7.der
+@ocsp -reqin {tests}/data/ocsp/req-nonce.der -respin {dir}/x7.der -CAfile {src}/test/ocsp-tests/root-cert.pem -no-CApath -no-CAstore
+@ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -serial 11 -no_nonce -reqout {dir}/r11.der
+ocsp -index {tests}/data/ocsp/index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -CA {src}/test/ocsp-tests/intermediate-cert.pem -reqin {dir}/r11.der
+ocsp -index {tests}/data/ocsp/index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -CA {src}/test/ocsp-tests/intermediate-cert.pem -reqin {dir}/r11.der -ignore_err
+ocsp -index {tests}/data/ocsp/dup-index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -CA {src}/test/ocsp-tests/intermediate-cert.pem -reqin {tests}/data/ocsp/req.der
+ocsp -index {tests}/data/ocsp/bad-index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -CA {src}/test/ocsp-tests/intermediate-cert.pem -reqin {tests}/data/ocsp/req.der
+ocsp -index {dir}/nonexistent.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -CA {src}/test/ocsp-tests/intermediate-cert.pem -reqin {tests}/data/ocsp/req.der
+ocsp -index {tests}/data/ocsp/index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -reqin {tests}/data/ocsp/req.der
+ocsp -index {tests}/data/ocsp/index.txt -CA {src}/test/ocsp-tests/intermediate-cert.pem -reqin {tests}/data/ocsp/req.der
+ocsp -index {tests}/data/ocsp/index.txt -rsigner {dir}/nonexistent.pem -CA {src}/test/ocsp-tests/intermediate-cert.pem -reqin {tests}/data/ocsp/req.der
+ocsp -index {tests}/data/ocsp/index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -rkey {dir}/nonexistent.pem -CA {src}/test/ocsp-tests/intermediate-cert.pem -reqin {tests}/data/ocsp/req.der
+ocsp -index {tests}/data/ocsp/index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -CA {dir}/nonexistent.pem -reqin {tests}/data/ocsp/req.der
+ocsp -index {tests}/data/ocsp/index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -CA {src}/test/ocsp-tests/intermediate-cert.pem -rother {dir}/nonexistent.pem -reqin {tests}/data/ocsp/req.der
+ocsp -index {tests}/data/ocsp/index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -CA {src}/test/ocsp-tests/intermediate-cert.pem -passin bad:x -reqin {tests}/data/ocsp/req.der
+ocsp -index {tests}/data/ocsp/index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -CA {src}/test/ocsp-tests/intermediate-cert.pem -rmd nosuchmd -reqin {tests}/data/ocsp/req.der
+ocsp -index {tests}/data/ocsp/index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -CA {src}/test/ocsp-tests/intermediate-cert.pem -rcid nosuchmd -reqin {tests}/data/ocsp/req.der
+ocsp -index {tests}/data/ocsp/index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -CA {src}/test/ocsp-tests/intermediate-cert.pem
+#
+# Servers.
+&ocsp -index {tests}/data/ocsp/index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -CA {src}/test/ocsp-tests/intermediate-cert.pem -port 18831 -nrequest 1
+@ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -serial 2 -url http://127.0.0.1:18831 -CAfile {src}/test/ocsp-tests/root-cert.pem -no-CApath -no-CAstore
+&ocsp -index {tests}/data/ocsp/index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -CA {src}/test/ocsp-tests/intermediate-cert.pem -port 18832 -nrequest 1 -req_text
+@ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -no_nonce -host 127.0.0.1:18832 -path /ocsp -header Host=localhost -header X-Test=1 -timeout 10 -CAfile {src}/test/ocsp-tests/root-cert.pem -no-CApath -no-CAstore
+&ocsp -index {tests}/data/ocsp/index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -CA {src}/test/ocsp-tests/intermediate-cert.pem -port 18833 -nrequest 1 -ndays 1
+@ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -url http://127.0.0.1:18833/some/path -noverify -respout {dir}/s3.der
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -url http://127.0.0.1:18839 -noverify
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -url nonsense://x
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -url https://127.0.0.1:18839 -noverify -proxy 127.0.0.1:18839 -no_proxy localhost
+ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -url http://127.0.0.1:18839 -header nokey
+ocsp -port 18834
+#
+# Options.
+ocsp
+ocsp -help
+ocsp extra
+ocsp -nosuchoption -alsounknown
+ocsp -respin {tests}/data/ocsp/ND1.der -noverify -provider default -propquery provider=default
+ocsp -respin {tests}/data/ocsp/ND1.der -noverify -provider-path {dir} -provparam default:x=1
+ocsp -respin {tests}/data/ocsp/ND1.der -noverify -multi 2
