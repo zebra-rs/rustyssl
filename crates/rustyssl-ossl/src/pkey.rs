@@ -125,3 +125,51 @@ impl Pkey {
         unsafe { ffi::PEM_write_bio_PUBKEY(out.as_ptr(), self.as_ptr()) }
     }
 }
+
+impl Pkey {
+    /// `EVP_PKEY_print_params(out, pkey, indent, NULL)`.
+    pub fn print_params(&self, out: &crate::Bio, indent: core::ffi::c_int) -> core::ffi::c_int {
+        // SAFETY: both are live; no print context.
+        unsafe {
+            ffi::EVP_PKEY_print_params(out.as_ptr(), self.as_ptr(), indent, core::ptr::null_mut())
+        }
+    }
+
+    /// `EVP_PKEY_print_public(out, pkey, indent, NULL)`.
+    pub fn print_public(&self, out: &crate::Bio, indent: core::ffi::c_int) -> core::ffi::c_int {
+        // SAFETY: as above.
+        unsafe {
+            ffi::EVP_PKEY_print_public(out.as_ptr(), self.as_ptr(), indent, core::ptr::null_mut())
+        }
+    }
+
+    /// `EVP_PKEY_print_private(out, pkey, indent, NULL)`.
+    pub fn print_private(&self, out: &crate::Bio, indent: core::ffi::c_int) -> core::ffi::c_int {
+        // SAFETY: as above.
+        unsafe {
+            ffi::EVP_PKEY_print_private(out.as_ptr(), self.as_ptr(), indent, core::ptr::null_mut())
+        }
+    }
+
+    /// `PEM_write_bio_Parameters`.
+    pub fn write_params_pem(&self, out: &crate::Bio) -> core::ffi::c_int {
+        // SAFETY: both are live.
+        unsafe { ffi::PEM_write_bio_Parameters(out.as_ptr(), self.as_ptr()) }
+    }
+
+    /// `PEM_write_bio_PrivateKey(out, pkey, NULL, NULL, 0, NULL, NULL)`.
+    pub fn write_private_pem(&self, out: &crate::Bio) -> core::ffi::c_int {
+        // SAFETY: both are live; no cipher or callback.
+        unsafe {
+            ffi::PEM_write_bio_PrivateKey(
+                out.as_ptr(),
+                self.as_ptr(),
+                core::ptr::null(),
+                core::ptr::null_mut(),
+                0,
+                None,
+                core::ptr::null_mut(),
+            )
+        }
+    }
+}

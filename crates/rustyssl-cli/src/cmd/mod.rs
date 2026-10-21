@@ -55,9 +55,9 @@ pub mod crl2pkcs7;
 // pub mod speed;
 pub mod spkac;
 // pub mod srp;
-// pub mod storeutl;
+pub mod storeutl;
 // pub mod ts;
-// pub mod verify;
+pub mod verify;
 // pub mod x509;
 
 /// The command's `main`, if it is ported.
@@ -114,9 +114,9 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "speed" => speed::main,
         "spkac" => spkac::main,
         // "srp" => srp::main,
-        // "storeutl" => storeutl::main,
+        "storeutl" => storeutl::main,
         // "ts" => ts::main,
-        // "verify" => verify::main,
+        "verify" => verify::main,
         // "x509" => x509::main,
         _ => return None,
     })

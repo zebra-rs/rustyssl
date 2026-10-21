@@ -4,7 +4,7 @@ use std::io::Write;
 
 use rustyssl_ossl::abi::{ASN1_DTFLGS_RFC822, NID_crl_number};
 use rustyssl_ossl::evp::Md;
-use rustyssl_ossl::verify::{LookupKind, StoreCtx};
+use rustyssl_ossl::verify::{LookupKind, VerifyCtx};
 
 use crate::generated::options::crl::{OPTIONS, Opt};
 use crate::lib::app_libctx::{libctx, opt_provider, propq};
@@ -176,8 +176,7 @@ fn run(argv: &[String]) -> i32 {
         if store.add_lookup(LookupKind::File).is_none() {
             return 1;
         }
-        let ctx = StoreCtx::new();
-        let Some(ctx) = ctx.filter(|c| c.init(&store, None, None)) else {
+        let Ok(ctx) = VerifyCtx::new(&store, None, None) else {
             eprintf!("Error initialising X509 store\n");
             return 1;
         };

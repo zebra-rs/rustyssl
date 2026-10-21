@@ -331,6 +331,11 @@ pub fn obj_create(oid: &str, sn: &str, ln: &str) -> c_int {
 pub struct CertStack(core::ptr::NonNull<stack_st_X509>);
 
 impl CertStack {
+    /// Takes ownership of a stack (and its certificates) the caller got from the library.
+    pub fn from_raw(p: *mut stack_st_X509) -> Option<Self> {
+        core::ptr::NonNull::new(p).map(Self)
+    }
+
     /// `sk_X509_new_null()`.
     pub fn new() -> Option<Self> {
         // SAFETY: no arguments.
@@ -372,6 +377,11 @@ impl Drop for CertStack {
     }
 }
 
+unsafe extern "C" fn free_dist_point(p: *mut c_void) {
+    // SAFETY: called by sk_pop_free with each member, a DIST_POINT.
+    unsafe { ffi::DIST_POINT_free(p.cast()) };
+}
+
 unsafe extern "C" fn free_crl(p: *mut c_void) {
     // SAFETY: called by sk_pop_free with each member, an X509_CRL.
     unsafe { ffi::X509_CRL_free(p.cast()) };
@@ -390,6 +400,13 @@ impl CrlStack {
 
     pub fn as_ptr(&self) -> *mut stack_st_X509_CRL {
         self.0.as_ptr()
+    }
+
+    /// Gives up ownership of the stack and its CRLs.
+    pub fn into_ptr(self) -> *mut stack_st_X509_CRL {
+        let p = self.0.as_ptr();
+        core::mem::forget(self);
+        p
     }
 
     /// `sk_X509_CRL_push`, which takes the CRL.
@@ -680,9 +697,72 @@ impl CertStack {
 #[derive(Clone, Copy)]
 pub struct CertRef<'a>(*mut crate::abi::X509, core::marker::PhantomData<&'a ()>);
 
-impl CertRef<'_> {
+impl<'a> CertRef<'a> {
+    pub(crate) fn new(p: *mut crate::abi::X509) -> Option<Self> {
+        (!p.is_null()).then_some(Self(p, core::marker::PhantomData))
+    }
+
     pub fn as_ptr(self) -> *mut crate::abi::X509 {
         self.0
+    }
+
+    /// `X509_get_subject_name`.
+    pub fn subject_name(self) -> NameRef<'a> {
+        // SAFETY: the certificate is live; the name is owned by it.
+        NameRef::new(unsafe { ffi::X509_get_subject_name(self.0) })
+    }
+
+    /// For each distribution point of the certificate's `nid` extension
+    /// (`NID_crl_distribution_points` or `NID_freshest_crl`), its first `http://` URI of
+    /// more than 6 bytes, if it has one (`get_dp_url` of `apps.c`).
+    pub fn dp_http_urls(self, nid: c_int) -> Vec<Option<String>> {
+        use crate::abi::{DIST_POINT, GEN_URI, OPENSSL_STACK};
+        // SAFETY: the certificate is live; the stack is the caller's to free.
+        let crldp = unsafe {
+            ffi::X509_get_ext_d2i(self.0, nid, core::ptr::null_mut(), core::ptr::null_mut())
+        }
+        .cast::<OPENSSL_STACK>();
+        let mut out = Vec::new();
+        if crldp.is_null() {
+            return out;
+        }
+        // SAFETY: crldp is live.
+        let n = unsafe { ffi::OPENSSL_sk_num(crldp) };
+        for i in 0..n.max(0) {
+            // SAFETY: i is in range; each member is a DIST_POINT.
+            let dp = unsafe { ffi::OPENSSL_sk_value(crldp, i) }.cast::<DIST_POINT>();
+            let mut url = None;
+            // SAFETY: dp is live (public layout).
+            let dpn = unsafe { (*dp).distpoint };
+            // SAFETY: dpn is NULL or a live DIST_POINT_NAME (public layout).
+            if !dpn.is_null() && unsafe { (*dpn).type_ } == 0 {
+                // SAFETY: dpn is live (checked above).
+                let name = unsafe { &(*dpn).name };
+                // SAFETY: type 0 is the fullname member of the union.
+                let gens = unsafe { name.fullname }.cast::<OPENSSL_STACK>();
+                // SAFETY: gens is NULL or live (sk_num of NULL is -1).
+                let m = unsafe { ffi::OPENSSL_sk_num(gens) };
+                for j in 0..m.max(0) {
+                    // SAFETY: j is in range.
+                    let gname = unsafe { ffi::OPENSSL_sk_value(gens, j) };
+                    let mut gtype: c_int = 0;
+                    // SAFETY: gname is a live GENERAL_NAME; gtype a valid out-pointer.
+                    let v = unsafe { ffi::GENERAL_NAME_get0_value(gname.cast(), &mut gtype) };
+                    if gtype != GEN_URI {
+                        continue;
+                    }
+                    let bytes = asn1_string_bytes(v.cast());
+                    if bytes.len() > 6 && bytes.starts_with(b"http://") {
+                        url = Some(String::from_utf8_lossy(&bytes).into_owned());
+                        break;
+                    }
+                }
+            }
+            out.push(url);
+        }
+        // SAFETY: the stack and its members are owned here and freed once.
+        unsafe { ffi::OPENSSL_sk_pop_free(crldp, Some(free_dist_point)) };
+        out
     }
 
     /// A new reference (`X509_up_ref`), owned.
@@ -1204,5 +1284,21 @@ impl Crl {
         // SAFETY: the CRL is live; sig is a valid out-pointer.
         unsafe { ffi::X509_CRL_get0_signature(self.as_ptr(), &mut sig, core::ptr::null_mut()) };
         corrupt(sig);
+    }
+}
+
+impl Cert {
+    /// `X509_print`.
+    pub fn print(&self, out: &Bio) -> c_int {
+        // SAFETY: both are live.
+        unsafe { ffi::X509_print(out.as_ptr(), self.as_ptr()) }
+    }
+}
+
+impl Crl {
+    /// `X509_CRL_print`.
+    pub fn print(&self, out: &Bio) -> c_int {
+        // SAFETY: both are live.
+        unsafe { ffi::X509_CRL_print(out.as_ptr(), self.as_ptr()) }
     }
 }

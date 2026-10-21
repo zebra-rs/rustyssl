@@ -1,0 +1,62 @@
+# `openssl storeutl` (cargo xtask test-apps: upstream's tool on the reference, then ours on
+# rustyssl and on the reference). pki/store/ holds a certificate, a CRL, and a key.
+storeutl -help
+storeutl {src}/test/certs/ca-cert.pem
+storeutl -text {src}/test/certs/ca-cert.pem
+storeutl -noout {src}/test/certs/leaf-chain.pem
+storeutl -noout -text {tests}/pki/crl1.pem
+storeutl {src}/test/certs/root-key.pem
+storeutl -text -noout {src}/test/certs/root-key.pem
+storeutl -keys -noout {src}/test/certs/cert-key-cert.pem
+storeutl -certs -noout {src}/test/certs/cert-key-cert.pem
+storeutl -crls -noout {src}/test/certs/cert-key-cert.pem
+storeutl -certs -keys {src}/test/certs/cert-key-cert.pem
+storeutl -text {src}/test/testrsapub.pem
+storeutl -noout -text {src}/test/testdsapub.pem
+storeutl -text {src}/test/certs/dhp2048.pem
+storeutl -noout {src}/test/certs/key-pass-12345.pem -passin pass:12345
+storeutl -noout -passin pass:12345 {src}/test/certs/key-pass-12345.pem
+storeutl -noout -passin pass:wrong {src}/test/certs/key-pass-12345.pem
+storeutl -noout -passin nonsense {src}/test/certs/key-pass-12345.pem
+storeutl -noout -passin file:{txt} {src}/test/certs/key-pass-12345.pem
+storeutl -noout -r {tests}/pki/store
+storeutl -noout -r -certs {tests}/pki/store
+storeutl -noout -r -subject /CN=CA {tests}/pki/store
+storeutl -noout -r -certs -subject /CN=CA {tests}/pki/store
+storeutl -noout -r -certs -subject /CN=nobody {tests}/pki/store
+storeutl -noout -r -crls -issuer /CN=CA -serial 2 {tests}/pki/store
+storeutl -noout -r -issuer /CN=Root -serial 2 {tests}/pki/store
+storeutl -noout -r -issuer /CN=Root {tests}/pki/store
+storeutl -noout -r -serial 2 {tests}/pki/store
+storeutl -noout -serial 0xzz {tests}/pki/store
+storeutl -noout -r -fingerprint 00112233 {tests}/pki/store
+storeutl -noout -r -fingerprint 00112233 -sha256 {tests}/pki/store
+storeutl -noout -r -fingerprint zz {tests}/pki/store
+storeutl -noout -r -alias foo {tests}/pki/store
+storeutl -noout -subject /CN=CA {src}/test/certs/ca-cert.pem
+storeutl -noout -subject CN=CA {src}/test/certs/ca-cert.pem
+storeutl -noout -subject /CN=CA -subject /CN=B {src}/test/certs/ca-cert.pem
+storeutl -noout -subject /CN=CA -alias x {src}/test/certs/ca-cert.pem
+storeutl -noout -alias x -fingerprint 00 {src}/test/certs/ca-cert.pem
+storeutl -noout -fingerprint 00 -alias x {src}/test/certs/ca-cert.pem
+storeutl -noout -fingerprint 00 -fingerprint 11 {src}/test/certs/ca-cert.pem
+storeutl -noout -alias x -alias y {src}/test/certs/ca-cert.pem
+storeutl -noout -issuer /CN=A -issuer /CN=B {src}/test/certs/ca-cert.pem
+storeutl -noout -serial 1 -serial 2 {src}/test/certs/ca-cert.pem
+storeutl -noout -issuer /CN=A -subject /CN=B {src}/test/certs/ca-cert.pem
+storeutl -noout -serial 1 -alias y {src}/test/certs/ca-cert.pem
+storeutl -certs -keys -crls {src}/test/certs/ca-cert.pem
+storeutl -certs -certs {src}/test/certs/ca-cert.pem
+storeutl -out {dir}/storeutl.pem {src}/test/certs/ca-cert.pem
+storeutl -out {dir}/nonexistent/x.pem {src}/test/certs/ca-cert.pem
+storeutl {dir}/nonexistent.pem
+storeutl {txt}
+storeutl file:{src}/test/certs/ca-cert.pem
+storeutl -noout -sha256 {src}/test/certs/ca-cert.pem
+storeutl -noout -nosuchdigest {src}/test/certs/ca-cert.pem
+storeutl -noout -sha256 -sha512 {src}/test/certs/ca-cert.pem
+storeutl -noout -provider default -propquery provider=default {src}/test/certs/ca-cert.pem
+storeutl -noout -provider-path {dir} -provider default {src}/test/certs/ca-cert.pem
+storeutl
+storeutl a b
+storeutl -nosuchoption

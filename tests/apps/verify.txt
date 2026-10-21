@@ -1,0 +1,83 @@
+# `openssl verify` (cargo xtask test-apps: upstream's tool on the reference, then ours on
+# rustyssl and on the reference). Its -help prints more than its option table (the purposes
+# and the named verification parameters). Chains from {src}/test/certs/.
+verify -help
+verify -h
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -show_chain {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -show_chain -nameopt RFC2253 {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -show_chain -nameopt nosuchopt {src}/test/certs/ee-cert.pem
+verify -trusted {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem {src}/test/certs/ee-cert.pem {src}/test/certs/ca-cert.pem
+verify -trusted {src}/test/certs/root-cert.pem -trusted {src}/test/certs/ca-cert.pem -show_chain {src}/test/certs/ee-cert.pem
+verify -trusted {src}/test/certs/root-cert.pem -CAfile {src}/test/certs/root-cert.pem {src}/test/certs/ee-cert.pem
+verify -trusted {src}/test/certs/ca-cert.pem -partial_chain -show_chain {src}/test/certs/ee-cert.pem
+verify -trusted {src}/test/certs/ca-cert.pem {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem {src}/test/certs/ee-cert.pem
+verify -no-CAfile -no-CApath -no-CAstore {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -verbose {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -verbose {src}/test/certs/ee-cert.pem {src}/test/certs/nonexistent.pem {txt}
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem < {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem - < {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem
+verify -CAfile {src}/test/certs/nonexistent.pem {src}/test/certs/ee-cert.pem
+verify -CAfile {txt} {src}/test/certs/ee-cert.pem
+verify -CApath {dir} -no-CAfile {src}/test/certs/root-cert.pem
+verify -CApath {txt} {src}/test/certs/root-cert.pem
+verify -CAstore {src}/test/certs/root-cert.pem -no-CAfile -no-CApath -untrusted {src}/test/certs/ca-cert.pem {src}/test/certs/ee-cert.pem
+verify -CAstore {dir}/nonexistent.pem {src}/test/certs/ee-cert.pem
+verify -untrusted {src}/test/certs/nonexistent.pem {src}/test/certs/ee-cert.pem
+verify -untrusted {txt} {src}/test/certs/ee-cert.pem
+verify -trusted {src}/test/certs/nonexistent.pem {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -purpose sslserver {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -purpose sslclient {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -purpose nosuchpurpose {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -verify_name ssl_server {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -verify_name nosuchname {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -verify_depth 0 {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -verify_depth 1 {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -auth_level 2 {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -attime 0 {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -attime 4102444800 {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -attime x {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -verify_hostname server.example {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -verify_hostname other.example {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -verify_email a@b.example {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -verify_ip 127.0.0.1 {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -verify_ip 999.0.0.1 {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -ignore_critical -issuer_checks -x509_strict -check_ss_sig -trusted_first -no_alt_chains -no_check_time -allow_proxy_certs -use_deltas -extended_crl {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -crl_check {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -crl_check_all {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -crl_check -CRLfile {tests}/pki/crl1.pem {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -crl_check -CRLfile {tests}/pki/crl2.pem {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -crl_check -CRLfile {tests}/pki/crl1.pem -CRLfile {tests}/pki/crl2.pem -use_deltas {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -CRLfile {src}/test/certs/nonexistent.pem {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -crl_download -crl_check {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -policy_check -explicit_policy -policy_print {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-pol-cert.pem -policy_check -policy 1.3.6.1.4.1.16604.998855.1 -explicit_policy -policy_print {src}/test/certs/ee-cert-policies.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-pol-cert.pem -policy_check -policy 1.3.6.1.4.1.16604.998855.2 -explicit_policy -policy_print {src}/test/certs/ee-cert-policies.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-pol-cert.pem -policy_check -policy 1.3.6.1.4.1.16604.998855.1 -inhibit_any -inhibit_map {src}/test/certs/ee-cert-policies.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-pol-cert.pem -policy_check -policy 1.3.6.1.4.1.16604.998855.1 -policy_print {src}/test/certs/ee-cert-policies-bad.pem
+verify -policy not.an.oid {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -suiteB_128_only {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -suiteB_128 {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -suiteB_192 {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-expired.pem {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-expired.pem -untrusted {src}/test/certs/ca-cert.pem {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem {src}/test/certs/ee-expired.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-nonca.pem {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem {src}/test/certs/ee-cert-crit-unknown-ext.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -x509_strict {src}/test/certs/ee-pathlen.pem
+verify -CAfile {src}/test/certs/root-cert.pem {src}/test/certs/ee-self-signed.pem
+verify -CAfile {src}/test/certs/ee-self-signed.pem {src}/test/certs/ee-self-signed.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem {src}/test/certs/root-cert.pem {src}/test/certs/ca-cert.pem
+verify -CAfile {src}/test/certs/sm2-root.crt -vfyopt distid:1234567812345678 {src}/test/certs/sm2.pem
+verify -CAfile {src}/test/certs/sm2-root.crt -vfyopt hexdistid:31323334353637383132333435363738 {src}/test/certs/sm2.pem
+verify -CAfile {src}/test/certs/sm2-root.crt -vfyopt hexdistid:zz {src}/test/certs/sm2.pem
+verify -CAfile {src}/test/certs/sm2-root.crt -vfyopt nosuch:1 {src}/test/certs/sm2.pem
+verify -CAfile {src}/test/certs/sm2-root.crt {src}/test/certs/sm2.pem
+verify -CAfile {src}/test/certs/root-ed25519.pem {src}/test/certs/server-ed25519-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -provider default -propquery provider=default {src}/test/certs/ee-cert.pem
+verify -CAfile {src}/test/certs/root-cert.pem -provider-path {dir} -provider default {src}/test/certs/ee-cert.pem
+verify -nosuchoption
+verify -CAfile
+verify -attime
