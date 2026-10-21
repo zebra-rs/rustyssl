@@ -386,7 +386,15 @@ fn mirror(st: &mut SslState, c: &Connection) {
     let n = c.negotiated();
     // Once the hellos chose it (`ssl_choose_server_version` sets `s->version` before the
     // certificate callback runs), or with a suite.
-    if n.cipher.is_some() || (!c.before() && c.version_decided()) {
+    if n.cipher.is_some() {
+        st.version = c_int::from(n.version);
+    } else if st.server {
+        if !c.before() && c.version_decided() {
+            st.version = c_int::from(n.version);
+        }
+    } else if c.client_version() != 0 {
+        // A client's is the method's until its ClientHello (`ssl_set_client_hello_version`
+        // sets the highest it offers), then the server's choice.
         st.version = c_int::from(n.version);
     }
     st.shutdown =

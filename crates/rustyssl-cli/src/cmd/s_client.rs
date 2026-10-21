@@ -1050,6 +1050,11 @@ enum Exit {
 pub fn main(argv: &[String]) -> i32 {
     let stdout = stdout_buffer();
     let ret = run(argv);
+    // Every `goto end` of upstream's with a failure shows the errors left (`run`'s early
+    // returns included).
+    if ret > 0 {
+        io::print_errors();
+    }
     // stdout is flushed at exit.
     if let Some(o) = &stdout {
         o.flush();

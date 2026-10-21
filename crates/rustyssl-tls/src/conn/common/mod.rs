@@ -244,6 +244,9 @@ impl core::fmt::Debug for Shared {
     }
 }
 
+/// The method's default session timeout (`tls1_default_timeout`), in seconds.
+pub(crate) const DEFAULT_TIMEOUT: i64 = 7200;
+
 /// The octets up to the first NUL (`PACKET_strndup`).
 pub(crate) fn until_nul(b: &[u8]) -> &[u8] {
     b.split(|&x| x == 0).next().unwrap_or_default()

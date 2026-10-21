@@ -43,8 +43,7 @@ const TICKET_NONCE_SIZE: usize = 8;
 const ONE_WEEK_SEC: i64 = 7 * 24 * 60 * 60;
 /// `TICKET_AGE_ALLOWANCE`, in milliseconds.
 const TICKET_AGE_ALLOWANCE_MS: i64 = 10_000;
-/// The method's default session timeout (`tls1_default_timeout`), in seconds.
-const DEFAULT_TIMEOUT: i64 = 7200;
+use crate::conn::common::DEFAULT_TIMEOUT;
 /// `SSL_SESSION_new`'s timeout, in seconds.
 const SESSION_NEW_TIMEOUT: i64 = 60 * 5 + 4;
 /// The most certificates a ticket's session may carry.
