@@ -1,0 +1,25 @@
+# Extension sections for the x509 and req corpora.
+extensions = v3_ee
+
+[ v3_ee ]
+basicConstraints = critical, CA:FALSE
+keyUsage = digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth, clientAuth
+subjectAltName = DNS:server.example, DNS:*.example.org, IP:127.0.0.1, email:admin@example.com
+authorityInfoAccess = OCSP;URI:http://ocsp.example/, caIssuers;URI:http://ca.example/ca.crt
+crlDistributionPoints = URI:http://crl.example/ca.crl
+certificatePolicies = 1.2.3.4
+
+[ v3_ca ]
+basicConstraints = critical, CA:TRUE, pathlen:1
+keyUsage = critical, keyCertSign, cRLSign
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always
+
+[ noaki ]
+basicConstraints = CA:FALSE
+subjectKeyIdentifier = none
+authorityKeyIdentifier = none
+
+[ bad ]
+basicConstraints = nonsense

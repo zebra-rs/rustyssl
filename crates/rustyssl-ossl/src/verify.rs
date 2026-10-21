@@ -374,6 +374,12 @@ impl<'a> VerifyCtx<'a> {
         unsafe { ffi::X509_STORE_CTX_set0_crls(self.0.as_ptr(), crls.as_ptr()) };
     }
 
+    /// `X509_STORE_CTX_set_flags`.
+    pub fn set_flags(&mut self, flags: c_ulong) {
+        // SAFETY: the context is live.
+        unsafe { ffi::X509_STORE_CTX_set_flags(self.0.as_ptr(), flags) };
+    }
+
     /// `X509_verify_cert`: what it returns.
     pub fn verify_cert(&mut self) -> c_int {
         // SAFETY: the context is live and initialized.
@@ -532,6 +538,22 @@ impl Store {
     pub fn set_flags(&self, flags: c_ulong) {
         // SAFETY: the store is live.
         unsafe { ffi::X509_STORE_set_flags(self.as_ptr(), flags) };
+    }
+
+    /// `X509_STORE_set_default_paths_ex(store, libctx, propq)`.
+    pub fn set_default_paths_ex(&self, libctx: Option<&LibCtx>, propq: Option<&str>) -> bool {
+        let Some(pq) = opt_c(propq) else {
+            return false;
+        };
+        let ctx = libctx.map_or(core::ptr::null_mut(), LibCtx::as_ptr);
+        // SAFETY: the store is live; ctx and pq are NULL or valid.
+        unsafe {
+            ffi::X509_STORE_set_default_paths_ex(
+                self.as_ptr(),
+                ctx,
+                pq.as_ref().map_or(core::ptr::null(), |p| p.as_ptr()),
+            ) == 1
+        }
     }
 
     /// `X509_STORE_add_cert`.

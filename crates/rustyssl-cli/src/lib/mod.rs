@@ -9,6 +9,7 @@
 pub mod app_libctx;
 pub mod app_rand;
 pub mod apps;
+pub mod ca_db;
 pub mod engine;
 pub mod io;
 pub mod opt;

@@ -1302,3 +1302,617 @@ impl Crl {
         unsafe { ffi::X509_CRL_print(out.as_ptr(), self.as_ptr()) }
     }
 }
+
+crate::handle!(
+    /// An owned `ASN1_OBJECT`.
+    Obj, ASN1_OBJECT, ASN1_OBJECT_free
+);
+
+impl Obj {
+    /// `OBJ_txt2obj(s, no_name)`.
+    pub fn from_txt(s: &str, no_name: bool) -> Option<Self> {
+        let c = cstring(s)?;
+        // SAFETY: a valid C string; the object is the caller's.
+        Self::from_ptr(unsafe { ffi::OBJ_txt2obj(c.as_ptr(), c_int::from(no_name)) })
+    }
+}
+
+/// `OBJ_nid2sn(nid)`.
+pub fn nid2sn(nid: c_int) -> Option<String> {
+    // SAFETY: any NID; the string is static.
+    string_at(unsafe { ffi::OBJ_nid2sn(nid) })
+}
+
+/// `OBJ_nid2ln(nid)`.
+pub fn nid2ln(nid: c_int) -> Option<String> {
+    // SAFETY: as above.
+    string_at(unsafe { ffi::OBJ_nid2ln(nid) })
+}
+
+/// `OBJ_sn2nid`.
+pub fn sn2nid(s: &str) -> c_int {
+    let Some(c) = cstring(s) else {
+        return 0;
+    };
+    // SAFETY: a valid C string.
+    unsafe { ffi::OBJ_sn2nid(c.as_ptr()) }
+}
+
+/// An extension borrowed from its owner.
+#[derive(Clone, Copy)]
+pub struct ExtRef<'a>(*mut X509_EXTENSION, core::marker::PhantomData<&'a ()>);
+
+impl ExtRef<'_> {
+    pub fn as_ptr(self) -> *mut X509_EXTENSION {
+        self.0
+    }
+
+    /// `OBJ_obj2nid(X509_EXTENSION_get_object(ex))`.
+    pub fn nid(self) -> c_int {
+        // SAFETY: the extension is live; the object is owned by it.
+        let obj = unsafe { ffi::X509_EXTENSION_get_object(self.0) };
+        // SAFETY: obj is live.
+        unsafe { ffi::OBJ_obj2nid(obj) }
+    }
+
+    /// The short name of its type (`OBJ_nid2sn`), as C has it (NULL for none).
+    pub fn sn(self) -> Option<String> {
+        nid2sn(self.nid())
+    }
+
+    /// `X509_EXTENSION_get_critical`.
+    pub fn critical(self) -> bool {
+        // SAFETY: the extension is live.
+        unsafe { ffi::X509_EXTENSION_get_critical(self.0) > 0 }
+    }
+}
+
+impl Extension {
+    pub fn as_ext(&self) -> ExtRef<'_> {
+        ExtRef(self.as_ptr(), core::marker::PhantomData)
+    }
+}
+
+/// A temporary `STACK_OF(X509_EXTENSION)` of borrowed extensions (freed without them).
+struct ExtList(*mut OPENSSL_STACK);
+
+impl ExtList {
+    fn new(exts: &[ExtRef<'_>]) -> Option<Self> {
+        // SAFETY: no arguments.
+        let st = unsafe { ffi::OPENSSL_sk_new_null() };
+        if st.is_null() {
+            return None;
+        }
+        let list = Self(st);
+        for e in exts {
+            // SAFETY: the stack is live; it only borrows e.
+            if unsafe { ffi::OPENSSL_sk_push(st, e.0.cast()) } <= 0 {
+                return None;
+            }
+        }
+        Some(list)
+    }
+
+    fn as_ptr(&self) -> *const crate::abi::stack_st_X509_EXTENSION {
+        self.0.cast()
+    }
+}
+
+impl Drop for ExtList {
+    fn drop(&mut self) {
+        // SAFETY: the stack is owned here; its members are borrowed, not freed.
+        unsafe { ffi::OPENSSL_sk_free(self.0) };
+    }
+}
+
+/// `X509V3_extensions_print(out, NULL, exts, flag, indent)`.
+pub fn extensions_print(out: &Bio, exts: &[ExtRef<'_>], flag: c_ulong, indent: c_int) -> c_int {
+    let Some(list) = ExtList::new(exts) else {
+        return 0;
+    };
+    // SAFETY: both are live; no title.
+    unsafe {
+        ffi::X509V3_extensions_print(out.as_ptr(), core::ptr::null(), list.as_ptr(), flag, indent)
+    }
+}
+
+/// The strings of a `STACK_OF(OPENSSL_STRING)`, freed with `X509_email_free`.
+fn take_strings(sk: *mut crate::abi::stack_st_OPENSSL_STRING) -> Vec<String> {
+    let st = sk.cast::<OPENSSL_STACK>();
+    let mut out = Vec::new();
+    // SAFETY: st is NULL or live (sk_num of NULL is -1).
+    let n = unsafe { ffi::OPENSSL_sk_num(st) };
+    for i in 0..n.max(0) {
+        // SAFETY: i is in range; each member is a C string.
+        let s = unsafe { ffi::OPENSSL_sk_value(st, i) };
+        if let Some(s) = string_at(s.cast()) {
+            out.push(s);
+        }
+    }
+    // SAFETY: the stack and its strings are owned here (NULL allowed).
+    unsafe { ffi::X509_email_free(sk) };
+    out
+}
+
+/// The certificate's purposes: (id, name) of each `X509_PURPOSE`.
+pub fn purpose_ids() -> Vec<(c_int, String)> {
+    // SAFETY: no arguments.
+    let n = unsafe { ffi::X509_PURPOSE_get_count() };
+    let mut out = Vec::new();
+    for i in 0..n.max(0) {
+        // SAFETY: i is in range.
+        let p = unsafe { ffi::X509_PURPOSE_get0(i) };
+        if p.is_null() {
+            continue;
+        }
+        // SAFETY: p is live.
+        let id = unsafe { ffi::X509_PURPOSE_get_id(p) };
+        // SAFETY: p is live; the name is owned by it.
+        let name = string_at(unsafe { ffi::X509_PURPOSE_get0_name(p) }).unwrap_or_default();
+        out.push((id, name));
+    }
+    out
+}
+
+impl Cert {
+    /// `X509_new_ex(libctx, propq)`.
+    pub fn new_ex(libctx: Option<&LibCtx>, propq: Option<&str>) -> Option<Self> {
+        let pq = opt_cstring(propq)?;
+        let ctx = libctx.map_or(core::ptr::null_mut(), LibCtx::as_ptr);
+        // SAFETY: ctx is NULL or live; pq is NULL or a valid C string.
+        Self::from_ptr(unsafe { ffi::X509_new_ex(ctx, opt_ptr(&pq)) })
+    }
+
+    /// Borrows the certificate.
+    pub fn as_cert(&self) -> CertRef<'_> {
+        CertRef(self.as_ptr(), core::marker::PhantomData)
+    }
+
+    /// `X509_set_subject_name`.
+    pub fn set_subject_name(&self, nm: NameRef<'_>) -> bool {
+        // SAFETY: both are live; the certificate copies the name.
+        unsafe { ffi::X509_set_subject_name(self.as_ptr(), nm.0) == 1 }
+    }
+
+    /// `X509_set_issuer_name`.
+    pub fn set_issuer_name(&self, nm: NameRef<'_>) -> bool {
+        // SAFETY: as above.
+        unsafe { ffi::X509_set_issuer_name(self.as_ptr(), nm.0) == 1 }
+    }
+
+    /// `X509_set_pubkey`.
+    pub fn set_pubkey(&self, pkey: &Pkey) -> bool {
+        // SAFETY: both are live; the certificate takes its own reference.
+        unsafe { ffi::X509_set_pubkey(self.as_ptr(), pkey.as_ptr()) == 1 }
+    }
+
+    /// `X509_get_pubkey` (a new reference).
+    pub fn pubkey(&self) -> Option<Pkey> {
+        // SAFETY: the certificate is live.
+        Pkey::from_raw(unsafe { ffi::X509_get_pubkey(self.as_ptr()) })
+    }
+
+    /// `X509_alias_set1(x, alias, -1)`.
+    pub fn alias_set1(&self, alias: &str) -> bool {
+        let Some(c) = cstring(alias) else {
+            return false;
+        };
+        // SAFETY: the certificate is live; c is NUL-terminated (length -1).
+        unsafe { ffi::X509_alias_set1(self.as_ptr(), c.as_ptr().cast(), -1) == 1 }
+    }
+
+    /// `X509_alias_get0`: the alias (up to a NUL, as `%s` prints it).
+    pub fn alias(&self) -> Option<Vec<u8>> {
+        let mut len: c_int = 0;
+        // SAFETY: the certificate is live; len is a valid out-pointer.
+        let p = unsafe { ffi::X509_alias_get0(self.as_ptr(), &mut len) };
+        if p.is_null() {
+            return None;
+        }
+        let n = usize::try_from(len).unwrap_or(0);
+        // SAFETY: the alias holds len bytes, owned by the certificate.
+        let bytes = unsafe { core::slice::from_raw_parts(p, n) };
+        let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
+        Some(bytes.get(..end).unwrap_or_default().to_vec())
+    }
+
+    /// `X509_trust_clear`.
+    pub fn trust_clear(&self) {
+        // SAFETY: the certificate is live.
+        unsafe { ffi::X509_trust_clear(self.as_ptr()) };
+    }
+
+    /// `X509_reject_clear`.
+    pub fn reject_clear(&self) {
+        // SAFETY: the certificate is live.
+        unsafe { ffi::X509_reject_clear(self.as_ptr()) };
+    }
+
+    /// `X509_add1_trust_object`.
+    pub fn add1_trust_object(&self, obj: &Obj) -> bool {
+        // SAFETY: both are live; the certificate copies the object.
+        unsafe { ffi::X509_add1_trust_object(self.as_ptr(), obj.as_ptr()) == 1 }
+    }
+
+    /// `X509_add1_reject_object`.
+    pub fn add1_reject_object(&self, obj: &Obj) -> bool {
+        // SAFETY: as above.
+        unsafe { ffi::X509_add1_reject_object(self.as_ptr(), obj.as_ptr()) == 1 }
+    }
+
+    /// `X509_get_ext_count`.
+    pub fn ext_count(&self) -> c_int {
+        // SAFETY: the certificate is live.
+        unsafe { ffi::X509_get_ext_count(self.as_ptr()) }
+    }
+
+    /// `X509_get_ext(x, i)`, borrowed.
+    pub fn ext(&self, i: c_int) -> Option<ExtRef<'_>> {
+        // SAFETY: the certificate is live; out-of-range gives NULL.
+        let e = unsafe { ffi::X509_get_ext(self.as_ptr(), i) };
+        (!e.is_null()).then_some(ExtRef(e, core::marker::PhantomData))
+    }
+
+    /// The certificate's extensions, borrowed, in order.
+    pub fn extensions(&self) -> Vec<ExtRef<'_>> {
+        (0..self.ext_count().max(0))
+            .filter_map(|i| self.ext(i))
+            .collect()
+    }
+
+    /// `X509_set_serialNumber` (the certificate copies it).
+    pub fn set_serial(&self, sn: &Integer) -> bool {
+        // SAFETY: both are live.
+        unsafe { ffi::X509_set_serialNumber(self.as_ptr(), sn.as_ptr()) == 1 }
+    }
+
+    /// `X509_get0_serialNumber`, copied.
+    pub fn serial(&self) -> Option<Integer> {
+        // SAFETY: the certificate is live; the serial is owned by it.
+        let s = unsafe { ffi::X509_get0_serialNumber(self.as_ptr()) };
+        if s.is_null() {
+            return None;
+        }
+        // SAFETY: s is live; the copy is the caller's.
+        Integer::from_ptr(unsafe { ffi::ASN1_INTEGER_dup(s) })
+    }
+
+    /// `X509_get0_notBefore`.
+    pub fn not_before(&self) -> Option<TimeRef<'_>> {
+        // SAFETY: the certificate is live; the time is owned by it.
+        TimeRef::new(unsafe { ffi::X509_get0_notBefore(self.as_ptr()) })
+    }
+
+    /// `X509_get0_notAfter`.
+    pub fn not_after(&self) -> Option<TimeRef<'_>> {
+        // SAFETY: as above.
+        TimeRef::new(unsafe { ffi::X509_get0_notAfter(self.as_ptr()) })
+    }
+
+    /// `X509_gmtime_adj(X509_getm_notBefore(x), 0)` (`true`) or
+    /// `ASN1_TIME_set_string_X509(X509_getm_notBefore(x), s)`.
+    pub fn set_not_before(&self, s: Option<&str>) -> bool {
+        // SAFETY: the certificate is live; the time is owned by it.
+        let t = unsafe { ffi::X509_getm_notBefore(self.as_ptr()) };
+        set_time(t, s, 0)
+    }
+
+    /// `X509_time_adj_ex(X509_getm_notAfter(x), days, 0, NULL)` for `None`, else
+    /// `ASN1_TIME_set_string_X509(X509_getm_notAfter(x), s)`.
+    pub fn set_not_after(&self, s: Option<&str>, days: c_int) -> bool {
+        // SAFETY: the certificate is live; the time is owned by it.
+        let t = unsafe { ffi::X509_getm_notAfter(self.as_ptr()) };
+        set_time(t, s, days)
+    }
+
+    /// `X509_set1_notBefore`.
+    pub fn set1_not_before(&self, t: TimeRef<'_>) -> bool {
+        // SAFETY: both are live; the certificate copies the time.
+        unsafe { ffi::X509_set1_notBefore(self.as_ptr(), t.0) == 1 }
+    }
+
+    /// `X509_set1_notAfter`.
+    pub fn set1_not_after(&self, t: TimeRef<'_>) -> bool {
+        // SAFETY: as above.
+        unsafe { ffi::X509_set1_notAfter(self.as_ptr(), t.0) == 1 }
+    }
+
+    /// `X509_get1_email`.
+    pub fn emails(&self) -> Vec<String> {
+        // SAFETY: the certificate is live; the stack is the caller's.
+        take_strings(unsafe { ffi::X509_get1_email(self.as_ptr()) })
+    }
+
+    /// `X509_get1_ocsp`.
+    pub fn ocsp_uris(&self) -> Vec<String> {
+        // SAFETY: as above.
+        take_strings(unsafe { ffi::X509_get1_ocsp(self.as_ptr()) })
+    }
+
+    /// `X509_subject_name_hash`.
+    pub fn subject_name_hash(&self) -> c_ulong {
+        // SAFETY: the certificate is live.
+        unsafe { ffi::X509_subject_name_hash(self.as_ptr()) }
+    }
+
+    /// `X509_subject_name_hash_old`.
+    pub fn subject_name_hash_old(&self) -> c_ulong {
+        // SAFETY: the certificate is live.
+        unsafe { ffi::X509_subject_name_hash_old(self.as_ptr()) }
+    }
+
+    /// `X509_issuer_name_hash`.
+    pub fn issuer_name_hash(&self) -> c_ulong {
+        // SAFETY: the certificate is live.
+        unsafe { ffi::X509_issuer_name_hash(self.as_ptr()) }
+    }
+
+    /// `X509_issuer_name_hash_old`.
+    pub fn issuer_name_hash_old(&self) -> c_ulong {
+        // SAFETY: the certificate is live.
+        unsafe { ffi::X509_issuer_name_hash_old(self.as_ptr()) }
+    }
+
+    /// `X509_check_purpose(x, id, ca)`.
+    pub fn check_purpose(&self, id: c_int, ca: c_int) -> c_int {
+        // SAFETY: the certificate is live.
+        unsafe { ffi::X509_check_purpose(self.as_ptr(), id, ca) }
+    }
+
+    /// `X509_print_ex`.
+    pub fn print_ex(&self, out: &Bio, nmflag: c_ulong, cflag: c_ulong) -> c_int {
+        // SAFETY: both are live.
+        unsafe { ffi::X509_print_ex(out.as_ptr(), self.as_ptr(), nmflag, cflag) }
+    }
+
+    /// `X509_digest`.
+    pub fn digest(&self, md: &crate::evp::Md) -> Option<Vec<u8>> {
+        // SAFETY: the certificate and digest are live; the buffers are valid.
+        digest_with(|b, n| unsafe { ffi::X509_digest(self.as_ptr(), md.as_ptr(), b, n) })
+    }
+
+    /// `X509_ocspid_print`.
+    pub fn ocspid_print(&self, out: &Bio) -> c_int {
+        // SAFETY: both are live.
+        unsafe { ffi::X509_ocspid_print(out.as_ptr(), self.as_ptr()) }
+    }
+
+    /// `X509_check_host(x, host, 0, 0, NULL)`.
+    pub fn check_host(&self, host: &str) -> c_int {
+        let Some(c) = cstring(host) else {
+            return -2;
+        };
+        // SAFETY: the certificate is live; c is a valid C string (length 0: strlen).
+        unsafe { ffi::X509_check_host(self.as_ptr(), c.as_ptr(), 0, 0, core::ptr::null_mut()) }
+    }
+
+    /// `X509_check_email(x, email, 0, 0)`.
+    pub fn check_email(&self, email: &str) -> c_int {
+        let Some(c) = cstring(email) else {
+            return -2;
+        };
+        // SAFETY: as above.
+        unsafe { ffi::X509_check_email(self.as_ptr(), c.as_ptr(), 0, 0) }
+    }
+
+    /// `X509_check_ip_asc(x, ip, 0)`.
+    pub fn check_ip_asc(&self, ip: &str) -> c_int {
+        let Some(c) = cstring(ip) else {
+            return -2;
+        };
+        // SAFETY: as above.
+        unsafe { ffi::X509_check_ip_asc(self.as_ptr(), c.as_ptr(), 0) }
+    }
+
+    /// `PEM_write_bio_X509_AUX`.
+    pub fn write_pem_aux(&self, bio: &Bio) -> c_int {
+        // SAFETY: both are live.
+        unsafe { ffi::PEM_write_bio_X509_AUX(bio.as_ptr(), self.as_ptr()) }
+    }
+
+    /// `corrupt_signature` of the certificate's signature.
+    pub fn corrupt_signature(&self) {
+        let mut sig: *const crate::abi::ASN1_BIT_STRING = core::ptr::null();
+        // SAFETY: the certificate is live; sig is a valid out-pointer.
+        unsafe { ffi::X509_get0_signature(&mut sig, core::ptr::null_mut(), self.as_ptr()) };
+        corrupt(sig);
+    }
+
+    /// `X509_to_X509_REQ(x, NULL, NULL)`.
+    pub fn to_req(&self) -> Option<Req> {
+        // SAFETY: the certificate is live; no key or digest.
+        Req::from_ptr(unsafe {
+            ffi::X509_to_X509_REQ(self.as_ptr(), core::ptr::null_mut(), core::ptr::null())
+        })
+    }
+
+    /// Whether `X509_get0_pubkey` is non-NULL.
+    pub fn has_pubkey(&self) -> bool {
+        // SAFETY: the certificate is live; the key is owned by it.
+        !unsafe { ffi::X509_get0_pubkey(self.as_ptr()) }.is_null()
+    }
+
+    /// `X509_get_version`.
+    pub fn version(&self) -> c_long {
+        // SAFETY: the certificate is live.
+        unsafe { ffi::X509_get_version(self.as_ptr()) }
+    }
+
+    /// `X509_cmp`.
+    pub fn x509_cmp(&self, other: &Cert) -> c_int {
+        // SAFETY: both are live.
+        unsafe { ffi::X509_cmp(self.as_ptr(), other.as_ptr()) }
+    }
+}
+
+/// Sets a time the object owns: now plus `days` (`X509_time_adj_ex`, `days` 0 for
+/// `X509_gmtime_adj(t, 0)`), or `s`.
+fn set_time(t: *mut crate::abi::ASN1_TIME, s: Option<&str>, days: c_int) -> bool {
+    match s {
+        None => {
+            // SAFETY: t is the object's live time; NULL means now.
+            !unsafe { ffi::X509_time_adj_ex(t, days, 0, core::ptr::null_mut()) }.is_null()
+        }
+        Some(s) => {
+            let Some(c) = cstring(s) else {
+                return false;
+            };
+            // SAFETY: t is live; c a valid C string.
+            unsafe { ffi::ASN1_TIME_set_string_X509(t, c.as_ptr()) == 1 }
+        }
+    }
+}
+
+/// `ASN1_TIME_set_string_X509(NULL, s)`: whether `s` is a valid time.
+pub fn time_string_ok(s: &str) -> bool {
+    let Some(c) = cstring(s) else {
+        return false;
+    };
+    // SAFETY: NULL only checks the string.
+    unsafe { ffi::ASN1_TIME_set_string_X509(core::ptr::null_mut(), c.as_ptr()) == 1 }
+}
+
+/// `ASN1_TIME_compare`.
+pub fn time_compare(a: TimeRef<'_>, b: TimeRef<'_>) -> c_int {
+    // SAFETY: both are live.
+    unsafe { ffi::ASN1_TIME_compare(a.0, b.0) }
+}
+
+impl Req {
+    /// `X509_REQ_get_subject_name`.
+    pub fn subject_name(&self) -> NameRef<'_> {
+        // SAFETY: the request is live; the name is owned by it.
+        NameRef::new(unsafe { ffi::X509_REQ_get_subject_name(self.as_ptr()) })
+    }
+
+    /// `X509_REQ_add_extensions(req, exts)` (the request copies them).
+    pub fn add_extensions(&self, exts: &[ExtRef<'_>]) -> bool {
+        let Some(list) = ExtList::new(exts) else {
+            return false;
+        };
+        // SAFETY: both are live.
+        unsafe { ffi::X509_REQ_add_extensions(self.as_ptr(), list.as_ptr()) == 1 }
+    }
+
+    /// `X509_REQ_print_ex`.
+    pub fn print_ex(&self, out: &Bio, nmflag: c_ulong, cflag: c_ulong) -> c_int {
+        // SAFETY: both are live.
+        unsafe { ffi::X509_REQ_print_ex(out.as_ptr(), self.as_ptr(), nmflag, cflag) }
+    }
+}
+
+impl<'a> V3Ctx<'a> {
+    /// `X509V3_set_ctx_test`: a context for checking a configuration's extensions.
+    /// (The macro is `X509V3_set_ctx(ctx, NULL, NULL, NULL, NULL, X509V3_CTX_TEST)`.)
+    pub fn test() -> Self {
+        Self::new(None, None, None, None, crate::abi::X509V3_CTX_TEST)
+    }
+
+    /// `X509V3_set_issuer_pkey` (NULL allowed).
+    pub fn set_issuer_pkey(&mut self, pkey: Option<&'a Pkey>) -> bool {
+        // SAFETY: the context is live; the key outlives it ('a) or is NULL.
+        unsafe {
+            ffi::X509V3_set_issuer_pkey(
+                self.as_ptr(),
+                pkey.map_or(core::ptr::null_mut(), Pkey::as_ptr),
+            ) == 1
+        }
+    }
+
+    /// `X509V3_EXT_add_nconf(conf, ctx, section, cert)`.
+    pub fn add_nconf(
+        &mut self,
+        conf: &crate::conf::Conf,
+        section: &str,
+        cert: Option<&Cert>,
+    ) -> bool {
+        let Some(s) = cstring(section) else {
+            return false;
+        };
+        // SAFETY: all are live or NULL.
+        unsafe {
+            ffi::X509V3_EXT_add_nconf(
+                conf.as_ptr(),
+                self.as_ptr(),
+                s.as_ptr(),
+                cert.map_or(core::ptr::null_mut(), Cert::as_ptr),
+            ) == 1
+        }
+    }
+
+    /// `X509V3_EXT_REQ_add_nconf(conf, ctx, section, req)`.
+    pub fn req_add_nconf(
+        &mut self,
+        conf: &crate::conf::Conf,
+        section: &str,
+        req: Option<&Req>,
+    ) -> bool {
+        let Some(s) = cstring(section) else {
+            return false;
+        };
+        // SAFETY: all are live or NULL.
+        unsafe {
+            ffi::X509V3_EXT_REQ_add_nconf(
+                conf.as_ptr(),
+                self.as_ptr(),
+                s.as_ptr(),
+                req.map_or(core::ptr::null_mut(), Req::as_ptr),
+            ) == 1
+        }
+    }
+
+    /// `X509V3_EXT_CRL_add_nconf(conf, ctx, section, crl)`.
+    pub fn crl_add_nconf(
+        &mut self,
+        conf: &crate::conf::Conf,
+        section: &str,
+        crl: Option<&Crl>,
+    ) -> bool {
+        let Some(s) = cstring(section) else {
+            return false;
+        };
+        // SAFETY: all are live or NULL.
+        unsafe {
+            ffi::X509V3_EXT_CRL_add_nconf(
+                conf.as_ptr(),
+                self.as_ptr(),
+                s.as_ptr(),
+                crl.map_or(core::ptr::null_mut(), Crl::as_ptr),
+            ) == 1
+        }
+    }
+}
+
+impl Pkey {
+    /// `EVP_PKEY_get_bn_param(pkey, name, &bn)`: the BIGNUM, if there is one.
+    pub fn bn_param(&self, name: &str) -> Option<Bn> {
+        let n = cstring(name)?;
+        let mut bn: *mut crate::abi::BIGNUM = core::ptr::null_mut();
+        // SAFETY: the key is live; bn is a valid out-pointer.
+        unsafe { ffi::EVP_PKEY_get_bn_param(self.as_ptr(), n.as_ptr(), &mut bn) };
+        Bn::from_ptr(bn)
+    }
+}
+
+/// `BN_print(out, bn)` (NULL allowed, as `BN_print` of NULL fails).
+pub fn bn_print(out: &Bio, bn: Option<&Bn>) -> c_int {
+    // SAFETY: the BIO is live; the BIGNUM live or NULL.
+    unsafe {
+        ffi::BN_print(
+            out.as_ptr(),
+            bn.map_or(core::ptr::null(), |b| b.as_ptr().cast_const()),
+        )
+    }
+}
+
+impl Integer {
+    /// `a2i_ASN1_INTEGER(bio, ai, buf, 1024)` into a new integer.
+    pub fn read_a2i(bio: &Bio) -> Option<Self> {
+        let ai = Self::new()?;
+        let mut buf = [0 as core::ffi::c_char; 1024];
+        // SAFETY: both are live; buf is writable for its length.
+        let ok =
+            unsafe { ffi::a2i_ASN1_INTEGER(bio.as_ptr(), ai.as_ptr(), buf.as_mut_ptr(), 1024) };
+        (ok == 1).then_some(ai)
+    }
+}
