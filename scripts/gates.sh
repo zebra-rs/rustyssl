@@ -39,6 +39,8 @@ run cargo test --workspace
 grep -E "FAILED|panicked" "$LAST" | head
 run cargo xtask codegen
 run cargo xtask coverage
+run cargo xtask unsafe-audit
+grep -E "FAIL" "$LAST" | head -5
 git diff --stat -- 'crates/*/src/generated' libs docs/coverage.md | tail -3
 run cargo xtask test-c
 grep -E "FAIL|passed|failed" "$LAST" | tail -5

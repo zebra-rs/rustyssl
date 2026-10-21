@@ -27,6 +27,7 @@ mod test_quic_interop;
 mod test_timing;
 mod test_tlsfuzzer;
 mod test_wycheproof;
+mod unsafe_audit;
 mod usage_scan;
 mod util;
 mod vendor;
@@ -43,6 +44,7 @@ const COMMANDS: &[(&str, &str)] = &[
     ("abi-check", "check symbols, versions, signatures, and struct layouts against abi/"),
     ("coverage", "report implemented exports per library and header into docs/coverage.md"),
     ("usage-scan", "rank exported functions by how many distro packages import them"),
+    ("unsafe-audit", "count unsafe per module against docs/security/unsafe-budget.txt; check the FFI guard"),
     ("test-c", "run the C conformance tests against the reference and target/dist"),
     ("test-apps", "run the reference's openssl tool on rustyssl and compare its output"),
     ("test-bogo", "BoringSSL's TLS test runner (BoGo) with an OpenSSL-API shim, on both libraries"),
@@ -85,6 +87,7 @@ fn main() -> ExitCode {
         Some("test-providers") => report("test-providers", test_providers::run(&rest)),
         Some("test-wycheproof") => report("test-wycheproof", test_wycheproof::run(&rest)),
         Some("test-timing") => report("test-timing", test_timing::run(&rest)),
+        Some("unsafe-audit") => report("unsafe-audit", unsafe_audit::run(&rest)),
         Some("usage-scan") => report("usage-scan", usage_scan::run(&rest)),
         Some("vendor") => report("vendor", vendor::run(&rest)),
         Some(name) if COMMANDS.iter().any(|(known, _)| *known == name) => {
