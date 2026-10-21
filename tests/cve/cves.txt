@@ -254,7 +254,7 @@ CVE-2025-9232 test cve_bio matching servers against no_proxy reads only the give
 CVE-2025-11187 test cve_pkcs PBMAC1 parameters are validated (10 malformed files)
 CVE-2025-15467 test cve_pkcs
 CVE-2025-15468 test cve_tls SSL_CIPHER_find of an unknown id returns NULL, on TLS and QUIC
-CVE-2025-15469 gap apps dgst one-shot truncation past 16 MiB: test-apps has no 16 MiB input yet
+CVE-2025-15469 apps dgst one-shot Ed25519 signing of 17 MB fails (read error, no signature) instead of signing the first 16 MiB
 CVE-2025-66199 n/a build TLS 1.3 certificate compression needs zlib, brotli or zstd, none in the default build
 CVE-2025-68160 test cve_bio BIO_f_linebuffer with short writes downstream stays in bounds
 CVE-2025-69418 test cve_cipher low-level OCB authenticates and encrypts trailing octets
