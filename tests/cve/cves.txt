@@ -64,7 +64,7 @@ CVE-2010-5298 test cve_tls released read buffers are reacquired, not reused
 CVE-2011-0014 test cve_tls a malformed status_request extension is refused
 CVE-2011-3207 test cve_x509 a CRL whose nextUpdate has passed fails verification
 CVE-2011-3210 test cve_race 8 threads of ECDHE handshakes on one server context
-CVE-2011-4108 gap timing DTLS CBC padding-oracle timing: tls-cbc-record measures TLS, not DTLS
+CVE-2011-4108 covered test-timing DTLS CBC padding check: dudect's dtls-cbc-record target (padding 0 against 255 over DTLS)
 CVE-2011-4109 test cve_x509 policy checking frees its tree once
 CVE-2011-4576 n/a sslv3 SSL 3.0 record padding; SSL 3.0 is disabled in the default build
 CVE-2011-4577 test cve_asn1 a malformed RFC 3779 address range
@@ -151,7 +151,7 @@ CVE-2016-2108 test cve_asn1 negative zero encodes as 0; odd INTEGERs round-trip
 CVE-2016-2109 test cve_asn1 d2i_CMS_bio with a 2 GiB length on a short BIO fails
 CVE-2016-2176 n/a platform EBCDIC builds
 CVE-2016-2177 n/a c undefined C pointer arithmetic; rustyssl's lengths are checked (AGENTS.md rule 3)
-CVE-2016-2178 gap timing DSA signing constant time: not measured by test-timing yet
+CVE-2016-2178 covered test-timing DSA signing: dudect's dsa-sign-nonce target (a full-length nonce against one 8 bits shorter, RFC 6979)
 CVE-2016-2179 test cve_tls buffered out-of-order DTLS messages are bounded
 CVE-2016-2180 test cve_asn1 TS_OBJ_print_bio prints a long OID within bounds
 CVE-2016-2181 test cve_tls replay protection holds for future-epoch records
@@ -179,9 +179,9 @@ CVE-2017-3737 test cve_tls after a fatal error, SSL_write and SSL_read keep fail
 CVE-2017-3738 test cve_pkey 1024-bit and longer exponentiation equals the simple method (AVX2)
 CVE-2018-0732 test cve_pkey DH key generation with a 20000-bit p is refused
 CVE-2018-0733 n/a asm HP-UX PA-RISC CRYPTO_memcmp assembly
-CVE-2018-0734 gap timing DSA signing timing: not measured by test-timing yet
+CVE-2018-0734 covered test-timing DSA signing: dudect's dsa-sign-nonce target (a full-length nonce against one 8 bits shorter, RFC 6979)
 CVE-2018-0735 covered test-timing ECDSA signing timing: dudect's ecdsa-sign target (P-256)
-CVE-2018-0737 gap timing RSA key generation cache timing: not measured by test-timing yet
+CVE-2018-0737 gap timing RSA key generation: its time depends on the primes it finds, so dudect's fixed-against-random classes don't apply; its exponentiations are bn-modexp-consttime's
 CVE-2018-0739 test cve_asn1 PKCS#7 content nested %d deep fails without exhausting the stack
 CVE-2018-5407 covered test-timing ECC scalar multiplication timing: dudect's ecdsa-sign target (P-256; SMT port contention isn't measured)
 CVE-2019-1543 test cve_cipher ChaCha20-Poly1305 refuses nonces over 12 octets
@@ -249,7 +249,7 @@ CVE-2024-12797 test cve_tls a client expecting another raw public key aborts the
 CVE-2024-13176 covered test-timing ECDSA nonce top-word timing: dudect's ecdsa-sign target (P-256)
 CVE-2025-4575 apps x509 x509 -addreject adds a rejected use
 CVE-2025-9230 test cve_pkcs RFC 3211 KEK unwrap with wrong passwords stays in bounds (64 messages)
-CVE-2025-9231 gap timing SM2 timing: not measured by test-timing yet
+CVE-2025-9231 covered test-timing SM2 signing on 64-bit Arm: dudect's sm2-sign target (a fixed key against random ones)
 CVE-2025-9232 test cve_bio matching servers against no_proxy reads only the given names
 CVE-2025-11187 test cve_pkcs PBMAC1 parameters are validated (10 malformed files)
 CVE-2025-15467 test cve_pkcs
@@ -295,10 +295,10 @@ CVE-2026-42772 test cve_quic 20000 reversed one-octet STREAM frames reassemble q
 CVE-2026-45445 test cve_cipher AES-OCB through EVP_Cipher uses the IV, as EVP_EncryptUpdate does
 CVE-2026-45446 test cve_cipher AES-SIV and AES-GCM-SIV check the tag of an empty message
 CVE-2026-45447 test cve_pkcs PKCS#7 verification of a message with repeated certificates
-CVE-2026-54872 gap timing non-NIST curve scalar multiplication timing: ecdsa-sign measures P-256 only
+CVE-2026-54872 covered test-timing scalar multiplication on a curve without a dedicated implementation: dudect's ecdsa-brainpool-nonce target
 CVE-2026-54873 test cve_quic 200000 one-octet STREAM fragments around gaps never filled: memory stays bounded, the connection stays open
 CVE-2026-54874 test cve_tls DTLS records for a future epoch are buffered in bounds
-CVE-2026-54875 gap timing SM2 scalar multiplication timing: not measured by test-timing yet
+CVE-2026-54875 covered test-timing SM2 scalar multiplication on Arm64: dudect's sm2-sign target
 CVE-2026-54876 test cve_tls checking stapled OCSP responses releases what it parsed
 CVE-2026-63072 test cve_pkcs KARI with a key-wrap-pad OID fails without writing past its buffer
 CVE-2026-63073 covered test-openssl-suite a CMP sender DN as a format string: upstream's cmp_vfy_test, run by test-openssl-suite --all
@@ -310,7 +310,7 @@ CVE-2026-75803 test cve_cipher an empty ciphertext with a forged tag fails throu
 CVE-2026-75804 test cve_quic STREAM data over the connection window, each stream within its own: FLOW_CONTROL_ERROR
 CVE-2026-75805 test cve_cmp an rp carrying a CertId, for a revocation requested by PKCS#10 CSR (crafted, re-protected)
 CVE-2026-75806 test cve_dtls forged AES-GCM and ChaCha20-Poly1305 records shorter than nonce and tag are dropped; the association lives on
-CVE-2026-77696 gap timing SM2 signing timing: not measured by test-timing yet
+CVE-2026-77696 covered test-timing SM2 signing's arithmetic on the private key: dudect's sm2-sign target (SM2 has no deterministic nonce to fix)
 CVE-2026-84782 test cve_dtls the server's flight is suspended by a full datagram pair and its timer expires: the flight stays intact
 CVE-2026-84783 n/a 4.0 OpenSSL 4.0 only (rustyssl targets the 3.x ABI)
 CVE-2026-84784 test cve_quic 20000 NEW_CONNECTION_ID frames each retiring the earlier IDs: memory stays bounded
