@@ -44,8 +44,6 @@ use crate::util::{
 /// A distribution's directories, all absolute.
 struct Layout {
     name: String,
-    /// `/usr`, or the keg.
-    prefix: String,
     /// The system's library directory.
     libdir: String,
     /// rustyssl's own directory: `<libdir>/rustyssl`, or the keg.
@@ -117,7 +115,6 @@ fn layout(
     };
     Ok(Layout {
         name: name.to_owned(),
-        prefix: usr,
         libdir,
         home,
         openssldir: openssldir.map_or(system_openssldir, str::to_owned),

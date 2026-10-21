@@ -36,8 +36,9 @@ fedora|el)
         procps-ng findutils tar gzip shadow-utils util-linux > /dev/null || exit 1
     ;;
 alpine)
+    # llvm-libunwind is the package's own dependency (Rust's unwinder on musl).
     apk add -q curl wget git openssh nginx apache2 apache2-ssl python3 py3-pip postgresql \
-        postgresql-client openssl procps tar shadow > /dev/null || exit 1
+        postgresql-client openssl procps tar shadow llvm-libunwind > /dev/null || exit 1
     ;;
 esac
 tar --keep-directory-symlink -xzf "$PACKAGE" -C / || exit 1
@@ -260,6 +261,12 @@ scenarios() { # $1 phase
         where=system
     fi
     [ "$where" = "$p" ]; result openssl-tool-is-$p $p $?
+    want=$(sha256sum $W/www/hello.txt | cut -d' ' -f1)
+    [ "$(openssl dgst -sha256 -r $W/www/hello.txt 2> $W/last.log | cut -d' ' -f1)" = "$want" ]
+    result openssl-tool-dgst $p $?
+    quiet openssl s_client -connect 127.0.0.1:8443 -servername localhost -CAfile $W/pki/ca.pem \
+        -verify_return_error -brief < /dev/null
+    result openssl-tool-s_client $p $?
     case $DISTRO in fedora|el) crypto_policies $p ;; esac
     stop_servers
 }

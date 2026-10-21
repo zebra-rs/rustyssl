@@ -148,20 +148,27 @@ pub fn run(args: &[String]) -> Result {
 pub const CLI_NAME: &str = "openssl";
 
 /// Builds `rustyssl-cli` and installs its binary as `bin/openssl`.
+///
+/// On musl, Rust links executables statically by default, and a static musl program can't
+/// `dlopen`, so the tool couldn't load the libraries: there it's linked dynamically. Only the
+/// binary's own link changes (`cargo rustc`), not how its dependencies are built.
 fn install_cli(root: &Path, release: &Path, dist: &Path) -> Result {
     let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
-    run_output(
-        Command::new(cargo)
-            .args([
-                "build",
-                "--release",
-                "--color",
-                "never",
-                "-p",
-                "rustyssl-cli",
-            ])
-            .current_dir(root),
-    )?;
+    let mut cmd = Command::new(cargo);
+    cmd.args([
+        "rustc",
+        "--release",
+        "--color",
+        "never",
+        "-p",
+        "rustyssl-cli",
+        "--bin",
+        "openssl",
+    ]);
+    if cfg!(target_env = "musl") {
+        cmd.args(["--", "-C", "target-feature=-crt-static"]);
+    }
+    run_output(cmd.current_dir(root))?;
     let bin = dist.join("bin");
     fs::create_dir_all(&bin)?;
     // fs::copy keeps the executable's permissions.

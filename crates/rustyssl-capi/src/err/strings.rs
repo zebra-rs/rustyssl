@@ -437,7 +437,12 @@ const PRINT_BUFFER: usize = 4096;
 fn thread_id() -> Vec<u8> {
     // SAFETY: no preconditions.
     let id = unsafe { libc::pthread_self() };
-    id.to_ne_bytes()
+    // `pthread_t` is an integer in glibc and macOS's libc crate, a pointer in musl.
+    #[cfg(target_env = "musl")]
+    let bytes = id.addr().to_ne_bytes();
+    #[cfg(not(target_env = "musl"))]
+    let bytes = id.to_ne_bytes();
+    bytes
         .iter()
         .flat_map(|b| format!("{b:02X}").into_bytes())
         .collect()
