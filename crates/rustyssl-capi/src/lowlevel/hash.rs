@@ -1524,16 +1524,19 @@ mod md2_tests {
         assert_eq!(hex(&out), "da853b0d3f88d99b30283a69e6ded6bb");
         // SAFETY: an all-zero MD2_CTX is a valid value of its integers and octets.
         let mut c: MD2_CTX = unsafe { core::mem::zeroed() };
-        // SAFETY: a live context, the message's octets, and room for 16.
-        unsafe {
-            assert_eq!(MD2_Init(&mut c), 1);
-            assert_eq!(MD2_Update(&mut c, b"message ".as_ptr(), 8), 1);
-            assert_eq!(MD2_Update(&mut c, b"digest".as_ptr(), 6), 1);
-            assert_eq!(MD2_Final(out.as_mut_ptr(), &mut c), 1);
-        }
+        // SAFETY: a live context.
+        assert_eq!(unsafe { MD2_Init(&mut c) }, 1);
+        // SAFETY: a live context and the message's 8 octets.
+        assert_eq!(unsafe { MD2_Update(&mut c, b"message ".as_ptr(), 8) }, 1);
+        // SAFETY: a live context and the message's 6 octets.
+        assert_eq!(unsafe { MD2_Update(&mut c, b"digest".as_ptr(), 6) }, 1);
+        // SAFETY: a live context and room for 16 octets.
+        assert_eq!(unsafe { MD2_Final(out.as_mut_ptr(), &mut c) }, 1);
         assert_eq!(hex(&out), "ab4f496bfb2a530b219ff33031fe06b0");
         // SAFETY: no preconditions.
-        let options = unsafe { core::ffi::CStr::from_ptr(MD2_options()) };
+        let options = unsafe { MD2_options() };
+        // SAFETY: a static NUL-terminated string.
+        let options = unsafe { core::ffi::CStr::from_ptr(options) };
         assert_eq!(options, c"md2(int)");
     }
 }

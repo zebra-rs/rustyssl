@@ -139,8 +139,10 @@ mod tests {
 
     #[test]
     fn no_sctp_bio_can_be_made() {
+        // SAFETY: no preconditions.
+        let method = unsafe { BIO_s_datagram_sctp() };
         // SAFETY: the built-in method.
-        assert!(unsafe { super::super::BIO_new(BIO_s_datagram_sctp()) }.is_null());
+        assert!(unsafe { super::super::BIO_new(method) }.is_null());
         let mut fds = [0; 2];
         // SAFETY: a two-element array.
         assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0);
@@ -152,18 +154,20 @@ mod tests {
         assert!(unsafe { BIO_new_dgram_sctp(fds[1], 0) }.is_null());
         // SAFETY: the descriptor is still ours.
         assert_eq!(unsafe { libc::close(fds[1]) }, 0);
-        // SAFETY: a memory BIO.
-        let mem = unsafe { super::super::BIO_new(super::super::mem::BIO_s_mem()) };
+        // SAFETY: no preconditions.
+        let mem_method = unsafe { super::super::mem::BIO_s_mem() };
+        // SAFETY: the built-in memory method.
+        let mem = unsafe { super::super::BIO_new(mem_method) };
         // SAFETY: a live BIO.
-        unsafe {
-            assert_eq!(BIO_dgram_is_sctp(mem), 0);
-            assert_eq!(BIO_dgram_sctp_wait_for_dry(mem), -1);
-            assert_eq!(BIO_dgram_sctp_msg_waiting(mem), -1);
-            assert_eq!(
-                BIO_dgram_sctp_notification_cb(mem, None, ptr::null_mut()),
-                -1
-            );
-            super::super::BIO_free(mem);
-        }
+        assert_eq!(unsafe { BIO_dgram_is_sctp(mem) }, 0);
+        // SAFETY: a live BIO.
+        assert_eq!(unsafe { BIO_dgram_sctp_wait_for_dry(mem) }, -1);
+        // SAFETY: a live BIO.
+        assert_eq!(unsafe { BIO_dgram_sctp_msg_waiting(mem) }, -1);
+        // SAFETY: a live BIO, no handler.
+        let r = unsafe { BIO_dgram_sctp_notification_cb(mem, None, ptr::null_mut()) };
+        assert_eq!(r, -1);
+        // SAFETY: our BIO, freed once.
+        unsafe { super::super::BIO_free(mem) };
     }
 }
