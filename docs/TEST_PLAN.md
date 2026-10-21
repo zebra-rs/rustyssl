@@ -219,6 +219,8 @@ rustyssl itself**. You can only regenerate golden files with
     (the QUIC programs built on OpenSSL's internal QUIC among them), 83 skipped on both, none
     fails on the reference. x86_64 Linux isn't measured yet: the whole tree's build and
     rustyssl's need more than the Docker VM's free space here.
+  - **With our CLI (2026-10-21, Phase 11.2, `--cli ours`):** the same 4334 of 4334 pass with
+    our `openssl` tool in place of the tree's `apps/openssl` on rustyssl.
 - Classify every test, and keep the list in `tests/openssl-suite/classification.toml`:
   - **(a) Public API** → must pass.
   - **(b) Needs internal symbols or headers** → excluded, with the reason.
