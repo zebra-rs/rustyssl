@@ -351,6 +351,204 @@ fn sm2_term_affine(g: &Group, pt: Option<&Point>, s: &BigNum, table: bool) -> Re
     Ok(s.is_one())
 }
 
+/// A projective point (X:Y:Z) for the complete formulas: (0:1:0) is the point at infinity.
+#[derive(Clone, Copy)]
+struct Proj {
+    x: Fe,
+    y: Fe,
+    z: Fe,
+}
+
+/// The curve's constants for the complete formulas: `a` and `3b`.
+struct Curve {
+    a: Fe,
+    b3: Fe,
+}
+
+/// `p + q` by Renes, Costello, and Batina's complete formula for any short Weierstrass curve
+/// (2016, algorithm 1: 12 products, 3 by `a`, 2 by `3b`): no special case, so doubling and the
+/// point at infinity go through the same steps, and nothing branches on the points.
+fn add_complete(f: &Fp, c: &Curve, p: &Proj, q: &Proj) -> Proj {
+    let t0 = f.mul(&p.x, &q.x);
+    let t1 = f.mul(&p.y, &q.y);
+    let t2 = f.mul(&p.z, &q.z);
+    let t3 = f.mul(&f.add(&p.x, &p.y), &f.add(&q.x, &q.y));
+    let t3 = f.sub(&t3, &f.add(&t0, &t1));
+    let t4 = f.mul(&f.add(&p.x, &p.z), &f.add(&q.x, &q.z));
+    let t4 = f.sub(&t4, &f.add(&t0, &t2));
+    let t5 = f.mul(&f.add(&p.y, &p.z), &f.add(&q.y, &q.z));
+    let t5 = f.sub(&t5, &f.add(&t1, &t2));
+    let z3 = f.add(&f.mul(&c.b3, &t2), &f.mul(&c.a, &t4));
+    let x3 = f.sub(&t1, &z3);
+    let z3 = f.add(&t1, &z3);
+    let y3 = f.mul(&x3, &z3);
+    let t1 = f.add(&f.add(&t0, &t0), &t0);
+    let t2 = f.mul(&c.a, &t2);
+    let t4 = f.mul(&c.b3, &t4);
+    let t1 = f.add(&t1, &t2);
+    let t2 = f.mul(&c.a, &f.sub(&t0, &t2));
+    let t4 = f.add(&t4, &t2);
+    let y3 = f.add(&y3, &f.mul(&t1, &t4));
+    let x3 = f.sub(&f.mul(&t3, &x3), &f.mul(&t5, &t4));
+    let z3 = f.add(&f.mul(&t5, &z3), &f.mul(&t3, &t1));
+    Proj {
+        x: x3,
+        y: y3,
+        z: z3,
+    }
+}
+
+/// A named curve's generator table for the comb: entry `16 w + j` is `j 16^w G`, for every
+/// 4-bit window `w` of the order, kept for the process.
+struct Comb {
+    nid: i32,
+    field: BigNum,
+    a: BigNum,
+    b: BigNum,
+    order: BigNum,
+    fp: std::sync::Arc<Fp>,
+    curve: Curve,
+    windows: usize,
+    table: Vec<Proj>,
+}
+
+/// The comb's table for `g`'s standard generator, if `g` is a named prime curve of cofactor 1
+/// with its own parameters and generator (`k G` is then `(k mod n) G` exactly).
+fn comb_for(g: &Group) -> Option<std::sync::Arc<Comb>> {
+    use std::sync::{Arc, Mutex, PoisonError};
+    static COMBS: Mutex<Vec<Arc<Comb>>> = Mutex::new(Vec::new());
+    if g.curve_name == 0 || !g.cofactor.is_one() || g.order.is_zero() || !standard_generator(g) {
+        return None;
+    }
+    let same = |c: &Comb| {
+        c.nid == g.curve_name
+            && bn::cmp(&c.field, &g.field).is_eq()
+            && bn::cmp(&c.a, &g.a).is_eq()
+            && bn::cmp(&c.b, &g.b).is_eq()
+            && bn::cmp(&c.order, &g.order).is_eq()
+    };
+    {
+        let kept = COMBS.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some(c) = kept.iter().find(|c| same(c)) {
+            return Some(Arc::clone(c));
+        }
+    }
+    let made = Arc::new(build_comb(g)?);
+    let mut kept = COMBS.lock().unwrap_or_else(PoisonError::into_inner);
+    if !kept.iter().any(|c| same(c)) {
+        kept.push(Arc::clone(&made));
+    }
+    Some(made)
+}
+
+/// Builds the comb's table (public values only: the curve and its generator).
+fn build_comb(g: &Group) -> Option<Comb> {
+    let gen_pt = g.generator.as_ref()?;
+    let fp = super::fe::cached(&g.field)?;
+    let f = fp.as_ref();
+    let reduce = |v: &BigNum| bn::nnmod(v, &g.field).ok().and_then(|v| f.from_bn(&v));
+    let curve = Curve {
+        a: reduce(&g.a)?,
+        b3: {
+            let b = reduce(&g.b)?;
+            f.add(&f.add(&b, &b), &b)
+        },
+    };
+    let infinity = Proj {
+        x: f.zero(),
+        y: f.one(),
+        z: f.zero(),
+    };
+    let mut base = Proj {
+        x: reduce(&gen_pt.x)?,
+        y: reduce(&gen_pt.y)?,
+        z: f.one(),
+    };
+    let windows = g.order.num_bits().div_ceil(4);
+    let mut table = Vec::with_capacity(windows.saturating_mul(16));
+    for _ in 0..windows {
+        let mut acc = infinity;
+        for _ in 0..16 {
+            table.push(acc);
+            acc = add_complete(f, &curve, &acc, &base);
+        }
+        // acc is 16 base: the next window's base.
+        base = acc;
+    }
+    Some(Comb {
+        nid: g.curve_name,
+        field: g.field.clone(),
+        a: g.a.clone(),
+        b: g.b.clone(),
+        order: g.order.clone(),
+        fp,
+        curve,
+        windows,
+        table,
+    })
+}
+
+/// `k G` by the comb: for each 4-bit window of `k mod n` (the order's number of windows,
+/// whatever `k`), the table's entry chosen by scanning all sixteen, added with the complete
+/// formula, so neither the steps nor the memory touched depend on `k`. The affine point.
+fn comb_mul(g: &Group, comb: &Comb, k: &BigNum) -> Result<Point> {
+    const F: &str = "ossl_ec_scalar_mul_ladder";
+    let bnlib = |e: bn::Error| Error::from(e).then(Reason::BnLib, F);
+    let k = if k.is_negative() || bn::ucmp(k, &g.order).is_ge() {
+        bn::nnmod(k, &g.order).map_err(bnlib)?
+    } else {
+        k.clone()
+    };
+    let f = comb.fp.as_ref();
+    let limbs = k.limbs();
+    let window = |w: usize| -> usize {
+        let at = w.saturating_mul(4);
+        let (i, j) = (at / 64, at % 64);
+        let lo = limbs.get(i).copied().unwrap_or(0) >> j;
+        // A window across two limbs takes the next one's low bits.
+        let hi = if j > 60 {
+            limbs
+                .get(i.saturating_add(1))
+                .copied()
+                .unwrap_or(0)
+                .wrapping_shl(u32::try_from(64usize.wrapping_sub(j)).unwrap_or(0))
+        } else {
+            0
+        };
+        usize::try_from((lo | hi) & 0xf).unwrap_or(0)
+    };
+    let mut acc = Proj {
+        x: f.zero(),
+        y: f.one(),
+        z: f.zero(),
+    };
+    for w in 0..comb.windows {
+        let want = window(w);
+        let mut e = acc;
+        let entries = comb
+            .table
+            .get(w.saturating_mul(16)..w.saturating_mul(16).saturating_add(16));
+        for (j, entry) in entries.unwrap_or_default().iter().enumerate() {
+            let d = u64::try_from(j ^ want).unwrap_or(1);
+            let m = ((d | d.wrapping_neg()) >> 63).wrapping_sub(1);
+            Fp::cmov(m, &mut e.x, &entry.x);
+            Fp::cmov(m, &mut e.y, &entry.y);
+            Fp::cmov(m, &mut e.z, &entry.z);
+        }
+        acc = add_complete(f, &comb.curve, &acc, &e);
+    }
+    if f.is_zero(&acc.z) {
+        return Ok(Point::infinity());
+    }
+    let zi = f.inv(&acc.z);
+    Ok(Point {
+        x: f.to_bn(&f.mul(&acc.x, &zi)),
+        y: f.to_bn(&f.mul(&acc.y, &zi)),
+        z: BigNum::one(),
+        z_is_one: true,
+    })
+}
+
 /// A point in the constant-time ladder: x and z of OpenSSL's x-only formulas.
 struct CtPoint {
     x: Fe,
@@ -378,6 +576,12 @@ fn ladder_ct(
     }
     if g.cofactor.is_zero() {
         return Err(Error::new(Reason::UnknownCofactor, F));
+    }
+    if pt.is_none()
+        && let Some(comb) = comb_for(g)
+    {
+        *r = comb_mul(g, &comb, scalar)?;
+        return Ok(());
     }
     let mut p = match pt {
         Some(p) => p.clone(),
@@ -725,4 +929,62 @@ fn wnaf_mul(g: &Group, r: &mut Point, req: &Request<'_>, rng: &mut Random<'_>) -
     }
     *out = acc;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ec::curves::{self, Field as CurveField};
+
+    /// The comb (the generator alone) and the ladder (the same point given explicitly) agree on
+    /// every named prime curve of cofactor 1, for scalars at the edges and past the order.
+    #[test]
+    fn comb_agrees_with_ladder() {
+        let mut none = |_: &mut [u8]| false;
+        let mut checked = 0;
+        for c in curves::builtin() {
+            if c.field != CurveField::Prime || c.cofactor != 1 {
+                continue;
+            }
+            let g = Group::from_curve(c).unwrap_or_else(|_| panic!("curve {}", c.nid));
+            assert!(comb_for(&g).is_some(), "curve {} has a comb", c.nid);
+            let n = g.order.clone();
+            let gen_pt = g.generator.clone().unwrap_or_default();
+            let word = |w: u64| BigNum::from_word(w);
+            let plus = |a: &BigNum, b: u64| bn::add(a, &word(b)).unwrap_or_default();
+            let minus = |a: &BigNum, b: u64| bn::sub(a, &word(b)).unwrap_or_default();
+            let mut big = BigNum::zero();
+            let _ = big.set_bit(n.num_bits().saturating_sub(1));
+            let pattern = BigNum::from_hex_digits(b"0123456789ABCDEF5A5A5A5AF0F0F0F0").unwrap_or_default();
+            let scalars = [
+                word(0),
+                word(1),
+                word(2),
+                word(15),
+                word(16),
+                word(17),
+                minus(&n, 1),
+                n.clone(),
+                plus(&n, 1),
+                plus(&bn::add(&n, &n).unwrap_or_default(), 5),
+                minus(&big, 1),
+                big.clone(),
+                pattern,
+            ];
+            for k in &scalars {
+                let mut by_comb = Point::infinity();
+                let mut by_ladder = Point::infinity();
+                ladder_ct(&g, &mut by_comb, k, None, &mut none).unwrap_or_else(|_| panic!("comb"));
+                ladder_ct(&g, &mut by_ladder, k, Some(&gen_pt), &mut none)
+                    .unwrap_or_else(|_| panic!("ladder"));
+                assert_eq!(by_comb.is_at_infinity(), by_ladder.is_at_infinity(), "curve {} k {}", c.nid, k.to_hex());
+                if !by_comb.is_at_infinity() {
+                    assert!(bn::cmp(&by_comb.x, &by_ladder.x).is_eq(), "x: curve {} k {}", c.nid, k.to_hex());
+                    assert!(bn::cmp(&by_comb.y, &by_ladder.y).is_eq(), "y: curve {} k {}", c.nid, k.to_hex());
+                }
+                checked += 1;
+            }
+        }
+        assert!(checked > 100, "{checked} checks");
+    }
 }

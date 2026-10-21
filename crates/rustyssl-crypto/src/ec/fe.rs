@@ -137,10 +137,11 @@ impl Fp {
             _ => false,
         };
         if !done {
-            let mut t = [0; FE_LIMBS + 2];
-            if let (Some(o), Some(t)) =
-                (out.get_mut(..self.n), t.get_mut(..self.n.saturating_add(2)))
-            {
+            let mut t = [0; 2 * FE_LIMBS + 2];
+            if let (Some(o), Some(t)) = (
+                out.get_mut(..self.n),
+                t.get_mut(..self.n.saturating_mul(2).saturating_add(2)),
+            ) {
                 self.mont.mul_into(o, a, b, t);
             }
         }
@@ -335,6 +336,14 @@ impl Fp {
             }
         }
         r
+    }
+
+    /// `src` into `dst` where `m` is all ones (zero: `dst` as it was), in constant time.
+    pub fn cmov(m: Limb, dst: &mut Fe, src: &Fe) {
+        let m = core::hint::black_box(m);
+        for (d, &s) in dst.0.iter_mut().zip(src.0.iter()) {
+            *d = (*d & !m) | (s & m);
+        }
     }
 
     /// Swaps `a` and `b` when `c`, in constant time.
