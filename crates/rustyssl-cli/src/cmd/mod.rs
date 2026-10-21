@@ -51,7 +51,7 @@ pub mod pkcs7;
 // pub mod s_time;
 pub mod sess_id;
 // pub mod skeyutl;
-// pub mod smime;
+pub mod smime;
 // pub mod speed;
 // pub mod spkac;
 // pub mod srp;
@@ -110,7 +110,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "s_time" => s_time::main,
         "sess_id" => sess_id::main,
         // "skeyutl" => skeyutl::main,
-        // "smime" => smime::main,
+        "smime" => smime::main,
         // "speed" => speed::main,
         // "spkac" => spkac::main,
         // "srp" => srp::main,

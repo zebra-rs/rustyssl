@@ -1,0 +1,120 @@
+# `openssl smime` (apps/smime.c): run with upstream's tool on the reference, then ours on
+# rustyssl and on the reference (cargo xtask test-apps); output and exit codes must match.
+# Signatures without attributes (-noattr) by RSA keys are deterministic and byte-compared;
+# signing times, DSA and ECDSA signatures, S/MIME boundaries and encryption are random, so
+# those outputs go to files that the following lines verify or decrypt.
+#
+# Deterministic signatures.
+smime -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem
+smime -sign -in {src}/test/smcont.txt -outform PEM -noattr -signer {src}/test/smime-certs/smrsa1.pem
+smime -sign -in {src}/test/smcont.txt -outform DER -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -out {dir}/s1.der
+smime -pk7out -in {dir}/s1.der -inform DER
+smime -verify -in {dir}/s1.der -inform DER -CAfile {src}/test/smime-certs/smroot.pem
+smime -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -certfile {src}/test/smime-certs/smroot.pem -md sha512
+smime -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -certfile {src}/test/smime-certs/smroot.pem -nocerts
+smime -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -text
+smime -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -binary
+smime -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -crlfeol
+smime -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -stream
+smime -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -indef -noindef
+smime -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -signer {src}/test/smime-certs/smrsa2.pem
+smime -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa3-cert.pem -inkey {src}/test/smime-certs/smrsa3-key.pem -keyform PEM
+smime -sign -in {src}/test/smcont.txt -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -to someone@example.com -from me@example.com -subject Signed
+smime -sign -in {src}/test/smcont.txt -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -crlfeol -to someone@example.com -from me@example.com -subject Signed
+smime -sign -in {src}/test/smcont.txt -nodetach -noattr -nosmimecap -signer {src}/test/smime-certs/smrsa1.pem -outform DER -out {dir}/s2.der
+smime -verify -in {dir}/s2.der -inform DER -CAfile {src}/test/smime-certs/smroot.pem -out {dir}/s2.txt
+smime -sign -in {src}/test/smcont.txt -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -stream -out {dir}/s3.msg
+smime -verify -in {dir}/s3.msg -CAfile {src}/test/smime-certs/smroot.pem
+smime -verify -in {dir}/s3.msg -CAfile {src}/test/smime-certs/smroot.pem -signer {dir}/signers.pem
+smime -verify -in {dir}/s3.msg -noverify -signer {dir}/signers.pem
+smime -verify -in {dir}/s3.msg -CAfile {src}/test/smime-certs/smroot.pem -signer {dir}/nonexistent/signers.pem
+smime -verify -in {dir}/s3.msg
+smime -verify -in {dir}/s3.msg -no-CAfile -no-CApath -no-CAstore
+smime -verify -in {dir}/s3.msg -nosigs -no-CAfile -no-CApath -no-CAstore
+smime -verify -in {dir}/s3.msg -CApath {dir} -CAstore file:{dir}/nonexistent.pem
+smime -verify -in {dir}/s3.msg -CAfile {src}/test/smime-certs/smroot.pem -nointern -certfile {src}/test/smime-certs/smrsa1.pem
+smime -verify -in {dir}/s3.msg -CAfile {src}/test/smime-certs/smroot.pem -nointern
+smime -verify -in {dir}/s3.msg -CAfile {src}/test/smime-certs/smroot.pem -nochain -purpose smimesign
+smime -verify -in {dir}/s3.msg -CAfile {src}/test/smime-certs/smroot.pem -policy_check -explicit_policy -policy 1.2.3.4
+smime -verify -in {dir}/s3.msg -CAfile {src}/test/smime-certs/smroot.pem -policy_check -policy_print
+smime -verify -in {dir}/s3.msg -CAfile {src}/test/smime-certs/smroot.pem -attime 0
+smime -verify -in {dir}/s3.msg -CAfile {src}/test/smime-certs/smroot.pem -purpose nosuchpurpose
+smime -verify -in {dir}/s3.msg -CAfile {src}/test/smime-certs/smroot.pem -verify_depth 0
+smime -verify -in {dir}/s3.msg -CAfile {src}/test/smime-certs/smroot.pem -x509_strict -check_ss_sig -crl_check
+smime -verify -in {dir}/s3.msg -CAfile {src}/test/smime-certs/smroot.pem -binary
+smime -verify -in {dir}/s3.msg -CAfile {src}/test/smime-certs/smroot.pem -text
+smime -verify -in {dir}/s3.msg -CAfile {src}/test/smime-certs/smroot.pem -inform PEM
+smime -resign -in {dir}/s3.msg -signer {src}/test/smime-certs/smrsa2.pem -noattr -outform PEM
+smime -resign -in {dir}/s3.msg -signer {src}/test/smime-certs/smrsa2.pem -noattr -out {dir}/s3r.msg
+smime -verify -in {dir}/s3r.msg -CAfile {src}/test/smime-certs/smroot.pem
+#
+# Random signatures and boundaries, verified.
+smime -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -out {dir}/d1.msg
+smime -verify -in {dir}/d1.msg -CAfile {src}/test/smime-certs/smroot.pem
+smime -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -signer {src}/test/smime-certs/smrsa2.pem -signer {src}/test/smime-certs/smdsa1.pem -signer {src}/test/smime-certs/smdsa2.pem -stream -out {dir}/d2.msg
+smime -verify -in {dir}/d2.msg -CAfile {src}/test/smime-certs/smroot.pem
+smime -sign -in {src}/test/smcont.txt -outform DER -signer {src}/test/smime-certs/smdsa1.pem -out {dir}/d3.der
+smime -verify -in {dir}/d3.der -inform DER -CAfile {src}/test/smime-certs/smroot.pem -content {src}/test/smcont.txt
+smime -verify -in {dir}/d3.der -inform DER -CAfile {src}/test/smime-certs/smroot.pem -content {dir}/nonexistent.txt
+smime -verify -in {dir}/d3.der -inform DER -CAfile {src}/test/smime-certs/smroot.pem
+smime -resign -in {dir}/d3.der -inform DER -outform DER -signer {src}/test/smime-certs/smrsa1.pem -out {dir}/d3r.der
+smime -verify -in {dir}/d3r.der -inform DER -CAfile {src}/test/smime-certs/smroot.pem -content {src}/test/smcont.txt
+smime -sign -in {src}/test/smcont.txt -outform DER -nodetach -signer {src}/test/smime-certs/smec1.pem -md sha256 -out {dir}/d4.der
+smime -verify -in {dir}/d4.der -inform DER -CAfile {src}/test/smime-certs/smroot.pem
+smime -sign -in {src}/test/smcont_zero.txt -md sha1 -certfile {src}/test/smime-certs/smroot.pem -signer {src}/test/smime-certs/smrsa1.pem -out {dir}/d5.msg
+smime -verify -in {dir}/d5.msg -CAfile {src}/test/smime-certs/smroot.pem
+#
+# Encryption, decrypted.
+smime -encrypt -in {src}/test/smcont.txt -stream -out {dir}/e1.msg {src}/test/smime-certs/smrsa1.pem {src}/test/smime-certs/smrsa2.pem {src}/test/smime-certs/smrsa3.pem
+smime -decrypt -recip {src}/test/smime-certs/smrsa1.pem -in {dir}/e1.msg
+smime -decrypt -recip {src}/test/smime-certs/smrsa3.pem -in {dir}/e1.msg
+smime -decrypt -recip {src}/test/smime-certs/smrsa3-cert.pem -inkey {src}/test/smime-certs/smrsa3-key.pem -in {dir}/e1.msg
+smime -decrypt -inkey {src}/test/smime-certs/smrsa2.pem -in {dir}/e1.msg
+smime -decrypt -recip {src}/test/smime-certs/smrsa1024.pem -in {dir}/e1.msg
+smime -encrypt -in {src}/test/smcont.txt -text -aes128 -out {dir}/e2.msg {src}/test/smime-certs/smrsa1.pem
+smime -decrypt -recip {src}/test/smime-certs/smrsa1.pem -in {dir}/e2.msg -text
+smime -decrypt -recip {src}/test/smime-certs/smrsa1.pem -in {dir}/e2.msg
+smime -encrypt -in {src}/test/smcont.txt -des3 -outform PEM -out {dir}/e3.pem {src}/test/smime-certs/smrsa1.pem
+smime -decrypt -recip {src}/test/smime-certs/smrsa1.pem -in {dir}/e3.pem -inform PEM
+smime -encrypt -in {src}/test/smcont.txt -aes-256-cbc -outform DER -binary -out {dir}/e4.der {src}/test/smime-certs/smrsa1.pem
+smime -decrypt -recip {src}/test/smime-certs/smrsa1.pem -in {dir}/e4.der -inform DER -binary
+smime -encrypt -in {src}/test/smcont.txt -aes-128-gcm {src}/test/smime-certs/smrsa1.pem
+smime -encrypt -in {src}/test/smcont.txt -nosuchcipher {src}/test/smime-certs/smrsa1.pem
+smime -encrypt -in {src}/test/smcont.txt {src}/test/smime-certs/nonexistent.pem
+smime -encrypt -in {src}/test/smcont.txt
+smime -decrypt -in {dir}/e1.msg
+smime -decrypt -recip {src}/test/smime-certs/smrsa1.pem -in {dir}/s3.msg
+smime -decrypt -recip {src}/test/smime-certs/smrsa1.pem -in {src}/test/smcont.txt
+#
+# Errors.
+smime -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr
+smime -sign -in {src}/test/smcont.txt -inkey {src}/test/smime-certs/smrsa1.pem
+smime -sign -in {src}/test/smcont.txt -inkey {src}/test/smime-certs/smrsa1.pem -inkey {src}/test/smime-certs/smrsa2.pem
+smime -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -inkey {src}/test/smime-certs/smrsa1.pem -inkey {src}/test/smime-certs/smrsa2.pem -outform PEM -noattr -nodetach
+smime -verify -in {dir}/s3.msg -signer {src}/test/smime-certs/smrsa1.pem -signer {src}/test/smime-certs/smrsa2.pem
+smime -sign -verify
+smime -encrypt -decrypt
+smime -in {src}/test/smcont.txt
+smime -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/nonexistent.pem
+smime -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -inkey {src}/test/smime-certs/smrsa2.pem -outform PEM -noattr
+smime -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -md nosuchmd
+smime -sign -in {dir}/nonexistent.txt -signer {src}/test/smime-certs/smrsa1.pem
+smime -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -out {dir}/nonexistent/x
+smime -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -certfile {dir}/nonexistent.pem
+smime -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -passin bad:x
+smime -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -keyform XYZ
+smime -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -inform XYZ
+smime -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -outform SMIME -nodetach -noattr -passin pass:unused
+smime -verify -in {dir}/s3.msg -inform DER
+smime -verify -in {dir}/s1.der -inform PEM
+smime -pk7out -in {dir}/s3.msg
+smime -pk7out -in {dir}/s3.msg -outform DER
+smime -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -outform PEM -nodetach -noattr -config {dir}/nonexistent.cnf
+smime -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -outform PEM -nodetach -noattr -rand {bin} -writerand {dir}/rand.out
+smime -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -outform PEM -nodetach -noattr -provider default -propquery provider=default
+smime -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -outform PEM -nodetach -noattr -provider-path {dir} -provparam default:x=1
+smime -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -outform PEM -nodetach -noattr -engine /nonexistent/engine.so
+smime -sign -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem < {src}/test/smcont.txt
+smime -help
+smime -nosuchoption -alsounknown
+smime -verify -verify_depth x

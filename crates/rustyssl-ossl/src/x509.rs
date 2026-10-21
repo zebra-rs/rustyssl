@@ -649,6 +649,17 @@ impl CertStack {
         }
     }
 
+    /// `sk_X509_push`, which takes the certificate.
+    pub fn push(&self, cert: Cert) -> bool {
+        // SAFETY: both are live; on success the stack owns the certificate.
+        if unsafe { ffi::OPENSSL_sk_push(self.as_ptr().cast(), cert.as_ptr().cast()) } > 0 {
+            core::mem::forget(cert);
+            true
+        } else {
+            false
+        }
+    }
+
     /// Takes ownership of a stack the caller got from the library (NULL: `None`).
     pub fn from_raw(p: *mut stack_st_X509) -> Option<Self> {
         core::ptr::NonNull::new(p).map(Self)
