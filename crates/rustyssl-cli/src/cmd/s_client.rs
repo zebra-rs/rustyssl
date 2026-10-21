@@ -3151,18 +3151,33 @@ mod tests {
         assert!(is_dns_name("a_b.c"));
     }
 
+    /// The reference's source tree, when the live tests are on (`cargo xtask test-apps`).
+    fn live() -> bool {
+        std::env::var_os("RUSTYSSL_CLI_LIVE").is_some()
+    }
+
     #[test]
     fn tlsa_fields() {
         assert_eq!(checked_uint8("3 1 1 ab"), Some((3, "1 1 ab")));
         assert_eq!(checked_uint8("256 1"), None);
         assert_eq!(checked_uint8("3"), None);
+    }
+
+    #[test]
+    fn live_tlsa_data() {
+        if !live() {
+            return;
+        }
         assert_eq!(hexdecode("ab cd"), Some(vec![0xab, 0xcd]));
         assert_eq!(hexdecode("abc"), None);
         assert_eq!(hexdecode("zz"), None);
     }
 
     #[test]
-    fn ldap_response() {
+    fn live_ldap_response() {
+        if !live() {
+            return;
+        }
         // SEQUENCE { INTEGER 1, [APPLICATION 24] { ENUMERATED 0, ... } }
         let ok = [
             0x30, 0x0c, 0x02, 0x01, 0x01, 0x78, 0x07, 0x0a, 0x01, 0x00, 0x04, 0x00, 0x04, 0x00,
