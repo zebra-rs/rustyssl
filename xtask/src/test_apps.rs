@@ -112,11 +112,26 @@ fn masked(text: &str) -> String {
                     l.replace_range(..at, "THREAD");
                 }
                 l = mask_location(&l);
+                l = mask_libdir(&l);
             }
             l
         })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+/// The libraries' own directory as `LIBDIR/`: macOS's `dlopen` errors list the paths dyld
+/// tried, the library's directory first (`target/ref/openssl-<version>/lib/` on the reference,
+/// `target/dist/lib/` on ours).
+fn mask_libdir(line: &str) -> String {
+    let mut l = line.replace("target/dist/lib/", "LIBDIR/");
+    while let Some(at) = l.find("target/ref/openssl-") {
+        let Some(end) = l[at..].find("/lib/") else {
+            break;
+        };
+        l.replace_range(at..at + end + "/lib/".len(), "LIBDIR/");
+    }
+    l
 }
 
 /// An error line's `:<file>.c:<line>:` (or `.rs`) as `:FILE:LINE:`.
@@ -552,6 +567,14 @@ mod tests {
             "THREAD:error:0308010C:x:f:unsupported:FILE:LINE:Global, Algorithm (a : 0)"
         );
         assert_eq!(masked("OPENSSLDIR: \"/usr/local/ssl\""), "OPENSSLDIR: DIR");
+        assert_eq!(
+            mask_libdir("tried: '/r/target/ref/openssl-3.6.5/lib/p.dylib' (no such file)"),
+            "tried: '/r/LIBDIR/p.dylib' (no such file)"
+        );
+        assert_eq!(
+            mask_libdir("tried: '/r/target/dist/lib/p.dylib' (no such file)"),
+            "tried: '/r/LIBDIR/p.dylib' (no such file)"
+        );
     }
 
     #[test]
