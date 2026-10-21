@@ -6,8 +6,9 @@
   The driver fails when the reference's `CHANGES.md` names a CVE missing here, when a `test`
   entry has no passing check naming it, or when an `apps` entry's corpus has no `# CVE-...`
   comment.
-- `cve_*.c`: TAP programs by area (ASN.1, X.509, PKCS#7/CMS/PKCS#12/TS/CMP, public keys,
-  ciphers, BIO, TLS and DTLS), with the shared helpers in `cve.h`. Each check's description
+- `cve_*.c`: TAP programs by area (ASN.1, X.509, PKCS#7/CMS/PKCS#12/TS, CMP exchanges, public
+  keys, ciphers, BIO, TLS, DTLS associations, QUIC, thread races, lengths near INT_MAX), with
+  the shared helpers in `cve.h`. Each check's description
   starts with the CVE it guards. They run on the reference and on rustyssl, in `data/`, and
   must pass with identical output: print outcomes (results, error codes, alerts, lengths),
   never random values.
