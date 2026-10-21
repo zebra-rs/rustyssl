@@ -1,0 +1,3 @@
+R	350101000000Z	261021002731Z,superseded	10	unknown	/C=US/O=Org/CN=first.example
+V	210101000000Z		11	unknown	/C=US/O=Org/CN=second.example
+R	350101000000Z	261021002731Z,keyTime,20250601000000Z	12	unknown	/C=US/O=Org/CN=third.example

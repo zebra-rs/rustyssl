@@ -156,3 +156,169 @@ pub fn rotate_serial(serialfile: &str, new_suffix: &str, old_suffix: &str) -> bo
     }
     ok
 }
+
+/// The fields of a CA database row (`DB_*` of `apps.h`).
+pub mod field {
+    pub const TYPE: usize = 0;
+    pub const EXP_DATE: usize = 1;
+    pub const REV_DATE: usize = 2;
+    pub const SERIAL: usize = 3;
+    pub const FILE: usize = 4;
+    pub const NAME: usize = 5;
+    /// `DB_NUMBER`.
+    pub const NUMBER: usize = 6;
+}
+
+/// `DB_TYPE_*` of `apps.h`.
+pub mod db_type {
+    pub const REV: u8 = b'R';
+    pub const EXP: u8 = b'E';
+    pub const VAL: u8 = b'V';
+    pub const SUSP: u8 = b'S';
+}
+
+/// `CA_DB` of `apps.h`: the index, its attributes, its file name, and when it was last
+/// changed (`dbst`, for `ocsp`'s reloading).
+pub struct CaDb {
+    pub db: rustyssl_ossl::txt_db::TxtDb,
+    pub unique_subject: bool,
+    pub dbfname: String,
+    pub modified: Option<std::time::SystemTime>,
+}
+
+/// `load_index(dbfile, db_attr)`: `unique_subject` is the caller's default (1 when it
+/// passes no attributes), which the `<dbfile>.attr` file overrides.
+pub fn load_index(dbfile: &str, unique_subject: bool) -> Option<CaDb> {
+    let ret = (|| {
+        let input = Bio::new_file(dbfile, "r")?;
+        let modified = std::fs::metadata(dbfile)
+            .ok()
+            .and_then(|m| m.modified().ok());
+        let db = rustyssl_ossl::txt_db::TxtDb::read(
+            &input,
+            core::ffi::c_int::try_from(field::NUMBER).unwrap_or(0),
+        )?;
+        let attr = format!("{dbfile}.attr");
+        let mut unique = unique_subject;
+        if let Some(conf) = super::apps::app_load_config_quiet(Some(&attr))
+            && let Some(p) = super::apps::app_conf_try_string(&conf, None, "unique_subject")
+        {
+            unique = super::apps::parse_yesno(Some(&p), true);
+        }
+        Some(CaDb {
+            db,
+            unique_subject: unique,
+            dbfname: dbfile.to_owned(),
+            modified,
+        })
+    })();
+    io::print_errors();
+    ret
+}
+
+/// `index_index`: the serial-number index, and the name index if subjects are unique.
+pub fn index_index(db: &CaDb) -> bool {
+    use rustyssl_ossl::txt_db::IndexKind;
+    if !db
+        .db
+        .create_index(field::SERIAL, IndexKind::NoLeadingZeros, false)
+    {
+        let (e, a1, a2) = db.db.error();
+        eprintf!("Error creating serial number index:({e},{a1},{a2})\n");
+        io::print_errors();
+        return false;
+    }
+    if db.unique_subject && !db.db.create_index(field::NAME, IndexKind::Plain, true) {
+        let (e, a1, a2) = db.db.error();
+        eprintf!("Error creating name index:({e},{a1},{a2})\n");
+        io::print_errors();
+        return false;
+    }
+    true
+}
+
+/// `save_index(dbfile, suffix, db)`: `<dbfile>.<suffix>` and `<dbfile>.attr.<suffix>`.
+pub fn save_index(dbfile: &str, suffix: &str, db: &CaDb) -> bool {
+    let ok = (|| {
+        if dbfile.len() + suffix.len() + 6 >= BSIZE {
+            eprintf!("File name too long\n");
+            return false;
+        }
+        let attr = format!("{dbfile}.attr");
+        let attr_new = format!("{dbfile}.attr.{suffix}");
+        let new = format!("{dbfile}.{suffix}");
+        let Some(out) = Bio::new_file(&new, "w") else {
+            perror(dbfile);
+            eprintf!("Unable to open '{dbfile}'\n");
+            return false;
+        };
+        let j = db.db.write(&out);
+        drop(out);
+        if j <= 0 {
+            return false;
+        }
+        let Some(out) = Bio::new_file(&attr_new, "w") else {
+            perror(&attr);
+            eprintf!("Unable to open '{attr}'\n");
+            return false;
+        };
+        let yes = if db.unique_subject { "yes" } else { "no" };
+        let _ = out.write_all(format!("unique_subject = {yes}\n").as_bytes());
+        true
+    })();
+    if !ok {
+        io::print_errors();
+    }
+    ok
+}
+
+/// `rotate_index(dbfile, new_suffix, old_suffix)`.
+pub fn rotate_index(dbfile: &str, new_suffix: &str, old_suffix: &str) -> bool {
+    let ok = (|| {
+        let j = (dbfile.len() + old_suffix.len()).max(dbfile.len() + new_suffix.len());
+        if j + 6 >= BSIZE {
+            eprintf!("File name too long\n");
+            return false;
+        }
+        let b4 = format!("{dbfile}.attr");
+        let b3 = format!("{dbfile}.attr.{old_suffix}");
+        let b2 = format!("{dbfile}.attr.{new_suffix}");
+        let b1 = format!("{dbfile}.{old_suffix}");
+        let b0 = format!("{dbfile}.{new_suffix}");
+        if let Some(e) = rename(dbfile, &b1)
+            && !tolerated(&e)
+        {
+            eprintf!("Unable to rename {dbfile} to {b1}\n");
+            reason(&e);
+            return false;
+        }
+        if let Some(e) = rename(&b0, dbfile) {
+            eprintf!("Unable to rename {b0} to {dbfile}\n");
+            reason(&e);
+            let _ = rename(&b1, dbfile);
+            return false;
+        }
+        if let Some(e) = rename(&b4, &b3)
+            && !tolerated(&e)
+        {
+            eprintf!("Unable to rename {b4} to {b3}\n");
+            reason(&e);
+            let _ = rename(dbfile, &b0);
+            let _ = rename(&b1, dbfile);
+            return false;
+        }
+        if let Some(e) = rename(&b2, &b4) {
+            eprintf!("Unable to rename {b2} to {b4}\n");
+            reason(&e);
+            let _ = rename(&b3, &b4);
+            let _ = rename(dbfile, &b0);
+            let _ = rename(&b1, dbfile);
+            return false;
+        }
+        true
+    })();
+    if !ok {
+        io::print_errors();
+    }
+    ok
+}

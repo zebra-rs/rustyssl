@@ -2042,3 +2042,332 @@ pub fn set_default_mask_asc(p: &str) -> bool {
     // SAFETY: a valid C string.
     unsafe { ffi::ASN1_STRING_set_default_mask_asc(c.as_ptr()) == 1 }
 }
+
+// ---- `ca`: CRLs, revoked entries, name entries, and times.
+
+crate::handle!(
+    /// An owned `X509_REVOKED`.
+    Revoked, X509_REVOKED, X509_REVOKED_free
+);
+
+impl Revoked {
+    /// `X509_REVOKED_new()`.
+    pub fn new() -> Option<Self> {
+        // SAFETY: no arguments.
+        Self::from_ptr(unsafe { ffi::X509_REVOKED_new() })
+    }
+
+    /// `X509_REVOKED_set_revocationDate` (copied).
+    pub fn set_revocation_date(&self, t: &Time) -> bool {
+        // SAFETY: both are live; the entry copies the time.
+        unsafe { ffi::X509_REVOKED_set_revocationDate(self.as_ptr(), t.as_ptr()) == 1 }
+    }
+
+    /// `X509_REVOKED_set_serialNumber` (copied).
+    pub fn set_serial(&self, sn: &Integer) -> bool {
+        // SAFETY: both are live; the entry copies the serial.
+        unsafe { ffi::X509_REVOKED_set_serialNumber(self.as_ptr(), sn.as_ptr()) == 1 }
+    }
+
+    /// `X509_REVOKED_add1_ext_i2d(rev, NID_crl_reason, ASN1_ENUMERATED(code), 0, 0)`.
+    pub fn add_reason(&self, nid: c_int, code: c_long) -> c_int {
+        // SAFETY: no arguments.
+        let e = unsafe { ffi::ASN1_ENUMERATED_new() };
+        if e.is_null() {
+            return 0;
+        }
+        // SAFETY: e is live.
+        let mut r = if unsafe { ffi::ASN1_ENUMERATED_set(e, code) } == 1 {
+            1
+        } else {
+            0
+        };
+        if r == 1 {
+            // SAFETY: both are live; the entry encodes a copy.
+            r = unsafe { ffi::X509_REVOKED_add1_ext_i2d(self.as_ptr(), nid, e.cast(), 0, 0) };
+        }
+        // SAFETY: e is owned here.
+        unsafe { ffi::ASN1_ENUMERATED_free(e) };
+        r
+    }
+
+    /// `X509_REVOKED_add1_ext_i2d(rev, nid, time, 0, 0)` (an `ASN1_GENERALIZEDTIME`).
+    pub fn add_time_ext(&self, nid: c_int, t: &Time) -> c_int {
+        // SAFETY: both are live; the entry encodes a copy.
+        unsafe { ffi::X509_REVOKED_add1_ext_i2d(self.as_ptr(), nid, t.as_ptr().cast(), 0, 0) }
+    }
+
+    /// `X509_REVOKED_add1_ext_i2d(rev, nid, obj, 0, 0)` (an `ASN1_OBJECT`).
+    pub fn add_obj_ext(&self, nid: c_int, obj: &Obj) -> c_int {
+        // SAFETY: both are live; the entry encodes a copy.
+        unsafe { ffi::X509_REVOKED_add1_ext_i2d(self.as_ptr(), nid, obj.as_ptr().cast(), 0, 0) }
+    }
+}
+
+impl Crl {
+    /// `X509_CRL_new_ex(libctx, propq)`.
+    pub fn new_ex(libctx: Option<&LibCtx>, propq: Option<&str>) -> Option<Self> {
+        let pq = opt_cstring(propq)?;
+        let ctx = libctx.map_or(core::ptr::null_mut(), LibCtx::as_ptr);
+        // SAFETY: ctx NULL or live; pq NULL or a valid C string.
+        Self::from_ptr(unsafe { ffi::X509_CRL_new_ex(ctx, opt_ptr(&pq)) })
+    }
+
+    /// `X509_CRL_set_issuer_name`.
+    pub fn set_issuer_name(&self, nm: NameRef<'_>) -> bool {
+        // SAFETY: both are live; the CRL copies the name.
+        unsafe { ffi::X509_CRL_set_issuer_name(self.as_ptr(), nm.0) == 1 }
+    }
+
+    /// `X509_CRL_set1_lastUpdate`.
+    pub fn set1_last_update(&self, t: &Time) -> bool {
+        // SAFETY: both are live; the CRL copies the time.
+        unsafe { ffi::X509_CRL_set1_lastUpdate(self.as_ptr(), t.as_ptr()) == 1 }
+    }
+
+    /// `X509_CRL_set1_nextUpdate`.
+    pub fn set1_next_update(&self, t: &Time) -> bool {
+        // SAFETY: as above.
+        unsafe { ffi::X509_CRL_set1_nextUpdate(self.as_ptr(), t.as_ptr()) == 1 }
+    }
+
+    /// `X509_CRL_add0_revoked` (the CRL takes the entry).
+    pub fn add0_revoked(&self, r: Revoked) -> bool {
+        // SAFETY: both are live; the CRL takes r.
+        unsafe { ffi::X509_CRL_add0_revoked(self.as_ptr(), r.into_ptr()) == 1 }
+    }
+
+    /// `X509_CRL_sort`.
+    pub fn sort(&self) -> bool {
+        // SAFETY: the CRL is live.
+        unsafe { ffi::X509_CRL_sort(self.as_ptr()) == 1 }
+    }
+
+    /// `X509_CRL_add1_ext_i2d(crl, nid, integer, crit, flags)`.
+    pub fn add1_ext_integer(&self, nid: c_int, v: &Integer, crit: c_int, flags: c_ulong) -> c_int {
+        // SAFETY: both are live; the CRL encodes a copy.
+        unsafe { ffi::X509_CRL_add1_ext_i2d(self.as_ptr(), nid, v.as_ptr().cast(), crit, flags) }
+    }
+
+    /// `X509_CRL_set_version`.
+    pub fn set_version(&self, v: c_long) -> bool {
+        // SAFETY: the CRL is live.
+        unsafe { ffi::X509_CRL_set_version(self.as_ptr(), v) == 1 }
+    }
+}
+
+impl Time {
+    /// `ASN1_UTCTIME_new` then `ASN1_UTCTIME_set_string(t, s)`: `None` if `s` isn't one.
+    pub fn utc_from_string(s: &str) -> Result<Self, bool> {
+        let c = cstring(s).ok_or(false)?;
+        // SAFETY: no arguments.
+        let t = Self::from_ptr(unsafe { ffi::ASN1_UTCTIME_new() }).ok_or(true)?;
+        // SAFETY: t is live; c a valid C string.
+        if unsafe { ffi::ASN1_UTCTIME_set_string(t.as_ptr(), c.as_ptr()) } == 1 {
+            Ok(t)
+        } else {
+            Err(false)
+        }
+    }
+
+    /// `ASN1_GENERALIZEDTIME_new` then `ASN1_GENERALIZEDTIME_set_string(t, s)`.
+    pub fn generalized_from_string(s: &str) -> Result<Self, bool> {
+        let c = cstring(s).ok_or(false)?;
+        // SAFETY: no arguments.
+        let t = Self::from_ptr(unsafe { ffi::ASN1_GENERALIZEDTIME_new() }).ok_or(true)?;
+        // SAFETY: t is live; c a valid C string.
+        if unsafe { ffi::ASN1_GENERALIZEDTIME_set_string(t.as_ptr(), c.as_ptr()) } == 1 {
+            Ok(t)
+        } else {
+            Err(false)
+        }
+    }
+
+    /// `X509_gmtime_adj(NULL, 0)`: now, as a new time.
+    pub fn now_utc() -> Option<Self> {
+        // SAFETY: NULL asks for a new time.
+        Self::from_ptr(unsafe { ffi::X509_gmtime_adj(core::ptr::null_mut(), 0) })
+    }
+
+    /// `X509_time_adj(t, 0, NULL)`: sets `t` to now.
+    pub fn set_now(&self) -> bool {
+        // SAFETY: the time is live; NULL means now.
+        !unsafe { ffi::X509_time_adj(self.as_ptr(), 0, core::ptr::null_mut()) }.is_null()
+    }
+
+    /// `X509_gmtime_adj(t, 0)` (`true`) or `X509_time_adj_ex(t, days, secs, NULL)`.
+    pub fn set_adj(&self, days: c_int, secs: c_long) -> bool {
+        // SAFETY: the time is live; NULL means now.
+        !unsafe { ffi::X509_time_adj_ex(self.as_ptr(), days, secs, core::ptr::null_mut()) }
+            .is_null()
+    }
+}
+
+/// `ASN1_TIME_set_string(NULL, s)`: whether `s` is a valid time.
+pub fn time_set_string_check(s: &str) -> bool {
+    let Some(c) = cstring(s) else {
+        return false;
+    };
+    // SAFETY: NULL only checks the string.
+    unsafe { ffi::ASN1_TIME_set_string(core::ptr::null_mut(), c.as_ptr()) == 1 }
+}
+
+/// `ASN1_GENERALIZEDTIME_set_string(NULL, s)`: whether `s` is a valid time.
+pub fn generalized_time_check(s: &str) -> bool {
+    let Some(c) = cstring(s) else {
+        return false;
+    };
+    // SAFETY: NULL only checks the string.
+    unsafe { ffi::ASN1_GENERALIZEDTIME_set_string(core::ptr::null_mut(), c.as_ptr()) == 1 }
+}
+
+/// `ASN1_TIME_diff(&pday, NULL, NULL, to)`: the days from now to `to`.
+pub fn days_until(to: TimeRef<'_>) -> Option<c_int> {
+    let mut d: c_int = 0;
+    // SAFETY: d is a valid out-pointer; NULL from means now; to is live.
+    (unsafe { ffi::ASN1_TIME_diff(&mut d, core::ptr::null_mut(), core::ptr::null(), to.0) } == 1)
+        .then_some(d)
+}
+
+/// An `X509_NAME_ENTRY` borrowed from its name.
+#[derive(Clone, Copy)]
+pub struct NameEntryRef<'a>(
+    *mut crate::abi::X509_NAME_ENTRY,
+    core::marker::PhantomData<&'a ()>,
+);
+
+impl NameEntryRef<'_> {
+    fn obj(self) -> *mut crate::abi::ASN1_OBJECT {
+        // SAFETY: the entry is live; the object is owned by it.
+        unsafe { ffi::X509_NAME_ENTRY_get_object(self.0) }
+    }
+
+    fn data_ptr(self) -> *mut crate::abi::ASN1_STRING {
+        // SAFETY: the entry is live; the string is owned by it.
+        unsafe { ffi::X509_NAME_ENTRY_get_data(self.0) }
+    }
+
+    /// `OBJ_obj2nid` of its object.
+    pub fn nid(self) -> c_int {
+        // SAFETY: the object is live.
+        unsafe { ffi::OBJ_obj2nid(self.obj()) }
+    }
+
+    /// Its value's type (`str->type`).
+    pub fn data_type(self) -> c_int {
+        let s = self.data_ptr();
+        if s.is_null() {
+            return 0;
+        }
+        // SAFETY: s is a live ASN1_STRING (public layout).
+        unsafe { (*s).type_ }
+    }
+
+    /// Its value's bytes.
+    pub fn data(self) -> Vec<u8> {
+        asn1_string_bytes(self.data_ptr())
+    }
+
+    /// Sets its value's type in place (`str->type = t`, as `ca -msie_hack` does).
+    pub fn set_data_type(self, t: c_int) {
+        let s = self.data_ptr();
+        if !s.is_null() {
+            // SAFETY: s is a live ASN1_STRING owned by the entry, which upstream changes in
+            // place too.
+            unsafe { (*s).type_ = t };
+        }
+    }
+
+    /// `ASN1_UNIVERSALSTRING_to_string` on its value, in place.
+    pub fn universal_to_string(self) {
+        // SAFETY: the value is live; the call converts it in place.
+        unsafe { ffi::ASN1_UNIVERSALSTRING_to_string(self.data_ptr()) };
+    }
+
+    /// `i2a_ASN1_OBJECT(out, obj)` of its object: what it returns.
+    pub fn print_obj(self, out: &Bio) -> c_int {
+        // SAFETY: both are live.
+        unsafe { ffi::i2a_ASN1_OBJECT(out.as_ptr(), self.obj()) }
+    }
+
+    /// `ASN1_STRING_cmp` of the two values.
+    pub fn data_cmp(self, other: NameEntryRef<'_>) -> c_int {
+        // SAFETY: both strings are live.
+        unsafe { ffi::ASN1_STRING_cmp(self.data_ptr(), other.data_ptr()) }
+    }
+}
+
+impl<'a> NameRef<'a> {
+    /// `X509_NAME_get_entry(nm, i)`.
+    pub fn entry(self, i: c_int) -> Option<NameEntryRef<'a>> {
+        // SAFETY: the name is live; out-of-range gives NULL.
+        let e = unsafe { ffi::X509_NAME_get_entry(self.0, i) };
+        (!e.is_null()).then_some(NameEntryRef(e, core::marker::PhantomData))
+    }
+
+    /// `X509_NAME_get_index_by_NID(nm, nid, last)`.
+    pub fn index_by_nid(self, nid: c_int, last: c_int) -> c_int {
+        // SAFETY: the name is live.
+        unsafe { ffi::X509_NAME_get_index_by_NID(self.0, nid, last) }
+    }
+}
+
+impl Name {
+    /// `X509_NAME_add_entry(nm, e, -1, 0)` (copied).
+    pub fn add_entry(&self, e: NameEntryRef<'_>) -> bool {
+        // SAFETY: both are live; the name copies the entry.
+        unsafe { ffi::X509_NAME_add_entry(self.as_ptr(), e.0, -1, 0) == 1 }
+    }
+
+    /// `X509_NAME_ENTRY_free(X509_NAME_delete_entry(nm, i))`.
+    pub fn delete_entry(&self, i: c_int) {
+        // SAFETY: the name is live; the entry returned is the caller's.
+        let e = unsafe { ffi::X509_NAME_delete_entry(self.as_ptr(), i) };
+        // SAFETY: e is NULL or owned here.
+        unsafe { ffi::X509_NAME_ENTRY_free(e) };
+    }
+}
+
+/// `ASN1_PRINTABLE_type(bytes, len)`.
+pub fn printable_type(bytes: &[u8]) -> c_int {
+    let Ok(n) = c_int::try_from(bytes.len()) else {
+        return 0;
+    };
+    // SAFETY: bytes is valid for n bytes.
+    unsafe { ffi::ASN1_PRINTABLE_type(bytes.as_ptr(), n) }
+}
+
+impl Integer {
+    /// Its content bytes (`ASN1_STRING_get0_data`).
+    pub fn bytes(&self) -> Vec<u8> {
+        asn1_string_bytes(self.as_ptr().cast_const().cast())
+    }
+}
+
+impl Req {
+    /// `X509_REQ_new()`.
+    pub fn new() -> Option<Self> {
+        // SAFETY: no arguments.
+        Self::from_ptr(unsafe { ffi::X509_REQ_new() })
+    }
+
+    /// `X509_REQ_check_private_key`.
+    pub fn check_private_key(&self, pkey: &Pkey) -> bool {
+        // SAFETY: both are live.
+        unsafe { ffi::X509_REQ_check_private_key(self.as_ptr(), pkey.as_ptr()) == 1 }
+    }
+}
+
+impl Pkey {
+    /// `EVP_PKEY_missing_parameters`.
+    pub fn missing_parameters(&self) -> bool {
+        // SAFETY: the key is live.
+        unsafe { ffi::EVP_PKEY_missing_parameters(self.as_ptr()) != 0 }
+    }
+
+    /// `EVP_PKEY_copy_parameters(self, from)`.
+    pub fn copy_parameters(&self, from: &Pkey) -> bool {
+        // SAFETY: both are live.
+        unsafe { ffi::EVP_PKEY_copy_parameters(self.as_ptr(), from.as_ptr()) == 1 }
+    }
+}

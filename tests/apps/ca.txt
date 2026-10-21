@@ -1,0 +1,140 @@
+# `openssl ca` (cargo xtask test-apps: upstream's tool on the reference, then ours on rustyssl
+# and on the reference). Each line starts from a fresh copy of pki/cadb/ (the CA of
+# test/certs/ca-cert.pem, its database, serial and CRL number files, and requests), with fixed
+# dates; its signatures are RSA PKCS#1 v1.5, so the output is byte-compared. Prompts read
+# standard input.
+ca -help
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {dir}/cadb/cn-ca.csr -policy policy_cn
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z {dir}/cadb/noorg.csr
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -out {dir}/ca-out.pem -verbose
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -quiet -notext
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -outdir {dir}/cadb
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -outdir {dir}/nonexistent
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -dateopt iso_8601
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -dateopt bad
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -md sha512
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -md nosuchmd
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -sigopt rsa_padding_mode:pkcs1
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -sigopt bad:x
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -vfyopt distid:x
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -subj /C=US/O=Renamed/CN=renamed.example
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -subj bad
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -subj /C=US/O=Ünï/CN=utf8.example -utf8
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -preserveDN -multivalue-rdn
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {dir}/cadb/email.csr -notext
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {dir}/cadb/email.csr -notext -noemailDN
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {dir}/cadb/email.csr -notext -msie_hack
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {dir}/cadb/email-utf8.csr -notext
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {dir}/cadb/first.csr
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {dir}/cadb/nocn.csr
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -policy policy_match
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -policy policy_bad
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -policy policy_badtype
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -policy nosuchpolicy
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -extensions v3_ca
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -extensions bad_ext
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -extfile {tests}/pki/x509.cnf
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -extfile {tests}/pki/x509.cnf -extensions v3_ca -verbose
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -extfile {tests}/pki/x509.cnf -extensions bad
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -extfile {dir}/nonexistent.cnf
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20350101000000Z -enddate 20250101000000Z -in {tests}/pki/ee.csr -notext
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate bad -in {tests}/pki/ee.csr -notext
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -not_before 20250101000000Z -not_after 20350101000000Z -days 10 -in {tests}/pki/ee.csr -notext
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -keyfile {dir}/cadb/ca.key -keyform PEM -cert {dir}/cadb/ca.pem -certform PEM
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -keyfile {dir}/cadb/root.key
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -keyfile {dir}/nonexistent.key
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -keyfile {src}/test/certs/key-pass-12345.pem -passin pass:12345
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -keyfile {src}/test/certs/key-pass-12345.pem -key 12345
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -keyfile {src}/test/certs/key-pass-12345.pem -passin pass:wrong
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -passin bad
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -cert {dir}/cadb/root.pem
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -keyform XYZ
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -inform DER
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr.der -inform DER -notext
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr.der -notext
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {dir}/nonexistent.csr
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext -create_serial
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -selfsign -keyfile {src}/test/certs/ee-key.pem -in {tests}/pki/ee.csr
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -selfsign -in {tests}/pki/ee.csr
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -ss_cert {src}/test/certs/ee-self-signed.pem -notext -policy policy_anything
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -ss_cert {src}/test/certs/ee-cert.pem -notext -policy policy_anything
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -ss_cert {dir}/nonexistent.pem
+@pki/cadb ca -config {dir}/cadb/ca.cnf -startdate 20250101000000Z -enddate 20350101000000Z -spkac {dir}/cadb/spkac.txt -notext
+@pki/cadb ca -config {dir}/cadb/ca.cnf -startdate 20250101000000Z -enddate 20350101000000Z -spkac {dir}/cadb/spkac.txt -out {dir}/spkac-cert.der
+@pki/cadb ca -config {dir}/cadb/ca.cnf -startdate 20250101000000Z -enddate 20350101000000Z -spkac {dir}/cadb/nospkac.txt
+@pki/cadb ca -config {dir}/cadb/ca.cnf -startdate 20250101000000Z -enddate 20350101000000Z -spkac {dir}/cadb/badspkac.txt
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -name CA_root -in {tests}/pki/ee.csr
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -section CA_root -in {dir}/cadb/email.csr -notext
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -name CA_rand -in {tests}/pki/ee.csr -notext -out {dir}/rand.pem
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -name CA_noserial -in {tests}/pki/ee.csr
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -name CA_nodays -in {tests}/pki/ee.csr
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -name CA_nokey -in {tests}/pki/ee.csr
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -name CA_nocert -in {tests}/pki/ee.csr
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -name CA_nodb -in {tests}/pki/ee.csr
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -name CA_badopts
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -name CA_badcertopt
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -name CA_badcopy
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -name CA_badmask
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -name CA_wrongkey
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -name CA_nosuchsection
+@pki/cadb ca -config {dir}/cadb/ca.cnf -name CA_bad_revdate
+@pki/cadb ca -config {dir}/cadb/ca.cnf -name CA_bad_revoked
+@pki/cadb ca -config {dir}/cadb/ca.cnf -name CA_bad_reason
+@pki/cadb ca -config {dir}/cadb/ca.cnf -name CA_bad_exp
+@pki/cadb ca -config {dir}/cadb/ca.cnf -name CA_bad_serial_len
+@pki/cadb ca -config {dir}/cadb/ca.cnf -name CA_bad_serial_char
+@pki/cadb ca -config {dir}/cadb/ca.cnf -name CA_dup_serial
+@pki/cadb ca -config {dir}/cadb/ca.cnf -name CA_dup_name
+@pki/cadb ca -config {dir}/cadb/ca.cnf -name CA_short_row
+@pki/cadb ca -config {dir}/cadb/ca.cnf -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext < {tests}/pki/yes.txt
+@pki/cadb ca -config {dir}/cadb/ca.cnf -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext < {tests}/pki/no.txt
+@pki/cadb ca -config {dir}/cadb/ca.cnf -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext < {tests}/pki/yes-no.txt
+@pki/cadb ca -config {dir}/cadb/ca.cnf -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -notext
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -notext {tests}/pki/ee.csr {dir}/cadb/email.csr
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -notext -infiles {tests}/pki/ee.csr {dir}/cadb/email.csr
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -notext -infiles
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -notext {tests}/pki/ee.csr {tests}/pki/ee.csr
+@pki/cadb ca -config {dir}/cadb/ca.cnf -gencrl -crl_lastupdate 20260101000000Z -crl_nextupdate 20260201000000Z
+@pki/cadb ca -config {dir}/cadb/ca.cnf -gencrl -crl_lastupdate 20260101000000Z -crl_nextupdate 20260201000000Z -crlexts crl_ext -md sha384
+@pki/cadb ca -config {dir}/cadb/ca.cnf -gencrl -crl_lastupdate 20260101000000Z -crl_nextupdate 20260201000000Z -crlexts bad_ext
+@pki/cadb ca -config {dir}/cadb/ca.cnf -gencrl -crl_lastupdate 20260101000000Z -crl_nextupdate 20260201000000Z -crlexts nosuchsection
+@pki/cadb ca -config {dir}/cadb/ca.cnf -gencrl -crl_lastupdate 20260101000000Z -crldays 7 -crlhours 1 -crlsec 30 -out {dir}/ca.crl
+@pki/cadb ca -config {dir}/cadb/ca.cnf -gencrl -crl_lastupdate bad -crldays 7
+@pki/cadb ca -config {dir}/cadb/ca.cnf -gencrl -crl_lastupdate 20260101000000Z -crl_nextupdate 20260201000000Z -name CA_root
+@pki/cadb ca -config {dir}/cadb/ca.cnf -gencrl -crl_lastupdate 20260101000000Z -crl_nextupdate 20260201000000Z -name CA_rand
+@pki/cadb ca -config {dir}/cadb/ca.cnf -gencrl -name CA_nodays
+@pki/cadb ca -config {dir}/cadb/ca.cnf -gencrl -crl_lastupdate 20260101000000Z -crl_nextupdate 20260201000000Z -name CA_bad_reason
+@pki/cadb ca -config {dir}/cadb/ca.cnf -gencrl -crl_lastupdate 20260101000000Z -crl_nextupdate 20260201000000Z -verbose
+@pki/cadb ca -config {dir}/cadb/ca.cnf -revoke {dir}/cadb/second.pem
+@pki/cadb ca -config {dir}/cadb/ca.cnf -revoke {dir}/cadb/first.pem
+@pki/cadb ca -config {dir}/cadb/ca.cnf -revoke {dir}/cadb/second.pem -crl_reason keyCompromise
+@pki/cadb ca -config {dir}/cadb/ca.cnf -revoke {dir}/cadb/second.pem -crl_reason nosuchreason
+@pki/cadb ca -config {dir}/cadb/ca.cnf -revoke {dir}/cadb/second.pem -crl_hold 1.2.840.10040.2.2
+@pki/cadb ca -config {dir}/cadb/ca.cnf -revoke {dir}/cadb/second.pem -crl_hold not.an.oid
+@pki/cadb ca -config {dir}/cadb/ca.cnf -revoke {dir}/cadb/second.pem -crl_compromise 20250101000000Z
+@pki/cadb ca -config {dir}/cadb/ca.cnf -revoke {dir}/cadb/second.pem -crl_compromise bad
+@pki/cadb ca -config {dir}/cadb/ca.cnf -revoke {dir}/cadb/second.pem -crl_CA_compromise 20250101000000Z
+@pki/cadb ca -config {dir}/cadb/ca.cnf -revoke {src}/test/certs/ee-cert.pem
+@pki/cadb ca -config {dir}/cadb/ca.cnf -revoke {src}/test/certs/ee-cert.pem -crl_reason removeFromCRL
+@pki/cadb ca -config {dir}/cadb/ca.cnf -revoke {dir}/nonexistent.pem
+@pki/cadb ca -config {dir}/cadb/ca.cnf -valid {src}/test/certs/ee-cert.pem
+@pki/cadb ca -config {dir}/cadb/ca.cnf -valid {dir}/cadb/second.pem
+@pki/cadb ca -config {dir}/cadb/ca.cnf -status 10
+@pki/cadb ca -config {dir}/cadb/ca.cnf -status 11
+@pki/cadb ca -config {dir}/cadb/ca.cnf -status 0A
+@pki/cadb ca -config {dir}/cadb/ca.cnf -status 99
+@pki/cadb ca -config {dir}/cadb/ca.cnf -status 0x10
+@pki/cadb ca -config {dir}/cadb/ca.cnf -updatedb
+@pki/cadb ca -config {dir}/cadb/ca.cnf -updatedb -verbose
+@pki/cadb ca -config {dir}/cadb/ca.cnf -updatedb -name CA_rand -verbose
+@pki/cadb ca -config {dir}/cadb/ca.cnf -name CA_root -verbose
+@pki/cadb ca -config {dir}/cadb/ca.cnf -rand {txt} -writerand {dir}/ca.rnd -status 10
+@pki/cadb ca -config {dir}/cadb/ca.cnf -provider default -propquery provider=default -status 11
+@pki/cadb ca -config {dir}/cadb/ca.cnf -provider-path {dir} -provider default -status 11
+ca -config {dir}/nonexistent.cnf -status 10
+ca -config {txt} -status 10
+ca -status 10
+ca -nosuchoption
+ca -crldays
