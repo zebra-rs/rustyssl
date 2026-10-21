@@ -4,10 +4,9 @@
 # errors and S skipped" lines, and the same number of ERROR lines (evp_test counts a key
 # generation it can't start as passed). A file is added once its algorithms and the functions
 # the program uses on them are implemented: the key-pair files need key parsing
-# (PEM_read_bio_*) and the key-generation files their key types (Phase 4), for instance;
-# evpciph_aes_stitched.txt (the AES-CBC-HMAC composites, offered on x86_64 with
-# AES-NI) needs TLS record mode (`tls-version`), which arrives with libssl in Phase 7. The
-# runs load the default and legacy providers (test/default-and-legacy.cnf), as the recipe does
+# (PEM_read_bio_*) and the key-generation files their key types (Phase 4), for instance.
+# evpciph_aes_stitched.txt's AES-CBC-HMAC composites are offered on x86_64 with AES-NI only
+# (elsewhere both libraries skip them). The runs load the default and legacy providers (test/default-and-legacy.cnf), as the recipe does
 # when the legacy module is built; each library finds its own module through OPENSSL_MODULES.
 evpciph_aes_ccm_cavs.txt
 evpciph_aes_common.txt
@@ -15,6 +14,7 @@ evpciph_aes_cts.txt
 evpciph_aes_gcm_siv.txt
 evpciph_aes_ocb.txt
 evpciph_aes_siv.txt
+evpciph_aes_stitched.txt
 evpciph_aes_wrap.txt
 evpciph_aria.txt
 evpciph_bf.txt

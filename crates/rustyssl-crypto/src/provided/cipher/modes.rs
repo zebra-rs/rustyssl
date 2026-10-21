@@ -117,7 +117,11 @@ impl Generic {
             return Err(Error::OutputBufferTooSmall);
         }
         let input = need(&io).map_err(|_| Error::CipherOperationFailed)?;
-        self.composite_cipher(input)
+        let mut out = self.composite_cipher(input)?;
+        if !one_shot {
+            self.composite_tls_unpad(&mut out)?;
+        }
+        Ok(out)
     }
 
     // ---------------------------------------------------------------------------------------
