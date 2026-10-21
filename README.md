@@ -286,6 +286,7 @@ cargo xtask usage-scan [--jobs N] [--limit N]  # rank exports by how many distro
 cargo xtask test-c                           # tests/c/*.c, each run on the reference and on target/dist; output must match
 cargo xtask test-apps [--bless] [list...]    # openssl tools: upstream's on both libraries (tests/apps/commands.txt); ours (target/dist/bin/openssl-rs) on both, against upstream's on the reference (tests/apps/<command>.txt); the CLI's live_* helper tests on both
 cargo xtask test-interop [case...]           # the reference's s_server/s_client in four library pairings (tests/interop/cases.txt)
+cargo xtask test-interop --cli ours [case...]  # the same, with our s_server/s_client (target/dist/bin/openssl-rs) on the rustyssl side
 cargo xtask test-interop --seed S [case...]  # the DTLS +faults cases' drop/duplicate/reorder schedule from seed S (default 1)
 cargo xtask test-interop --peer gnutls [case...]  # s_server/s_client on each library against gnutls-cli/gnutls-serv (tests/interop/gnutls.txt)
 cargo xtask test-differential [--random N] [--seed S]  # probe corpus + N random sessions, reference vs ours
