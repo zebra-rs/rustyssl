@@ -1,0 +1,5 @@
+rustyssl (3.6.5+rustyssl0.1.0-1) unstable; urgency=medium
+
+  * OpenSSL 3.6.5's ABI, side by side with the system's OpenSSL.
+
+ -- rustyssl developers <rustyssl@localhost>  Wed, 21 Oct 2026 00:00:00 +0000
