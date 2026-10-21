@@ -28,7 +28,10 @@ fn ptr_of(s: &Option<std::ffi::CString>) -> *const core::ffi::c_char {
 
 /// An `OSSL_ENCODER_CTX` (possibly NULL), freed when dropped, with the strings it was made
 /// with: the library keeps the output type and structure pointers, not copies.
-pub struct Encoder(*mut OSSL_ENCODER_CTX, [Option<std::ffi::CString>; 2]);
+pub struct Encoder {
+    ctx: *mut OSSL_ENCODER_CTX,
+    _strings: [Option<std::ffi::CString>; 2],
+}
 
 impl Encoder {
     /// `OSSL_ENCODER_CTX_new_for_pkey(pkey, selection, output_type, output_structure, NULL)`.
