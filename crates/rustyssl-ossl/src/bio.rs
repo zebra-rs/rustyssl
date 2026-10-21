@@ -82,6 +82,14 @@ impl Bio {
         Ok(())
     }
 
+    /// `BIO_new_mem_buf(data, len)`: a read-only memory `BIO` over `data` (not copied),
+    /// which reads 0 at its end.
+    pub fn new_mem_buf(data: &'static [u8]) -> Option<Self> {
+        let n = c_int::try_from(data.len()).ok()?;
+        // SAFETY: data is valid for n bytes for the program's life, which the BIO only reads.
+        Self::from_ptr(unsafe { ffi::BIO_new_mem_buf(data.as_ptr().cast(), n) })
+    }
+
     /// `BIO_new(BIO_f_buffer())`.
     pub fn new_buffer() -> Option<Self> {
         // SAFETY: no arguments; the result is a static method table.

@@ -23,7 +23,7 @@ pub mod configutl;
 // pub mod enc;
 pub mod engine;
 // pub mod errstr;
-// pub mod fipsinstall;
+pub mod fipsinstall;
 // pub mod gendsa;
 // pub mod genpkey;
 // pub mod genrsa;
@@ -82,7 +82,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "enc" => enc::main,
         "engine" => engine::main,
         // "errstr" => errstr::main,
-        // "fipsinstall" => fipsinstall::main,
+        "fipsinstall" => fipsinstall::main,
         // "gendsa" => gendsa::main,
         // "genpkey" => genpkey::main,
         // "genrsa" => genrsa::main,
