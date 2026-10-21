@@ -8,7 +8,9 @@
 //!   which `cargo xtask test-apps` runs with our tool and upstream's;
 //! - `covered <where>`: another suite that runs in the gates or in CI (named in the note);
 //! - `n/a <reason>`: the vulnerable code has no counterpart in rustyssl's default build
-//!   (removed protocol versions, platform assembly, FIPS module, scripts, ...).
+//!   (removed protocol versions, platform assembly, FIPS module, scripts, ...);
+//! - `gap <area>`: relevant, with no regression test yet; the note says why, and the report
+//!   lists these as work left.
 //!
 //! The `tests/cve/*.c` programs are TAP programs like `tests/c`'s, run the same way: built
 //! against the vendored headers, run on the reference and on rustyssl, passing every check
@@ -43,7 +45,9 @@ pub fn run(args: &[String]) -> Result {
     let changes = fs::read_to_string(reference_source(&root)?.join("CHANGES.md"))?;
     for id in cve_ids(&changes) {
         if !known.contains(id.as_str()) {
-            problems.push(format!("{id} (in the reference's CHANGES.md) isn't in tests/cve/cves.txt"));
+            problems.push(format!(
+                "{id} (in the reference's CHANGES.md) isn't in tests/cve/cves.txt"
+            ));
         }
     }
 
@@ -81,14 +85,25 @@ pub fn run(args: &[String]) -> Result {
         match e.kind.as_str() {
             "test" if ran.contains(e.place.as_str()) && !failed.contains(&e.place) => {
                 if passed.get(&e.id) != Some(&e.place) {
-                    problems.push(format!("{}: no passing check in {}.c names it", e.id, e.place));
+                    problems.push(format!(
+                        "{}: no passing check in {}.c names it",
+                        e.id, e.place
+                    ));
                 }
             }
             "apps" => {
                 let corpus = root.join("tests/apps").join(format!("{}.txt", e.place));
                 let text = fs::read_to_string(&corpus).unwrap_or_default();
-                if !text.lines().any(|l| l.starts_with('#') && l.contains(&e.id)) {
-                    problems.push(format!("{}: no `# {}` comment in {}", e.id, e.id, corpus.display()));
+                if !text
+                    .lines()
+                    .any(|l| l.starts_with('#') && l.contains(&e.id))
+                {
+                    problems.push(format!(
+                        "{}: no `# {}` comment in {}",
+                        e.id,
+                        e.id,
+                        corpus.display()
+                    ));
                 }
             }
             _ => {}
@@ -102,19 +117,26 @@ pub fn run(args: &[String]) -> Result {
         println!("FAIL {p}");
     }
     let tested = entries.iter().filter(|e| e.kind == "test").count();
+    let count = |kind: &str| entries.iter().filter(|e| e.kind == kind).count();
     println!(
-        "{} CVEs indexed: {tested} with tests here, {} in test-apps, {} covered elsewhere, {} not applicable; report in {}",
+        "{} CVEs indexed: {tested} with tests here, {} in test-apps, {} covered elsewhere, {} not applicable, {} without a test yet; report in {}",
         entries.len(),
-        entries.iter().filter(|e| e.kind == "apps").count(),
-        entries.iter().filter(|e| e.kind == "covered").count(),
-        entries.iter().filter(|e| e.kind == "n/a").count(),
+        count("apps"),
+        count("covered"),
+        count("n/a"),
+        count("gap"),
         path.display()
     );
     if failed.is_empty() && problems.is_empty() {
         println!("{} CVE test programs passed", tests.len());
         Ok(())
     } else {
-        Err(format!("{} program(s) and {} index check(s) failed", failed.len(), problems.len()).into())
+        Err(format!(
+            "{} program(s) and {} index check(s) failed",
+            failed.len(),
+            problems.len()
+        )
+        .into())
     }
 }
 
@@ -158,9 +180,14 @@ fn index(path: &Path) -> Result<Vec<Entry>> {
         }
         let mut words = line.split_whitespace();
         let (Some(id), Some(kind), Some(place)) = (words.next(), words.next(), words.next()) else {
-            return Err(format!("{}:{}: expected `<id> <kind> <place> <note>`", path.display(), n + 1).into());
+            return Err(format!(
+                "{}:{}: expected `<id> <kind> <place> <note>`",
+                path.display(),
+                n + 1
+            )
+            .into());
         };
-        if !["test", "apps", "covered", "n/a"].contains(&kind) || cve_ids(id) != [id] {
+        if !["test", "apps", "covered", "n/a", "gap"].contains(&kind) || cve_ids(id) != [id] {
             return Err(format!("{}:{}: bad line", path.display(), n + 1).into());
         }
         if !seen.insert(id.to_owned()) {
@@ -188,7 +215,11 @@ fn report(entries: &[Entry], passed: &BTreeMap<String, String>, failed: &[String
             "test" => "not run",
             _ => "",
         };
-        let _ = writeln!(out, "| {} | {} | {} | {} | {} |", e.id, e.kind, e.place, result, e.note);
+        let _ = writeln!(
+            out,
+            "| {} | {} | {} | {} | {} |",
+            e.id, e.kind, e.place, result, e.note
+        );
     }
     out
 }

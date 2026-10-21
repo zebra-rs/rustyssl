@@ -287,7 +287,7 @@ static inline void end_init(end *e, SSL_CTX *ctx, int server)
     e->ssl = SSL_new(ctx);
     e->in = BIO_new(BIO_s_mem());
     e->out = BIO_new(BIO_s_mem());
-    BIO_set_mem_eof_return(e->in, -1);
+    (void)BIO_set_mem_eof_return(e->in, -1);
     SSL_set_bio(e->ssl, e->in, e->out);
     if (server)
         SSL_set_accept_state(e->ssl);

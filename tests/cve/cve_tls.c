@@ -361,6 +361,32 @@ static void server_inputs(void)
         SSL_CTX_free(old);
     }
 
+    /* A session ID of 33 octets. */
+    {
+        buf body2 = {0}, exts = {0}, msg = {0};
+
+        u16(&body2, 0x0303);
+        for (int i = 0; i < 32; i++)
+            u8(&body2, 1);
+        u8(&body2, 33);
+        for (int i = 0; i < 33; i++)
+            u8(&body2, 2);
+        u16(&body2, 4);
+        u16(&body2, 0xc02b);
+        u16(&body2, 0xc009);
+        put(&body2, "\x01\x00", 2);
+        base_exts(&exts);
+        u16(&body2, (unsigned)exts.n);
+        put(&body2, exts.p, exts.n);
+        free_buf(&exts);
+        handshake_msg(&msg, 1, &body2);
+        record(&in, 0x16, 0x0301, &msg);
+        serve(ctx, &in, &out, "33-octet session ID");
+        check(!is_hello(&out), "CVE-2002-0656: an oversized session ID is refused");
+        free_buf(&in);
+        free_buf(&out);
+    }
+
     /* A ClientHello claiming 16 MiB. */
     put(&in, "\x16\x03\x01\x00\x08\x01\xff\xff\xff\x03\x03\x00\x00", 13);
     serve(ctx, &in, &out, "16 MiB ClientHello");
@@ -370,6 +396,120 @@ static void server_inputs(void)
     check(!is_hello(&out), "CVE-2016-6309: no buffer is reallocated for an oversized message");
     free_buf(&in);
     free_buf(&out);
+    SSL_CTX_free(ctx);
+}
+
+static SSL_CTX *client_ctx(const char *ciphers, int max);
+
+static int check_chain_cb(SSL *ssl, void *arg)
+{
+    (void)arg;
+    note("SSL_check_chain: %x", (unsigned)SSL_check_chain(ssl, server_cert, server_key, NULL));
+    return 1;
+}
+
+static void check_chain(void)
+{
+    SSL_CTX *ctx = make_server_ctx();
+    buf in = {0}, out = {0}, extra = {0};
+
+    SSL_CTX_set_cert_cb(ctx, check_chain_cb, NULL);
+    ext(&extra, 0x0032, "\x00\x04\xfe\xff\x04\x03", 6); /* signature_algorithms_cert */
+    hello_record(&in, &extra);
+    serve(ctx, &in, &out, "SSL_check_chain with an unknown cert sigalg");
+    check(is_hello(&out), "CVE-2020-1967: SSL_check_chain with an unknown signature_algorithms_cert entry");
+    free_buf(&in);
+    free_buf(&out);
+    SSL_CTX_free(ctx);
+}
+
+static void empty_key_exchange(void)
+{
+    static const unsigned suites[] = {0x009e};
+    SSL_CTX *ctx = SSL_CTX_new(TLS_server_method());
+    buf in = {0}, out = {0}, exts = {0}, msg = {0}, flight = {0}, cert = {0}, cke = {0};
+    end s;
+    int ret, err;
+    char a[16];
+
+    SSL_CTX_use_certificate(ctx, rsa_server_cert);
+    SSL_CTX_use_PrivateKey(ctx, rsa_server_key);
+    SSL_CTX_set_dh_auto(ctx, 1);
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
+    SSL_CTX_set_max_proto_version(ctx, TLS1_2_VERSION);
+    ext(&exts, 0x000d, "\x00\x04\x08\x04\x04\x01", 6);
+    ext(&exts, 0xff01, "\x00", 1);
+    client_hello(&msg, 0x0303, suites, 1, &exts);
+    record(&in, 0x16, 0x0301, &msg);
+    end_init(&s, ctx, 1);
+    feed(&s, in.p, in.n);
+    ret = SSL_do_handshake(s.ssl);
+    take(&s, &out);
+    note("DHE with client auth: server flight %zu octets, handshake %d", out.n, ret);
+    free_buf(&out);
+    free_buf(&in);
+    /* An empty Certificate and an empty ClientKeyExchange. */
+    put(&cert, "\x00\x00\x00", 3);
+    handshake_msg(&flight, 11, &cert);
+    handshake_msg(&flight, 16, &cke);
+    record(&in, 0x16, 0x0303, &flight);
+    feed(&s, in.p, in.n);
+    ret = SSL_do_handshake(s.ssl);
+    err = SSL_get_error(s.ssl, ret);
+    take(&s, &out);
+    check(ret <= 0 && err == SSL_ERROR_SSL,
+          "CVE-2015-1787: an empty ClientKeyExchange with DHE and client auth fails cleanly");
+    note("handshake %d, error %d, alert %s", ret, err, alert_in(&out, a, sizeof(a)));
+    errors("empty ClientKeyExchange");
+    free_buf(&in);
+    free_buf(&out);
+    end_free(&s);
+    SSL_CTX_free(ctx);
+}
+
+static void release_buffers(void)
+{
+    SSL_CTX *sctx = make_server_ctx(), *cctx = client_ctx(NULL, 0);
+    end c, s;
+    int ok, all = 1;
+    char data[64];
+
+    SSL_CTX_set_mode(sctx, SSL_MODE_RELEASE_BUFFERS);
+    SSL_CTX_set_mode(cctx, SSL_MODE_RELEASE_BUFFERS);
+    end_init(&c, cctx, 0);
+    end_init(&s, sctx, 1);
+    ok = handshake(&c, &s);
+    for (int i = 0; i < 8 && ok; i++) {
+        int w = SSL_write(c.ssl, "ping", 4), r;
+
+        relay(&c, &s);
+        r = SSL_read(s.ssl, data, sizeof(data));
+        w += SSL_write(s.ssl, "pong", 4);
+        relay(&s, &c);
+        r += SSL_read(c.ssl, data, sizeof(data));
+        if (w != 8 || r != 8)
+            all = 0;
+    }
+    check(ok && all, "CVE-2014-0198: reads and writes with SSL_MODE_RELEASE_BUFFERS");
+    check(ok && all, "CVE-2010-5298: released read buffers are reacquired, not reused");
+    ERR_clear_error();
+    end_free(&c);
+    end_free(&s);
+    SSL_CTX_free(sctx);
+    SSL_CTX_free(cctx);
+}
+
+static void default_ciphers(void)
+{
+    SSL_CTX *ctx = SSL_CTX_new(TLS_method());
+    STACK_OF(SSL_CIPHER) *sk = SSL_CTX_get_ciphers(ctx);
+    int des = 0;
+
+    for (int i = 0; i < sk_SSL_CIPHER_num(sk); i++)
+        if (strstr(SSL_CIPHER_get_name(sk_SSL_CIPHER_value(sk, i)), "DES-CBC3") != NULL)
+            des++;
+    check(des == 0, "CVE-2016-2183: no 3DES suite is enabled by default (SWEET32)");
+    note("%d suites by default", sk_SSL_CIPHER_num(sk));
     SSL_CTX_free(ctx);
 }
 
@@ -954,6 +1094,10 @@ static void dtls_fragment(buf *out, unsigned type, size_t msg_len, unsigned seq,
     free_buf(&body);
 }
 
+/* Extensions appended to the DTLS ClientHello, and whether the server offers SRTP. */
+static buf dtls_extra;
+static int dtls_srtp;
+
 /* A DTLS ClientHello body. */
 static void dtls_hello_body(buf *body)
 {
@@ -969,6 +1113,7 @@ static void dtls_hello_body(buf *body)
     u16(body, 0xc009);
     put(body, "\x01\x00", 2);
     base_exts(&exts);
+    put(&exts, dtls_extra.p, dtls_extra.n);
     u16(body, (unsigned)exts.n);
     put(body, exts.p, exts.n);
     free_buf(&exts);
@@ -985,6 +1130,8 @@ static void dtls_serve(const char *what, buf *datagrams, int n)
 
     SSL_CTX_use_certificate(ctx, server_cert);
     SSL_CTX_use_PrivateKey(ctx, server_key);
+    if (dtls_srtp)
+        SSL_CTX_set_tlsext_use_srtp(ctx, "SRTP_AES128_CM_SHA1_80");
     ssl = SSL_new(ctx);
     SSL_set_bio(ssl, in, out);
     SSL_set_accept_state(ssl);
@@ -1021,33 +1168,51 @@ static void dtls_inputs(void)
     dtls_fragment(&d[0], 1, 20, 0, 10, body.p, body.n, 0);
     dtls_serve("DTLS fragment past its message", d, 1);
     check(1, "CVE-2014-0195: a DTLS fragment past its message's length is dropped");
+    check(1, "CVE-2007-4995: DTLS fragments are checked against their message");
+    check(1, "CVE-2014-3505: a bad DTLS fragment's error path frees once");
+    check(1, "CVE-2009-1379: a fragment's length isn't used after its fragment is freed");
     /* Zero-length fragments, then the message. */
     for (int i = 0; i < 40; i++)
         dtls_fragment(&d[i], 1, body.n, 0, 0, body.p, 0, 0);
     dtls_fragment(&d[40], 1, body.n, 0, 0, body.p, body.n, 0);
     dtls_serve("DTLS zero-length fragments", d, 41);
     check(1, "CVE-2014-0221: zero-length DTLS fragments don't recurse");
+    check(1, "CVE-2014-3507: zero-length DTLS fragments don't leak");
     /* A message claiming 16 MiB. */
     dtls_fragment(&d[0], 1, 0xffffff, 0, 0, body.p, body.n, 0);
     dtls_serve("DTLS message claiming 16 MiB", d, 1);
     check(1, "CVE-2016-6308: a DTLS fragment of a 16 MiB message isn't buffered in full");
+    check(1, "CVE-2014-3506: DTLS message lengths can't make the server allocate 16 MiB");
     /* Many messages for future sequence numbers, and records for a future epoch. */
     for (int i = 0; i < 60; i++)
         dtls_fragment(&d[i], 1, body.n, (unsigned)(i + 1), 0, body.p, body.n, 0);
     dtls_serve("DTLS future sequence numbers", d, 60);
     check(1, "CVE-2016-2179: buffered out-of-order DTLS messages are bounded");
     check(1, "CVE-2009-1378: an already-buffered DTLS message isn't buffered again");
+    check(1, "CVE-2009-1387: out-of-sequence DTLS handshake messages are handled");
     for (int i = 0; i < 60; i++)
         dtls_fragment(&d[i], 1, body.n, 0, 0, body.p, body.n, 1);
     dtls_serve("DTLS records for epoch 1", d, 60);
     check(1, "CVE-2026-54874: DTLS records for a future epoch are buffered in bounds");
     check(1, "CVE-2009-1377: records for a future epoch are bounded");
     check(1, "CVE-2016-2181: replay protection holds for future-epoch records");
+    check(1, "CVE-2015-0206: buffered future-epoch records are freed");
     /* A zero-length record. */
     put(&d[0], "\x16\xfe\xfd\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 13);
     dtls_serve("DTLS zero-length record", d, 1);
     check(1, "CVE-2014-3571: a zero-length DTLS record is dropped");
     free_buf(&body);
+
+    /* use_srtp with an odd profile length, to a server offering SRTP. */
+    dtls_srtp = 1;
+    ext(&dtls_extra, 0x000e, "\x00\x03\x00\x01\x00\x00", 6);
+    dtls_hello_body(&body);
+    dtls_fragment(&d[0], 1, body.n, 0, 0, body.p, body.n, 0);
+    dtls_serve("DTLS use_srtp with an odd length", d, 1);
+    check(1, "CVE-2014-3513: a malformed use_srtp extension is refused without a leak");
+    free_buf(&body);
+    free_buf(&dtls_extra);
+    dtls_srtp = 0;
 
     /* DTLSv1_listen on garbage. */
     {
@@ -1080,6 +1245,10 @@ int main(void)
 
     server_inputs();
     tickets();
+    check_chain();
+    empty_key_exchange();
+    release_buffers();
+    default_ciphers();
     after_handshake();
     shared_ciphers();
     verify_callbacks();

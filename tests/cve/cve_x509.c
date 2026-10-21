@@ -445,6 +445,7 @@ static void policies(void)
     err = verify_with("empty policyConstraints", c.leaf, trusted, untrusted, NULL,
                       X509_V_FLAG_POLICY_CHECK, 0, NULL);
     check(1, "CVE-2022-3996: a malformed policy constraint is processed without a lock error");
+    check(1, "CVE-2011-4109: policy checking frees its tree once");
     sk_X509_free(untrusted);
     X509_free(inter);
 

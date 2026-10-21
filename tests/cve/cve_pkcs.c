@@ -9,6 +9,7 @@
 #include <openssl/cmp.h>
 #include <openssl/cms.h>
 #include <openssl/crmf.h>
+#include <openssl/ocsp.h>
 #include <openssl/pkcs12.h>
 #include <openssl/pkcs7.h>
 #include <openssl/rand.h>
@@ -278,7 +279,7 @@ static void pkcs7_decrypt_wrong_key(void)
           "CVE-2012-0884: PKCS#7 decryption with the wrong RSA key reveals nothing (MMA)");
     ERR_clear_error();
     (void)r;
-    BIO_reset(out);
+    (void)BIO_reset(out);
     r = PKCS7_decrypt(p7, key, cert, out, 0);
     note("right key: %d", r);
     BIO_free(out);
@@ -372,7 +373,7 @@ static void cms_bad_structures(void)
 
         if (ndef != NULL) {
             BIO_write(ndef, message, (int)strlen(message));
-            BIO_flush(ndef);
+            (void)BIO_flush(ndef);
             while (ndef != NULL && ndef != out) {
                 BIO *next = BIO_pop(ndef);
 
@@ -982,6 +983,48 @@ static void cmp_protection_alg(void)
     OSSL_CMP_CTX_free(client);
 }
 
+static void ocsp_verify(void)
+{
+    EVP_PKEY *ca_key = ec_key(), *leaf_key = ec_key(), *rkey = ec_key();
+    X509 *ca = ca_cert("CA", ca_key, NULL, NULL), *leaf = leaf_cert("leaf", leaf_key, ca, ca_key);
+    X509 *responder = leaf_cert("responder", rkey, NULL, NULL), *nokey = X509_new();
+    OCSP_BASICRESP *bs = OCSP_BASICRESP_new();
+    OCSP_CERTID *id = OCSP_cert_to_id(NULL, leaf, ca);
+    ASN1_TIME *now = X509_gmtime_adj(NULL, 0);
+    X509_STORE *store = X509_STORE_new();
+    STACK_OF(X509) *certs = sk_X509_new_null();
+    int r1, r2;
+
+    OCSP_basic_add1_status(bs, id, V_OCSP_CERTSTATUS_GOOD, 0, NULL, now, NULL);
+    OCSP_basic_sign(bs, responder, rkey, EVP_sha256(), NULL, 0);
+    X509_STORE_add_cert(store, ca);
+    r1 = OCSP_basic_verify(bs, NULL, store, OCSP_NOCHECKS);
+    check(r1 <= 0,
+          "CVE-2022-1343: OCSP_basic_verify with OCSP_NOCHECKS fails when the signer doesn't verify");
+    note("NOCHECKS %d", r1);
+    ERR_clear_error();
+
+    X509_set_subject_name(nokey, X509_get_subject_name(responder));
+    sk_X509_push(certs, nokey);
+    r2 = OCSP_basic_verify(bs, certs, store, OCSP_NOINTERN | OCSP_TRUSTOTHER | OCSP_NOVERIFY);
+    check(r2 <= 0, "CVE-2013-0166: an OCSP signer certificate without a key fails verification");
+    note("signer without a key %d", r2);
+    ERR_clear_error();
+
+    sk_X509_free(certs);
+    X509_STORE_free(store);
+    ASN1_TIME_free(now);
+    OCSP_CERTID_free(id);
+    OCSP_BASICRESP_free(bs);
+    X509_free(nokey);
+    X509_free(responder);
+    X509_free(leaf);
+    X509_free(ca);
+    EVP_PKEY_free(rkey);
+    EVP_PKEY_free(leaf_key);
+    EVP_PKEY_free(ca_key);
+}
+
 int main(void)
 {
     pkcs7_missing_content();
@@ -1001,5 +1044,6 @@ int main(void)
     timestamps();
     crmf_encrypted_value();
     cmp_protection_alg();
+    ocsp_verify();
     return finish();
 }

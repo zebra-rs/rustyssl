@@ -542,6 +542,25 @@ static void hexstrings(void)
     ASN1_OCTET_STRING_free(os);
 }
 
+static void attributes(void)
+{
+    /* Attribute { OID, SET { } } with an empty value set, and one whose value set is a
+     * SEQUENCE. */
+    static const unsigned char empty[] = {0x30, 0x07, 0x06, 0x03, 0x55, 0x04, 0x03, 0x31, 0x00};
+    static const unsigned char not_set[] = {0x30, 0x0a, 0x06, 0x03, 0x55, 0x04, 0x03,
+                                            0x30, 0x03, 0x0c, 0x01, 'a'};
+    const unsigned char *p = empty;
+    X509_ATTRIBUTE *a = d2i_X509_ATTRIBUTE(NULL, &p, sizeof(empty)), *b;
+
+    p = not_set;
+    b = d2i_X509_ATTRIBUTE(NULL, &p, sizeof(not_set));
+    check(b == NULL, "CVE-2015-3195: a malformed X509_ATTRIBUTE fails to parse, freeing what it built");
+    note("empty value set %s", a != NULL ? "parsed" : "rejected");
+    ERR_clear_error();
+    X509_ATTRIBUTE_free(a);
+    X509_ATTRIBUTE_free(b);
+}
+
 static unsigned long hash_str(const void *p)
 {
     return (unsigned long)strlen((const char *)p);
@@ -593,5 +612,6 @@ int main(void)
     mbstrings();
     hexstrings();
     lhash_flush();
+    attributes();
     return finish();
 }

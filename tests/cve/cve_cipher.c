@@ -324,6 +324,7 @@ static void stitched(void)
     ERR_clear_error();
     if (c == NULL) {
         check(1, "CVE-2016-2107: a TLS CBC record with bad padding and MAC fails # skip not offered");
+        check(1, "CVE-2012-2686: a TLS 1.2 CBC record through the AES-NI path # skip not offered");
     } else {
         EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
         unsigned char rec[64], aad[13] = {0, 0, 0, 0, 0, 0, 0, 1, 0x17, 0x03, 0x03, 0x00, 0x40};
@@ -335,6 +336,7 @@ static void stitched(void)
         r1 = EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_TLS1_AAD, sizeof(aad), aad);
         r2 = EVP_Cipher(ctx, rec, rec, sizeof(rec));
         check(r2 <= 0, "CVE-2016-2107: a TLS CBC record with bad padding and MAC fails");
+        check(r2 <= 0, "CVE-2012-2686: a TLS 1.2 CBC record through the AES-NI path fails cleanly");
         note("TLS1_AAD %d, cipher %d", r1, r2);
         ERR_clear_error();
         EVP_CIPHER_CTX_free(ctx);
