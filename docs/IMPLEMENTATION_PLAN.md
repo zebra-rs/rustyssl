@@ -6170,12 +6170,34 @@ S/MIME and CMS signatures, results decrypted or verified again, and only exit co
   `opt_tls_used`'s storage (undefined behavior). TLS to a CMP server is set up and checked
   (`-reqout_only` stops before connecting) but no TLS session runs in the corpus.
 - **test-apps:** `&` lines run a server (`ocsp -port`, `cmp -port`) in the background on
-  loopback for the next line; `@` masks times within a few days of now; `PID=n` and our tool's
-  name (shown through `opt_appname`) are masked.
+  loopback for the next line; `^` (G4's `@`, renamed at the merge since G3's fixtures use
+  `@`) masks times within a few days of now; `PID=n` and our tool's name (shown through
+  `opt_appname`) are masked.
 - **Library fixes found by the corpora** (`rustyssl-capi`): the functions errors are raised in
   for PEM framing (`get_name`, `get_header_and_data`), `ASN1_INTEGER` conversions, and
   `OPENSSL_hexstr2buf`. Left in the library: a failed AES key unwrap is raised in `update`
   rather than `aes_wrap_cipher_internal` (the corpus avoids printing it).
+
+The forks' merge (2026-10-21, local, branch `cli-merge`): G1, G2, G3, G6 and G4 merged in that
+order, on top of the HMAC DRBG fix their random differential sessions found (seed
+1792544394: an HMAC DRBG ignores `cipher` when it loads its MAC).
+- **One copy of each shared helper:** `src/lib/keygen.rs` (`init_gen_str`, `app_keygen`,
+  `app_paramgen`), `src/lib/ec_common.rs`, `lib::opt::opt_cipher`, `lib::apps::perror`, and
+  in `src/lib/apps.rs` the `apps.c` helpers the commands share (`set_cert_times`,
+  `check_cert_time_string`, `check_cert_attributes`, `set_crl_lastupdate`,
+  `set_crl_nextupdate`, `policies_print`, `store_setup_crl_download`, `load_cert_certs`,
+  `load_certs_multifile`, `warn_cert`, `next_item`); `ocsp` reads the CA index with
+  `lib::ca_db`.
+- **`rustyssl-ossl`:** one handle per C type (`EVP_PKEY_CTX`, `EVP_SKEY`, `EVP_SKEYMGMT`,
+  `PKCS7`, `ASN1_TIME`, `ASN1_OBJECT`, `TXT_DB`, `BIGNUM`, `EVP_MAC`, `EVP_MAC_CTX`) and one
+  definition per wrapper; where two forks' wrappers of one call differ in form, the second is
+  named for what it does (`PkeyCtx::sign_into`, `Time::utc_from_string_kept`, ...). The
+  parameter lists are `Params` (from text), `ParamList` and `ParamValues` (built by the
+  caller), all `ParamArray`.
+- **test-apps on macOS** (the forks measured on Linux): the libraries' directories in dyld's
+  messages, both libraries' OPENSSLDIR, ENGINESDIR and MODULESDIR, dlopen's message, and the
+  line of an `apps/<file>.c` location (`__LINE__` of a two-line macro call: GCC and clang
+  differ) are masked. 3825 command lines pass on macOS.
 
 ## Phase 12: Hardening, performance, release 1.0 → M7
 
