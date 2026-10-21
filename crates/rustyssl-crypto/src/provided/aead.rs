@@ -150,6 +150,44 @@ impl crate::lowlevel::modes::Block128 for KeyBlock<'_> {
     }
 }
 
+/// The key as the low-level code's CTR function (`ctr128_f`, as AES-NI's and ARMv8's
+/// `ctr32_encrypt_blocks`): the counter blocks of a run encrypted many at a time.
+struct KeyCtr<'a>(&'a Key);
+
+impl crate::lowlevel::modes::Ctr128 for KeyCtr<'_> {
+    fn ctr(&self, input: &[u8], out: &mut [u8], blocks: usize, iv: &[u8; 16]) {
+        let len = blocks.saturating_mul(16).min(input.len()).min(out.len());
+        if let (Some(i), Some(o)) = (input.get(..len), out.get_mut(..len)) {
+            o.copy_from_slice(i);
+            self.ctr_in_place(o, blocks, iv);
+        }
+    }
+
+    fn ctr_in_place(&self, data: &mut [u8], blocks: usize, iv: &[u8; 16]) {
+        const BATCH: usize = 32;
+        let mut stream = Zeroizing::new([0u8; BATCH * 16]);
+        let (head, tail) = iv.split_at(12);
+        let mut counter = u32::from_be_bytes(tail.try_into().unwrap_or([0; 4]));
+        let len = blocks.saturating_mul(16).min(data.len());
+        for chunk in data.get_mut(..len).unwrap_or_default().chunks_mut(BATCH * 16) {
+            let Some(buf) = stream.get_mut(..chunk.len()) else {
+                return;
+            };
+            for slot in buf.as_chunks_mut::<16>().0 {
+                let (fixed, count) = slot.split_at_mut(12);
+                fixed.copy_from_slice(head);
+                count.copy_from_slice(&counter.to_be_bytes());
+                counter = counter.wrapping_add(1);
+            }
+            // AES and the other 128-bit block ciphers don't fail on whole blocks.
+            let _ = self.0.0.encrypt_blocks(buf);
+            for (d, k) in chunk.iter_mut().zip(buf.iter()) {
+                *d ^= k;
+            }
+        }
+    }
+}
+
 /// `GCM128_CONTEXT` without the key: `CRYPTO_gcm128_*` as `lowlevel::aead` ports them, with
 /// OpenSSL's GHASH buffering (`Xn`), so a context used after a failed check, or finished twice,
 /// hashes on exactly as the reference's does.
@@ -178,12 +216,9 @@ impl Gcm128 {
 
     /// `CRYPTO_gcm128_encrypt`/`_decrypt` in place: -1 past the limit.
     fn crypt(&mut self, key: &Key, data: &mut [u8], enc: bool) -> Result<(), i32> {
-        let input = Zeroizing::new(data.to_vec());
-        let r = if enc {
-            self.0.encrypt(&input, data, &KeyBlock(key))
-        } else {
-            self.0.decrypt(&input, data, &KeyBlock(key))
-        };
+        let r = self
+            .0
+            .crypt_in_place(data, &KeyBlock(key), Some(&KeyCtr(key)), enc);
         if r == 0 { Ok(()) } else { Err(r) }
     }
 
@@ -2147,7 +2182,7 @@ impl ChaChaPoly {
                 self.chacha.apply(&mut d)?;
                 self.poly_update(&d);
             } else {
-                self.poly_update(&d.clone());
+                self.poly_update(&d);
                 self.chacha.apply(&mut d)?;
             }
             self.len_text = self.len_text.wrapping_add(u64::try_from(p).unwrap_or(0));

@@ -692,6 +692,34 @@ impl Ctx {
         }
     }
 
+    /// Whether [`Self::update_in_place`] does what `update` and `cipher` would: a stream mode
+    /// (CTR, OFB, CFB, CFB8, ChaCha20, RC4) with its key set, which writes as many octets as
+    /// it's given and buffers nothing.
+    pub fn in_place_ok(&self) -> bool {
+        let Self::Generic(g) = self else {
+            return false;
+        };
+        g.key_set
+            && matches!(
+                g.kind,
+                Kind::ChaCha20
+                    | Kind::Rc4 { .. }
+                    | Kind::Block {
+                        mode: Mode::Ctr | Mode::Ofb | Mode::Cfb | Mode::Cfb8,
+                        ..
+                    }
+            )
+    }
+
+    /// `update` (or `cipher`) for a context [`Self::in_place_ok`] accepts, on `data` where the
+    /// input already is and the output goes: the same octets, without a copy.
+    pub fn update_in_place(&mut self, data: &mut [u8]) -> Result<(), Error> {
+        crate::dit::with(|| match self {
+            Self::Generic(g) if !data.is_empty() => g.hw(data, data.len()).map(|_| ()),
+            _ => Err(Error::Internal),
+        })
+    }
+
     /// `final`.
     pub fn finalize(&mut self, outsize: usize) -> Result<Output, Error> {
         crate::dit::with(|| self.finalize_dit(outsize))
@@ -1565,30 +1593,36 @@ fn ct_le(a: u16, b: u16) -> u8 {
 /// CBC in place over whole blocks (`CRYPTO_cbc128_encrypt`/`_decrypt`, DES's CBC).
 fn cbc(cipher: &dyn BlockCipher, iv: &mut [u8], data: &mut [u8], enc: bool) -> Result<(), Error> {
     let bs = iv.len();
-    for block in data.chunks_mut(bs) {
-        if block.len() != bs {
-            return Err(Error::Internal);
-        }
-        if enc {
-            for (b, v) in block.iter_mut().zip(iv.iter()) {
+    if bs == 0 || bs > MAX_BLOCK || !data.len().is_multiple_of(bs) {
+        return Err(Error::Internal);
+    }
+    if enc {
+        // Each block needs the one before it: the cipher chains them itself.
+        return cipher
+            .cbc_encrypt(iv, data)
+            .map_err(|_| Error::CipherOperationFailed);
+    }
+    // Decryption: many blocks at a time, then each XORed with the ciphertext before it.
+    let mut saved = [0u8; CTR_BATCH * MAX_BLOCK];
+    for chunk in data.chunks_mut(CTR_BATCH.saturating_mul(bs)) {
+        let len = chunk.len();
+        let cts = saved.get_mut(..len).ok_or(Error::Internal)?;
+        cts.copy_from_slice(chunk);
+        cipher
+            .decrypt_blocks(chunk)
+            .map_err(|_| Error::CipherOperationFailed)?;
+        for (i, block) in chunk.chunks_exact_mut(bs).enumerate() {
+            let prev = match i.checked_sub(1) {
+                None => &*iv,
+                Some(p) => cts
+                    .get(p.saturating_mul(bs)..i.saturating_mul(bs))
+                    .ok_or(Error::Internal)?,
+            };
+            for (b, v) in block.iter_mut().zip(prev) {
                 *b ^= v;
             }
-            cipher
-                .encrypt_blocks(block)
-                .map_err(|_| Error::CipherOperationFailed)?;
-            iv.copy_from_slice(block);
-        } else {
-            let mut c = Zeroizing::new([0u8; MAX_BLOCK]);
-            let saved = c.get_mut(..bs).ok_or(Error::Internal)?;
-            saved.copy_from_slice(block);
-            cipher
-                .decrypt_blocks(block)
-                .map_err(|_| Error::CipherOperationFailed)?;
-            for (b, v) in block.iter_mut().zip(iv.iter()) {
-                *b ^= v;
-            }
-            iv.copy_from_slice(saved);
         }
+        iv.copy_from_slice(cts.get(len.saturating_sub(bs)..).ok_or(Error::Internal)?);
     }
     Ok(())
 }
@@ -1726,20 +1760,56 @@ fn ctr(
         .map_err(|_| Error::Internal)?
         .checked_rem(bs)
         .unwrap_or(0);
-    for b in data.iter_mut() {
+    let mut rest: &mut [u8] = data;
+    // The key stream left in the current block first.
+    while n != 0 && !rest.is_empty() {
+        let (b, tail) = rest.split_first_mut().ok_or(Error::Internal)?;
+        *b ^= ks.get(n).copied().ok_or(Error::Internal)?;
+        n = next(n, bs);
+        rest = tail;
+    }
+    // Whole blocks, many at a time: their counters encrypted in one call, which lets the
+    // cipher work on several blocks at once.
+    if bs > 0 && bs <= MAX_BLOCK {
+        let mut stream = Zeroizing::new([0u8; CTR_BATCH * MAX_BLOCK]);
+        while rest.len() >= bs {
+            let blocks = rest.len().checked_div(bs).unwrap_or(0).min(CTR_BATCH);
+            let len = blocks.checked_mul(bs).ok_or(Error::Internal)?;
+            let buf = stream.get_mut(..len).ok_or(Error::Internal)?;
+            for slot in buf.chunks_exact_mut(bs) {
+                slot.copy_from_slice(counter);
+                ctr_inc(counter);
+            }
+            encrypt_iv(cipher, buf)?;
+            let (chunk, tail) = core::mem::take(&mut rest).split_at_mut(len);
+            for (d, k) in chunk.iter_mut().zip(buf.iter()) {
+                *d ^= k;
+            }
+            rest = tail;
+        }
+    }
+    // A last partial block, keeping its key stream for the next call.
+    for b in rest.iter_mut() {
         if n == 0 {
             ks.copy_from_slice(counter);
             encrypt_iv(cipher, ks)?;
-            // ctr128_inc: the whole counter, big-endian.
-            for c in counter.iter_mut().rev() {
-                *c = c.wrapping_add(1);
-                if *c != 0 {
-                    break;
-                }
-            }
+            ctr_inc(counter);
         }
         *b ^= ks.get(n).copied().ok_or(Error::Internal)?;
         n = next(n, bs);
     }
     u32::try_from(n).map_err(|_| Error::Internal)
+}
+
+/// How many blocks CTR and CBC decryption hand the cipher at once.
+const CTR_BATCH: usize = 32;
+
+/// `ctr128_inc`: the whole counter, big-endian.
+fn ctr_inc(counter: &mut [u8]) {
+    for c in counter.iter_mut().rev() {
+        *c = c.wrapping_add(1);
+        if *c != 0 {
+            break;
+        }
+    }
 }

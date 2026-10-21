@@ -86,6 +86,21 @@ pub trait BlockCipher: Send + Sync {
     fn encrypt_blocks(&self, data: &mut [u8]) -> Result<(), Error>;
     /// Decrypts whole blocks in place.
     fn decrypt_blocks(&self, data: &mut [u8]) -> Result<(), Error>;
+    /// CBC encryption of whole blocks in place, chained from `iv` (left as the last block).
+    fn cbc_encrypt(&self, iv: &mut [u8], data: &mut [u8]) -> Result<(), Error> {
+        let bs = iv.len();
+        if bs == 0 || !data.len().is_multiple_of(bs) {
+            return Err(Error::BlockLength);
+        }
+        for block in data.chunks_exact_mut(bs) {
+            for (b, v) in block.iter_mut().zip(iv.iter()) {
+                *b ^= v;
+            }
+            self.encrypt_blocks(block)?;
+            iv.copy_from_slice(block);
+        }
+        Ok(())
+    }
     /// A copy, for a copied context.
     fn clone_box(&self) -> Box<dyn BlockCipher>;
 }
@@ -117,6 +132,28 @@ where
             return Err(Error::BlockLength);
         }
         self.0.decrypt_blocks(blocks);
+        Ok(())
+    }
+
+    fn cbc_encrypt(&self, iv: &mut [u8], data: &mut [u8]) -> Result<(), Error> {
+        // The chain without a call through the trait object per block.
+        let mut chain = Array::<u8, C::BlockSize>::default();
+        if iv.len() != chain.len() {
+            return Err(Error::BlockLength);
+        }
+        chain.copy_from_slice(iv);
+        let (blocks, rest) = Array::<u8, C::BlockSize>::slice_as_chunks_mut(data);
+        if !rest.is_empty() {
+            return Err(Error::BlockLength);
+        }
+        for block in blocks {
+            for (b, v) in block.iter_mut().zip(chain.iter()) {
+                *b ^= v;
+            }
+            self.0.encrypt_block(block);
+            chain.copy_from_slice(block);
+        }
+        iv.copy_from_slice(&chain);
         Ok(())
     }
 
