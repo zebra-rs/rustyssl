@@ -11,7 +11,7 @@ pub mod version;
 // pub mod ciphers;
 // pub mod cmp;
 // pub mod cms;
-// pub mod configutl;
+pub mod configutl;
 pub mod crl;
 pub mod crl2pkcs7;
 pub mod dgst;
@@ -21,9 +21,9 @@ pub mod dsaparam;
 pub mod ec;
 pub mod ecparam;
 pub mod enc;
-// pub mod engine;
+pub mod engine;
 pub mod errstr;
-// pub mod fipsinstall;
+pub mod fipsinstall;
 pub mod gendsa;
 pub mod genpkey;
 pub mod genrsa;
@@ -52,7 +52,7 @@ pub mod rsautl;
 // pub mod sess_id;
 pub mod skeyutl;
 // pub mod smime;
-// pub mod speed;
+pub mod speed;
 pub mod spkac;
 // pub mod srp;
 pub mod storeutl;
@@ -70,7 +70,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "ciphers" => ciphers::main,
         // "cmp" => cmp::main,
         // "cms" => cms::main,
-        // "configutl" => configutl::main,
+        "configutl" => configutl::main,
         "crl" => crl::main,
         "crl2pkcs7" => crl2pkcs7::main,
         "dgst" => dgst::main,
@@ -80,9 +80,9 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         "ec" => ec::main,
         "ecparam" => ecparam::main,
         "enc" => enc::main,
-        // "engine" => engine::main,
+        "engine" => engine::main,
         "errstr" => errstr::main,
-        // "fipsinstall" => fipsinstall::main,
+        "fipsinstall" => fipsinstall::main,
         "gendsa" => gendsa::main,
         "genpkey" => genpkey::main,
         "genrsa" => genrsa::main,
@@ -111,7 +111,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "sess_id" => sess_id::main,
         "skeyutl" => skeyutl::main,
         // "smime" => smime::main,
-        // "speed" => speed::main,
+        "speed" => speed::main,
         "spkac" => spkac::main,
         // "srp" => srp::main,
         "storeutl" => storeutl::main,

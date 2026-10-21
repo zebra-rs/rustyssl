@@ -1,0 +1,83 @@
+# `openssl fipsinstall` (cargo xtask test-apps runs each line with upstream's tool on the reference,
+# then with ours on rustyssl and on the reference). Neither has a FIPS module: installing `fips`
+# fails as it does upstream without one, and the legacy provider's module stands in for a
+# provider that loads. The files are in tests/apps/fipsinstall/; {bin} is the "module" whose MAC
+# they hold.
+fipsinstall -help
+fipsinstall
+fipsinstall -module {bin}
+fipsinstall -module {bin} -out fips.cnf
+fipsinstall -module {bin} -quiet
+fipsinstall -module {bin} -noout
+fipsinstall -module {bin} -provider_name fips2 -section_name sect
+fipsinstall -module /nonexistent/fips.so
+fipsinstall -module {bin} -mac_name nosuch
+fipsinstall -module {bin} -mac_name nosuch -quiet
+fipsinstall -module {bin} -macopt foo:1
+fipsinstall -module {bin} -macopt nocolon
+fipsinstall -module {bin} -macopt hexkey:zz
+fipsinstall -module {bin} -macopt digest:nosuch
+fipsinstall -module {bin} -mac_name KMAC-128 -macopt hexkey:00112233445566778899aabbccddeeff -verify -in {tests}/fipsinstall/good.cnf
+fipsinstall -module {bin} -mac_name KMAC-256 -macopt size:100 -verify -in {tests}/fipsinstall/good.cnf
+# The legacy provider's module, installed as a provider.
+fipsinstall -module {src}/../lib/ossl-modules/legacy.so -provider_name legacy
+fipsinstall -module {src}/../lib/ossl-modules/legacy.so -provider_name legacy -section_name s -quiet
+fipsinstall -module {src}/../lib/ossl-modules/legacy.so -provider_name legacy -self_test_oninstall
+fipsinstall -module {src}/../lib/ossl-modules/legacy.so -provider_name legacy -self_test_onload -noout
+fipsinstall -module {src}/../lib/ossl-modules/legacy.so -provider_name legacy -pedantic
+fipsinstall -module {src}/../lib/ossl-modules/legacy.so -provider_name legacy -no_conditional_errors -no_security_checks -no_pbkdf2_lower_bound_check -self_test_oninstall
+fipsinstall -module {src}/../lib/ossl-modules/legacy.so -provider_name legacy -ems_check -no_short_mac -no_drbg_truncated_digests -signature_digest_check -hmac_key_check -kmac_key_check -hkdf_digest_check -tls13_kdf_digest_check -tls1_prf_digest_check -sshkdf_digest_check -sskdf_digest_check -x963kdf_digest_check
+fipsinstall -module {src}/../lib/ossl-modules/legacy.so -provider_name legacy -dsa_sign_disabled -tdes_encrypt_disabled -rsa_pkcs15_padding_disabled -rsa_pss_saltlen_check -rsa_sign_x931_disabled -hkdf_key_check -kbkdf_key_check -tls13_kdf_key_check -tls1_prf_key_check -sshkdf_key_check -sskdf_key_check -x963kdf_key_check -x942kdf_key_check -ecdh_cofactor_check
+fipsinstall -module {src}/../lib/ossl-modules/legacy.so -provider_name legacy -corrupt_desc x -corrupt_type y
+fipsinstall -module {src}/../lib/ossl-modules/legacy.so -provider_name legacy -macopt digest:SHA512 -macopt hexkey:0011
+fipsinstall -module {src}/../lib/ossl-modules/legacy.so -provider_name legacy -mac_name KMAC-128 -macopt hexkey:00112233445566778899aabbccddeeff
+fipsinstall -module {src}/../lib/ossl-modules/legacy.so -provider_name legacy -self_test_oninstall -out legacy.cnf
+fipsinstall -module {src}/../lib/ossl-modules/legacy.so -verify -in legacy.cnf -section_name fips_sect -self_test_oninstall
+fipsinstall -module {src}/../lib/ossl-modules/legacy.so -verify -in legacy.cnf
+fipsinstall -module {src}/../lib/ossl-modules/legacy.so -provider_name legacy -out /nonexistent/dir/legacy.cnf
+# -verify.
+fipsinstall -module {bin} -verify
+fipsinstall -module {bin} -verify -in {tests}/fipsinstall/good.cnf
+fipsinstall -module {bin} -verify -in {tests}/fipsinstall/good.cnf -self_test_oninstall
+fipsinstall -module {bin} -verify -in {tests}/fipsinstall/good.cnf -self_test_oninstall -quiet
+fipsinstall -module {bin} -verify -in {tests}/fipsinstall/good.cnf -section_name nosuch
+fipsinstall -module {bin} -verify -in {tests}/fipsinstall/lower.cnf
+fipsinstall -module {bin} -verify -in {tests}/fipsinstall/other.cnf -section_name mine
+fipsinstall -module {bin} -verify -in {tests}/fipsinstall/badmac.cnf
+fipsinstall -module {bin} -verify -in {tests}/fipsinstall/badmac.cnf -quiet
+fipsinstall -module {bin} -verify -in {tests}/fipsinstall/notahex.cnf
+fipsinstall -module {bin} -verify -in {tests}/fipsinstall/noversion.cnf
+fipsinstall -module {bin} -verify -in {tests}/fipsinstall/version2.cnf
+fipsinstall -module {bin} -verify -in {tests}/fipsinstall/nomac.cnf
+fipsinstall -module {bin} -verify -in {tests}/fipsinstall/nostatus.cnf -self_test_oninstall
+fipsinstall -module {bin} -verify -in {tests}/fipsinstall/noinstallmac.cnf -self_test_oninstall
+fipsinstall -module {bin} -verify -in {tests}/fipsinstall/badinstallmac.cnf -self_test_oninstall
+fipsinstall -module {bin} -verify -in {tests}/fipsinstall/badinstallmac.cnf
+fipsinstall -module {bin} -verify -in {tests}/fipsinstall/missing.cnf
+fipsinstall -module {bin} -verify -in {tests}/fipsinstall/good.cnf -macopt digest:SHA1
+fipsinstall -verify -in {tests}/fipsinstall/good.cnf
+# -config: whether a parent configuration loads the provider.
+fipsinstall -config {tests}/fipsinstall/parent.cnf -provider_name default
+fipsinstall -config {tests}/fipsinstall/parent.cnf -provider_name legacy -quiet
+fipsinstall -config {tests}/fipsinstall/parent.cnf
+fipsinstall -config {tests}/fipsinstall/parent.cnf -quiet
+fipsinstall -config {tests}/fipsinstall/broken.cnf
+fipsinstall -config {tests}/fipsinstall/missing.cnf
+fipsinstall -config {tests}/fipsinstall/parent.cnf -verify
+# -pedantic and the options it excludes.
+fipsinstall -module {bin} -pedantic -no_conditional_errors
+fipsinstall -module {bin} -pedantic -no_security_checks
+fipsinstall -module {bin} -pedantic -no_pbkdf2_lower_bound_check
+fipsinstall -module {bin} -pedantic -self_test_oninstall
+fipsinstall -verify -pedantic -self_test_oninstall
+fipsinstall -no_conditional_errors -pedantic
+# Option errors.
+fipsinstall -x
+fipsinstall -module
+fipsinstall -module /nonexistent/dir/
+fipsinstall -in /nonexistent/x.cnf -module {bin}
+fipsinstall -config /nonexistent/x.cnf
+fipsinstall -module {bin} extra
+fipsinstall -help -x
+fipsinstall -x -help
+fipsinstall -quiet=1

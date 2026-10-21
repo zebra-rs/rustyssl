@@ -118,3 +118,30 @@ pub fn error_string_n(e: c_ulong) -> String {
     let end = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
     String::from_utf8_lossy(buf.get(..end).unwrap_or_default()).into_owned()
 }
+
+/// `ERR_print_errors_fp(stdout)`, as the bytes it would write (the caller writes them, in
+/// order with its own output).
+pub fn errors_text() -> Vec<u8> {
+    match Bio::new_mem() {
+        Some(m) => {
+            print_errors(&m);
+            m.read_to_end()
+        }
+        None => Vec::new(),
+    }
+}
+
+/// `ERR_GET_LIB(e)`.
+pub fn lib(e: c_ulong) -> c_int {
+    if is_system_error(e) {
+        return crate::abi::ERR_LIB_SYS;
+    }
+    let shifted = e >> crate::abi::ERR_LIB_OFFSET;
+    c_int::try_from(shifted & c_ulong::try_from(crate::abi::ERR_LIB_MASK).unwrap_or(0)).unwrap_or(0)
+}
+
+/// `ERR_get_error()`.
+pub fn get_error() -> c_ulong {
+    // SAFETY: no arguments; it only touches this thread's queue.
+    unsafe { ffi::ERR_get_error() }
+}

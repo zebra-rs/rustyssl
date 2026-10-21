@@ -483,3 +483,146 @@ impl ParamBld {
             .map(BuiltParams)
     }
 }
+
+/// An owned, END-terminated `OSSL_PARAM` list built value by value (fork G6). Its keys and values live as long as it does,
+/// at addresses that don't move.
+pub struct ParamValues {
+    list: Vec<OSSL_PARAM>,
+    keys: Vec<CString>,
+    bytes: Vec<Box<[u8]>>,
+    /// Boxed so each value keeps its address as the list grows.
+    #[allow(clippy::vec_box)]
+    uints: Vec<Box<c_uint>>,
+    /// Values the library allocated (`OSSL_PARAM_allocate_from_text`), freed with
+    /// `OPENSSL_free`.
+    allocated: Vec<*mut c_void>,
+}
+
+impl Default for ParamValues {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ParamValues {
+    /// An empty list (END only).
+    pub fn new() -> Self {
+        ParamValues {
+            list: vec![END],
+            keys: Vec::new(),
+            bytes: Vec::new(),
+            uints: Vec::new(),
+            allocated: Vec::new(),
+        }
+    }
+
+    fn push(&mut self, k: CString, p: OSSL_PARAM) {
+        self.keys.push(k);
+        let at = self.list.len().saturating_sub(1);
+        self.list.insert(at, p);
+    }
+
+    /// `OSSL_PARAM_construct_utf8_string(key, value, 0)`.
+    pub fn utf8(mut self, key: &str, value: &str) -> Self {
+        let (Ok(k), Ok(v)) = (CString::new(key), CString::new(value)) else {
+            return self;
+        };
+        let mut b = v.into_bytes_with_nul().into_boxed_slice();
+        // SAFETY: k and b (a NUL-terminated string) live as long as the list, at addresses
+        // that don't move.
+        let p =
+            unsafe { ffi::OSSL_PARAM_construct_utf8_string(k.as_ptr(), b.as_mut_ptr().cast(), 0) };
+        self.bytes.push(b);
+        self.push(k, p);
+        self
+    }
+
+    /// `OSSL_PARAM_construct_octet_string(key, value, len)`.
+    pub fn octets(mut self, key: &str, value: &[u8]) -> Self {
+        let Ok(k) = CString::new(key) else {
+            return self;
+        };
+        let mut b = value.to_vec().into_boxed_slice();
+        // SAFETY: as above; b holds len bytes.
+        let p = unsafe {
+            ffi::OSSL_PARAM_construct_octet_string(k.as_ptr(), b.as_mut_ptr().cast(), b.len())
+        };
+        self.bytes.push(b);
+        self.push(k, p);
+        self
+    }
+
+    /// `OSSL_PARAM_construct_uint(key, &value)`.
+    pub fn uint(mut self, key: &str, value: c_uint) -> Self {
+        let Ok(k) = CString::new(key) else {
+            return self;
+        };
+        let mut b = Box::new(value);
+        // SAFETY: as above; b is an aligned unsigned int.
+        let p = unsafe { ffi::OSSL_PARAM_construct_uint(k.as_ptr(), &mut *b) };
+        self.uints.push(b);
+        self.push(k, p);
+        self
+    }
+
+    /// The list, for the C API (END-terminated, owned by `self`).
+    pub fn as_ptr(&self) -> *const OSSL_PARAM {
+        self.list.as_ptr()
+    }
+}
+
+impl Drop for ParamValues {
+    fn drop(&mut self) {
+        for p in self.allocated.drain(..) {
+            openssl_free(p);
+        }
+    }
+}
+
+/// The `OSSL_PARAM_UTF8_STRING` value of `key` in the list at `params` (a callback's), as
+/// `OSSL_PARAM_locate_const` finds it.
+///
+/// # Safety
+/// `params` is NULL or a live END-terminated list.
+pub(crate) unsafe fn utf8_at(params: *const OSSL_PARAM, key: &core::ffi::CStr) -> Option<String> {
+    // SAFETY: the caller's contract; key is a valid C string.
+    let p = unsafe { ffi::OSSL_PARAM_locate_const(params, key.as_ptr()) };
+    if p.is_null() {
+        return None;
+    }
+    // SAFETY: p points into the live list.
+    let p = unsafe { &*p };
+    if i64::from(p.data_type) != i64::from(OSSL_PARAM_UTF8_STRING) || p.data.is_null() {
+        return None;
+    }
+    // SAFETY: a UTF8 string parameter's data is a NUL-terminated string.
+    Some(
+        unsafe { core::ffi::CStr::from_ptr(p.data.cast::<c_char>()) }
+            .to_string_lossy()
+            .into_owned(),
+    )
+}
+
+/// An END-terminated parameter array a call can read: each kind of list here.
+pub trait ParamArray {
+    /// The array, for the C API (it stays owned by `self`).
+    fn param_ptr(&self) -> *const OSSL_PARAM;
+}
+
+impl ParamArray for Params {
+    fn param_ptr(&self) -> *const OSSL_PARAM {
+        self.as_ptr()
+    }
+}
+
+impl ParamArray for ParamValues {
+    fn param_ptr(&self) -> *const OSSL_PARAM {
+        self.as_ptr()
+    }
+}
+
+impl ParamArray for ParamList {
+    fn param_ptr(&self) -> *const OSSL_PARAM {
+        self.as_ptr()
+    }
+}

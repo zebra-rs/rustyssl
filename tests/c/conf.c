@@ -57,16 +57,20 @@ static void print_masked(const char *s)
     printf("%s", s);
 }
 
-/* Prints and clears the error queue: library, reason, and data of each entry. */
+/*
+ * Prints and clears the error queue: library, reason, function, and data of each entry.
+ */
 static void errors(const char *what)
 {
     unsigned long e;
-    const char *data;
+    const char *func, *data;
     int flags;
 
     printf("# errors %s:", what);
-    while ((e = ERR_get_error_all(NULL, NULL, NULL, &data, &flags)) != 0) {
+    while ((e = ERR_get_error_all(NULL, NULL, &func, &data, &flags)) != 0) {
         printf(" %d/%d", ERR_GET_LIB(e), ERR_GET_REASON(e));
+        if (func != NULL && *func != '\0')
+            printf(" %s", func);
         if ((flags & ERR_TXT_STRING) != 0 && data != NULL && *data != '\0') {
             printf(" [");
             print_masked(data);

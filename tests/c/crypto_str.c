@@ -36,6 +36,14 @@ static unsigned long reason(void)
     return ERR_GET_REASON(ERR_get_error());
 }
 
+/* The function the oldest error names, taking the error off the queue. */
+static int error_in(const char *func)
+{
+    const char *f = NULL;
+
+    return ERR_get_error_all(NULL, NULL, &f, NULL, NULL) != 0 && same(f, func);
+}
+
 static void duplicating(void)
 {
     char *s = OPENSSL_strdup("hello");
@@ -172,6 +180,13 @@ static void hex(void)
     check(OPENSSL_hexstr2buf_ex(buf, sizeof(buf), &len, "01:02", '\0') == 0
           && reason() == CRYPTO_R_ILLEGAL_HEX_DIGIT,
           "OPENSSL_hexstr2buf_ex: no separator means none is allowed");
+    ERR_clear_error();
+    check(OPENSSL_hexstr2buf("zz", NULL) == NULL && error_in("hexstr2buf_sep"),
+          "OPENSSL_hexstr2buf: decoding errors name hexstr2buf_sep");
+    check(OPENSSL_hexstr2buf("a", NULL) == NULL && error_in("ossl_hexstr2buf_sep"),
+          "OPENSSL_hexstr2buf: a short string names ossl_hexstr2buf_sep");
+    check(OPENSSL_hexstr2buf_ex(buf, 2, &len, "010203", '\0') == 0
+          && error_in("hexstr2buf_sep"), "OPENSSL_hexstr2buf_ex: errors name hexstr2buf_sep");
 
     buf[0] = 0x0a;
     buf[1] = 0xbc;

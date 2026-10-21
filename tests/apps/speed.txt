@@ -1,0 +1,160 @@
+# `openssl speed` (cargo xtask test-apps runs each line with upstream's tool on the reference,
+# then with ours on rustyssl and on the reference). Lines starting with `%` are compared with
+# their numbers masked (decision 4: the timings differ by nature), and the lines naming how the
+# library was built. -testmode runs one operation per benchmark; a few lines run for real, for
+# a second each.
+speed -help
+speed -h
+# Option errors.
+speed -x
+speed -seconds
+speed -seconds 0
+speed -seconds -1
+speed -seconds x
+speed -bytes 0
+speed -misalign 65
+speed -misalign x
+speed -multi 0
+speed -async_jobs 100000
+speed -async_jobs -1
+speed -primes 0
+speed nosuch
+speed sha256 nosuch
+speed -evp nosuch
+speed -evp aes-128-cbc -evp sha256
+speed -hmac nosuch
+speed -hmac aes-128-cbc
+speed -cmac nosuch
+speed -cmac sha256
+speed -aead sha256
+speed -evp aes-128-cbc -aead
+speed -evp sha256 -aead
+speed -mb sha256
+speed -mb -evp aes-128-gcm
+speed -mb -evp sha256
+speed -help -x
+speed -x -help
+speed -testmode=1
+speed -config /nonexistent/x.cnf sha256
+speed -provider-path /nonexistent -provider nosuch sha256
+speed -rand /nonexistent/x sha256
+# The digests, MACs, ciphers, and random bytes.
+%speed -testmode md5 sha1 sha256 sha512 rmd160 ripemd ripemd160
+%speed -testmode sha
+%speed -testmode md2 mdc2 md4 whirlpool
+%speed -testmode hmac
+%speed -testmode -hmac sha512
+%speed -testmode -hmac sha3-256 hmac
+%speed -testmode -hmac shake128
+%speed -testmode aes-128-cbc aes-192-cbc aes-256-cbc
+%speed -testmode aes camellia
+%speed -testmode camellia-128-cbc camellia-192-cbc camellia-256-cbc
+%speed -testmode des des-cbc des-ede3 rc4 rc2 rc2-cbc rc5 rc5-cbc idea idea-cbc seed seed-cbc bf bf-cbc blowfish cast cast5 cast-cbc
+%speed -testmode ghash rand
+%speed -testmode cmac
+%speed -testmode -cmac aes-256-cbc
+%speed -testmode -cmac camellia-128-cbc
+%speed -testmode -cmac des-ede3-cbc
+%speed -testmode -cmac aes-128-ccm
+%speed -testmode kmac kmac128 kmac256
+%speed -testmode openssl
+%speed -testmode -bytes 8 aes-128-cbc
+%speed -testmode -bytes 17 aes-128-cbc sha256
+%speed -testmode -bytes 1 rand
+%speed -testmode -misalign 1 sha256 aes-128-cbc
+%speed -testmode -misalign 64 -bytes 16 aes-128-cbc
+# -evp: a digest, a cipher, AEAD ciphers (each mode), -decrypt.
+%speed -testmode -evp sha256
+%speed -testmode -evp shake256
+%speed -testmode -evp sm3
+%speed -testmode -evp aes-128-cbc
+%speed -testmode -evp aes-128-cbc -decrypt
+%speed -testmode -evp aes-256-ctr
+%speed -testmode -evp chacha20
+%speed -testmode -evp aes-128-gcm
+%speed -testmode -evp aes-128-gcm -decrypt
+%speed -testmode -evp aes-128-gcm -aead
+%speed -testmode -evp aes-256-gcm -aead -decrypt
+%speed -testmode -evp aes-128-ccm
+%speed -testmode -evp aes-128-ccm -aead -decrypt
+%speed -testmode -evp aes-128-ocb -aead
+%speed -testmode -evp aes-128-ocb -decrypt
+%speed -testmode -evp aes-128-siv -aead
+%speed -testmode -evp aes-128-siv -decrypt
+%speed -testmode -evp aes-128-gcm-siv -aead
+%speed -testmode -evp aes-128-gcm-siv -decrypt -aead
+%speed -testmode -evp chacha20-poly1305 -aead
+%speed -testmode -evp chacha20-poly1305 -decrypt
+%speed -testmode -evp aes-128-gcm -aead -bytes 64
+%speed -testmode -evp aes-128-xts
+%speed -testmode -evp aes-128-wrap
+%speed -testmode -evp sha256 hmac md5
+%speed -testmode -mb -evp AES-128-CBC-HMAC-SHA1
+%speed -testmode -mb -evp AES-256-CBC-HMAC-SHA256 -bytes 1024
+%speed -testmode -mb -mr -evp AES-128-CBC-HMAC-SHA256
+# The public-key benchmarks.
+%speed -testmode rsa512 rsa1024 rsa2048
+%speed -testmode rsa
+%speed -testmode -primes 3 rsa2048
+%speed -testmode -primes 2 rsa1024
+%speed -testmode -primes 6 rsa1024
+%speed -testmode dsa dsa1024 dsa2048
+%speed -testmode ecdsa
+%speed -testmode ecdsap160 ecdsap192 ecdsap224 ecdsap256 ecdsap384 ecdsap521
+%speed -testmode ecdsak163 ecdsak233 ecdsak283 ecdsak409 ecdsak571 ecdsab163 ecdsab233 ecdsab283 ecdsab409 ecdsab571
+%speed -testmode ecdsabrp256r1 ecdsabrp256t1 ecdsabrp384r1 ecdsabrp384t1 ecdsabrp512r1 ecdsabrp512t1
+%speed -testmode ecdh
+%speed -testmode ecdhp256 ecdhx25519 ecdhx448 ecdhk233 ecdhb233 ecdhbrp256r1
+%speed -testmode eddsa
+%speed -testmode ed25519 ed448
+%speed -testmode sm2 curveSM2
+%speed -testmode ffdh2048 ffdh3072
+%speed -testmode ffdh4096 ffdh6144 ffdh8192
+# KEMs and signature algorithms (one at a time: the library's order is its own).
+%speed -testmode -kem-algorithms X25519
+%speed -testmode X448
+%speed -testmode ECP-256
+%speed -testmode ECP-384 -kem-algorithms
+%speed -testmode ML-KEM-512
+%speed -testmode ML-KEM-768 -mr
+%speed -testmode X25519MLKEM768
+%speed -testmode SecP256r1MLKEM768
+%speed -testmode rsa1024 -kem-algorithms
+%speed -testmode -signature-algorithms ML-DSA-44
+%speed -testmode ML-DSA-65
+%speed -testmode SLH-DSA-SHA2-128f
+%speed -testmode -mr ML-DSA-87
+%speed -testmode rsa512 -signature-algorithms
+%speed -testmode -signature-algorithms dsa1024
+# Machine-readable output.
+%speed -testmode -mr sha256 aes-128-cbc rsa1024 dsa1024 ecdsap256 ecdhp256 ed25519 sm2 ffdh2048
+%speed -testmode -mr -evp aes-128-gcm -aead
+%speed -testmode -mr -hmac sha1 -cmac aes-128-cbc kmac128
+# Async jobs: rustyssl's ASYNC_is_capable() is 0 (docs/DEVIATIONS.md), where speed says so
+# and, in test mode, succeeds; so these must only succeed (on the reference, the jobs run).
+~speed -testmode -async_jobs 1 sha256 rsa1024
+~speed -testmode -async_jobs 4 -evp aes-128-gcm -aead ecdsap256 ed25519 ffdh2048
+~speed -testmode -async_jobs 2 -mr -bytes 64 sha1 hmac
+# -multi, -mlock, -elapsed, -engine.
+%speed -testmode -multi 1 sha256 rsa1024 ecdhp256
+%speed -testmode -multi 1 -mr sha256
+%speed -testmode -mlock sha256
+%speed -testmode -elapsed sha256
+%speed -testmode -elapsed -mr sha256
+%speed -testmode -engine rdrand sha256
+%speed -testmode -engine dynamic rand
+# Providers, configuration, random state.
+%speed -testmode -provider legacy -provider default md4 mdc2 whirlpool rmd160 des des-cbc rc4 rc2 idea seed bf cast
+%speed -testmode -provider legacy -provider default -evp bf-cbc
+%speed -testmode -config {tests}/speed/legacy.cnf md4 rc4 -cmac des-ede3-cbc
+%speed -testmode -provider-path {src}/../lib/ossl-modules -provider legacy md4
+%speed -testmode -provider default -propquery provider=default sha256
+%speed -testmode -provider default -provparam default:x=1 sha256
+%speed -testmode -propquery provider=nosuch sha256
+%speed -testmode -rand {bin} -writerand rand.out sha256
+# Real runs, a second each.
+%speed -seconds 1 -bytes 16 sha256
+%speed -seconds 1 -bytes 1024 -evp aes-128-gcm -decrypt
+%speed -seconds 1 ed25519
+%speed -seconds 1 -mr ecdhx25519
+%speed -seconds 1 -multi 1 -bytes 64 md5

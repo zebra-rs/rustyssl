@@ -1,0 +1,24 @@
+# A configuration file exercising what configutl expands.
+HOME = .
+top = top value
+quoted = "a \"quoted\" value"  # trailing comment
+single = 'single # not a comment'
+escapes = tab\there\nnewline\rcr\bback
+dollar = costs \$5 and has a \# hash
+spaces = "  leading and trailing  "
+backslash = a\\b
+expanded = $top and ${top} and $(top)
+empty =
+
+[ other ]
+name = from other
+again = $name, ${other::name}, $default::top
+conf = $ENV::OPENSSL_CONF
+
+[zeta]
+z = last
+cross = $other::name
+
+[ alpha ]
+a.1 = one
+a.2 = two
