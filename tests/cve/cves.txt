@@ -57,13 +57,13 @@ CVE-2010-0740 test cve_tls a record with major version 4 is refused
 CVE-2010-0742 test cve_pkcs EnvelopedData with OriginatorInfo certificates parses and decrypts
 CVE-2010-0928 n/a upstream a fault attack outside OpenSSL's threat model
 CVE-2010-1633 test cve_pkey verify-recover of a bad signature reports failure
-CVE-2010-3864 gap race a thread race on extension data: not reproducible deterministically
+CVE-2010-3864 test cve_race 8 threads of SNI handshakes and resumptions against one server's session cache
 CVE-2010-4180 n/a removed the Netscape cipher-change workaround; a no-op in 3.x
 CVE-2010-4252 n/a removed J-PAKE; removed upstream, not in rustyssl
 CVE-2010-5298 test cve_tls released read buffers are reacquired, not reused
 CVE-2011-0014 test cve_tls a malformed status_request extension is refused
 CVE-2011-3207 test cve_x509 a CRL whose nextUpdate has passed fails verification
-CVE-2011-3210 gap race a thread race on ECDH state: not reproducible deterministically
+CVE-2011-3210 test cve_race 8 threads of ECDHE handshakes on one server context
 CVE-2011-4108 gap timing DTLS CBC padding-oracle timing: tls-cbc-record measures TLS, not DTLS
 CVE-2011-4109 test cve_x509 policy checking frees its tree once
 CVE-2011-4576 n/a sslv3 SSL 3.0 record padding; SSL 3.0 is disabled in the default build
@@ -92,7 +92,7 @@ CVE-2014-3505 test cve_tls a bad DTLS fragment's error path frees once
 CVE-2014-3506 test cve_tls DTLS message lengths can't make the server allocate 16 MiB
 CVE-2014-3507 test cve_tls zero-length DTLS fragments don't leak
 CVE-2014-3508 test cve_asn1 OBJ_obj2txt into a short buffer stays within it and NUL-terminates
-CVE-2014-3509 gap race a thread race on a resumed session's point formats: not reproducible deterministically
+CVE-2014-3509 test cve_race one ECDHE session (with its point formats) resumed on 8 threads at once
 CVE-2014-3510 test cve_dtls a DTLS client offering anonymous ECDH gets ServerHelloDone without ServerKeyExchange: unexpected_message
 CVE-2014-3511 test cve_tls a fragmented ClientHello still negotiates TLS 1.2
 CVE-2014-3512 test cve_pkey SRP rejects A = N and values longer than N
@@ -126,14 +126,14 @@ CVE-2015-1787 test cve_tls an empty ClientKeyExchange with DHE and client auth f
 CVE-2015-1788 test cve_x509 malformed binary-field parameters don't loop forever
 CVE-2015-1789 test cve_asn1 X509_cmp_time rejects malformed times without reading past them
 CVE-2015-1790 test cve_pkcs PKCS#7 enveloped data without encrypted content fails
-CVE-2015-1791 gap race a thread race on NewSessionTicket: not reproducible deterministically
+CVE-2015-1791 test cve_race one TLS 1.2 session resumed on 8 threads, its ticket renewed on every resumption
 CVE-2015-1792 test cve_pkcs CMS verification with an unknown digest ends
 CVE-2015-1793 test cve_x509 alternative chain building doesn't let a non-CA issue certificates
 CVE-2015-1794 test cve_pkey DH with p=0 fails cleanly
 CVE-2015-3193 test cve_pkey Montgomery exponentiation equals the simple method (x86_64 squaring)
 CVE-2015-3194 test cve_x509 a PSS maskGenAlgorithm without parameters
 CVE-2015-3195 test cve_asn1 a malformed X509_ATTRIBUTE fails to parse, freeing what it built
-CVE-2015-3196 gap race a thread race on PSK identity hints: not reproducible deterministically
+CVE-2015-3196 test cve_race one PSK session with an identity hint resumed on 8 threads at once
 CVE-2015-3197 n/a sslv2 SSLv2 cipher negotiation; SSLv2 is not implemented
 CVE-2016-0701 test cve_pkey modular exponentiation equals the simple method (MIPS squaring)
 CVE-2016-0702 covered test-timing modular exponentiation cache-bank timing: dudect's bn-modexp-consttime target
