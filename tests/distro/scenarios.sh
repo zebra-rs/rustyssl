@@ -183,7 +183,7 @@ chmod 600 $PGDATA/server.key
 cat >> $PGDATA/postgresql.conf <<EOF
 listen_addresses = 'localhost'
 port = 5433
-unix_socket_directories = '$W'
+unix_socket_directories = '$PGDATA'
 ssl = on
 ssl_cert_file = 'chain.pem'
 ssl_key_file = 'server.key'
@@ -196,8 +196,8 @@ start_servers() {
     $HTTPD -f $W/httpd.conf -k start || log "httpd failed to start"
     /usr/sbin/sshd -p 2222 -o PidFile=$W/sshd.pid -o PermitRootLogin=prohibit-password \
         -o PasswordAuthentication=no || log "sshd failed to start"
-    su postgres -s /bin/sh -c "$PGBIN/pg_ctl -D $PGDATA -l $W/pg.log -w start" > /dev/null ||
-        log "postgres failed to start"
+    su postgres -s /bin/sh -c "$PGBIN/pg_ctl -D $PGDATA -l $PGDATA/pg.log -w start" > /dev/null ||
+        { log "postgres failed to start"; tail -5 $PGDATA/pg.log; }
     sleep 1
 }
 stop_servers() {
@@ -250,6 +250,11 @@ scenarios() { # $1 phase
         'host=localhost port=5433 user=postgres dbname=postgres sslmode=verify-full' 2> $W/last.log)" = t ]
     result postgresql-verify-full $p $?
     loaded $p
+    case "$(command -v openssl)" in
+    /usr/local/bin/openssl) where=rustyssl ;;
+    *) where=system ;;
+    esac
+    [ "$where" = "$p" ]; result openssl-tool-is-$p $p $?
     case $DISTRO in fedora|el) crypto_policies $p ;; esac
     stop_servers
 }
@@ -305,9 +310,11 @@ log "system phase"
 scenarios system
 log "switching to rustyssl"
 rustyssl-select rustyssl || exit 1
+hash -r
 [ "$(rustyssl-select status)" = rustyssl ] || exit 1
 log "openssl is now: $(openssl version)"
 scenarios rustyssl
 rustyssl-select system > /dev/null
+hash -r
 [ "$(rustyssl-select status)" = system ]; result select-back-to-system rustyssl $?
 echo "== done"

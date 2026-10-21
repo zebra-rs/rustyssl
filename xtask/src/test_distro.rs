@@ -58,6 +58,8 @@ pub fn run(args: &[String]) -> Result {
     );
     let mut failed = Vec::new();
     let mut packages: BTreeMap<&str, String> = BTreeMap::new();
+    // Builder images this run pulled, removed at its end.
+    let mut builders = Vec::new();
     for name in selected {
         println!("== {name}");
         let log = if name == "homebrew" {
@@ -73,7 +75,7 @@ pub fn run(args: &[String]) -> Result {
             let tarball = match packages.get(layout) {
                 Some(t) => t.clone(),
                 None => {
-                    let t = build_package(&root, &out, layout, musl)?;
+                    let t = build_package(&root, &out, layout, musl, &mut builders)?;
                     packages.insert(layout, t.clone());
                     t
                 }
@@ -92,6 +94,9 @@ pub fn run(args: &[String]) -> Result {
             failed.push(name.to_owned());
         }
     }
+    for image in &builders {
+        remove_image(image);
+    }
     fs::write(target_dir(&root).join("distro-report.md"), report)?;
     if failed.is_empty() {
         Ok(())
@@ -102,7 +107,13 @@ pub fn run(args: &[String]) -> Result {
 
 /// Builds the layout's package in the builder container; returns the tarball's file name
 /// (in `out`).
-fn build_package(root: &Path, out: &Path, layout: &str, musl: bool) -> Result<String> {
+fn build_package(
+    root: &Path,
+    out: &Path,
+    layout: &str,
+    musl: bool,
+    builders: &mut Vec<String>,
+) -> Result<String> {
     let toolchain = toolchain(root)?;
     let (image, setup, volume) = if musl {
         (
@@ -125,7 +136,9 @@ fn build_package(root: &Path, out: &Path, layout: &str, musl: bool) -> Result<St
          {{ tail -30 /out/build-{layout}.log; exit 1; }}; \
          cp target/package/rustyssl-*-{layout}-*.tar.gz /out/"
     );
-    let pulled = !image_present(&image);
+    if !image_present(&image) {
+        builders.push(image.clone());
+    }
     let status = Command::new("docker")
         .args(["run", "--rm", "--platform", platform()])
         .arg("-v")
@@ -142,9 +155,6 @@ fn build_package(root: &Path, out: &Path, layout: &str, musl: bool) -> Result<St
         .args(["sh", "-c", &script])
         .status()
         .map_err(|e| format!("cannot run docker: {e}"))?;
-    if pulled {
-        remove_image(&image);
-    }
     if !status.success() {
         return Err(format!("building the {layout} package failed").into());
     }
