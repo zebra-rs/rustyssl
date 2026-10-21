@@ -58,6 +58,8 @@ jobs:
       - run: cargo test --workspace
       - name: C conformance tests (reference vs rustyssl)
         run: cargo xtask test-c
+      - name: CVE regression suite (reference vs rustyssl)
+        run: cargo xtask test-cve
       - name: Differential tests (reference vs rustyssl)
         run: cargo xtask test-differential --random 1000
       - name: The openssl tools, upstream's and ours, on rustyssl
