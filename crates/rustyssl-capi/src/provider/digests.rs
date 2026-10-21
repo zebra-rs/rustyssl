@@ -519,16 +519,31 @@ static SSL3_SETTABLE: Params<2> = Params([
     PARAM_END,
 ]);
 static MDC2_SETTABLE: Params<2> = Params([
-    bare(OSSL_DIGEST_PARAM_PAD_TYPE, OSSL_PARAM_UNSIGNED_INTEGER),
+    // `OSSL_PARAM_uint`.
+    defn(
+        OSSL_DIGEST_PARAM_PAD_TYPE,
+        OSSL_PARAM_UNSIGNED_INTEGER,
+        size_of::<core::ffi::c_uint>(),
+    ),
     PARAM_END,
 ]);
+// Typed as upstream's `produce_param_decoder` declares them (`size_t` for SHAKE and KMAC,
+// `uint` for BLAKE2), which `list -verbose` shows as each one's size.
 static XOF_CTX_PARAMS: Params<3> = Params([
-    bare(OSSL_DIGEST_PARAM_XOFLEN, OSSL_PARAM_UNSIGNED_INTEGER),
-    bare(OSSL_DIGEST_PARAM_SIZE, OSSL_PARAM_UNSIGNED_INTEGER),
+    defn(
+        OSSL_DIGEST_PARAM_XOFLEN,
+        OSSL_PARAM_UNSIGNED_INTEGER,
+        SIZE_T,
+    ),
+    defn(OSSL_DIGEST_PARAM_SIZE, OSSL_PARAM_UNSIGNED_INTEGER, SIZE_T),
     PARAM_END,
 ]);
 static BLAKE2_CTX_PARAMS: Params<2> = Params([
-    bare(OSSL_DIGEST_PARAM_SIZE, OSSL_PARAM_UNSIGNED_INTEGER),
+    defn(
+        OSSL_DIGEST_PARAM_SIZE,
+        OSSL_PARAM_UNSIGNED_INTEGER,
+        size_of::<core::ffi::c_uint>(),
+    ),
     PARAM_END,
 ]);
 
