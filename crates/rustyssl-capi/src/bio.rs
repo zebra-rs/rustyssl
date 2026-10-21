@@ -39,6 +39,8 @@ pub(crate) mod null;
 pub(crate) mod pair;
 pub(crate) mod prefix;
 pub(crate) mod print;
+#[cfg(feature = "fedora")]
+pub(crate) mod sctp;
 pub(crate) mod sock;
 pub(crate) mod state;
 

@@ -1,0 +1,24 @@
+# rustyssl for Alpine (musl), side by side with the system's OpenSSL.
+# Builds with the pinned Rust toolchain (rustup); see rust-toolchain.toml.
+pkgname=rustyssl
+pkgver=3.6.5
+pkgrel=0
+pkgdesc="Memory-safe drop-in replacement for OpenSSL's libraries"
+url="https://github.com/zebra-rs/rustyssl"
+arch="x86_64 aarch64"
+license="Apache-2.0"
+# Rust's unwinder on musl.
+depends="llvm-libunwind"
+makedepends="gcc musl-dev binutils llvm-libunwind-dev tar"
+install="$pkgname.pre-deinstall"
+source="$pkgname-$pkgver.tar.gz"
+options="!check !strip"
+
+build() {
+	cargo xtask package alpine
+}
+
+package() {
+	mkdir -p "$pkgdir"
+	cp -a target/package/alpine/root/. "$pkgdir"/
+}

@@ -1,0 +1,17 @@
+Source: rustyssl
+Section: libs
+Priority: optional
+Maintainer: rustyssl developers <rustyssl@localhost>
+Build-Depends: debhelper-compat (= 13), gcc, binutils
+Standards-Version: 4.7.0
+Homepage: https://github.com/zebra-rs/rustyssl
+Rules-Requires-Root: no
+
+Package: rustyssl
+Architecture: amd64 arm64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: memory-safe drop-in replacement for OpenSSL's libraries
+ rustyssl reimplements libcrypto.so.3 and libssl.so.3 in Rust with OpenSSL 3's ABI,
+ and the openssl command-line tool. This package installs them side by side with
+ the system's OpenSSL, under /usr/lib/<arch>/rustyssl; run "rustyssl-select rustyssl"
+ to make every program use them, and "rustyssl-select system" to go back.

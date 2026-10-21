@@ -190,7 +190,19 @@ pub(crate) fn ext_parse_status_request(
             c.hs.sh.status_type = abi::TLSEXT_STATUSTYPE_ocsp;
             for id in &responder_ids {
                 if !der_is(id, 0x80, &[1, 2], true) {
-                    return Err(bad);
+                    // A whole DER value of another tag: `d2i_OCSP_RESPID` finds no CHOICE
+                    // alternative, and its entry precedes the extension's.
+                    let other_tag =
+                        rustyssl_asn1::der::element(id).is_ok_and(|e| e.raw.len() == id.len());
+                    return Err(if other_tag {
+                        bad.caused_by(crate::error::Cause {
+                            lib: abi::ERR_LIB_ASN1,
+                            reason: abi::ASN1_R_NO_MATCHING_CHOICE_TYPE,
+                            func: "asn1_item_embed_d2i",
+                        })
+                    } else {
+                        bad
+                    });
                 }
             }
             if !extensions.is_empty() {

@@ -23,5 +23,10 @@ subtle.workspace = true
 rustyssl-quic = { workspace = true, features = ["test-provider"] }
 rustyssl-tls = { workspace = true, features = ["test-provider"] }
 
+[features]
+# The Fedora profile (`cargo xtask dist --profile fedora`): Fedora's ABI extras, MD2 (`MD2_*`,
+# `EVP_md2`, the legacy provider's MD2) and the SCTP datagram functions.
+fedora = []
+
 [lints]
 workspace = true

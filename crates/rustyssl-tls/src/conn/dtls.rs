@@ -75,6 +75,9 @@ pub struct State {
     pub(crate) next_write_seq: u16,
     /// The sequence number of the message in `hs_in`.
     cur_seq: u16,
+    /// How many octets of that message's body arrived: fewer than its header announces for
+    /// an empty fragment of a longer message, which is then processed as it is (`init_num`).
+    pub(crate) cur_body_len: usize,
     /// Messages received ahead of their turn or in fragments (`buffered_messages`).
     frags: BTreeMap<u16, Frag>,
     /// The flight sent (`sent_messages`).
@@ -679,13 +682,13 @@ impl Connection {
                     || h.typ != msgs_type(abi::SSL3_MT_CLIENT_HELLO)
                     || self.st.hand_state != st(abi::DTLS_ST_SW_HELLO_VERIFY_REQUEST)
                 {
-                    self.out_of_seq(&h, foff, flen, mlen, body);
+                    self.out_of_seq(&h, foff, flen, mlen, body)?;
                     continue;
                 }
                 chretran = true;
             }
             if flen > 0 && flen < mlen {
-                self.reassemble(&h, foff, flen, mlen, &body);
+                self.reassemble(&h, foff, flen, mlen, &body)?;
                 continue;
             }
             if !self.cfg.server
@@ -739,6 +742,7 @@ impl Connection {
         }
         self.hs_in.extend_from_slice(&framed);
         self.dtls.cur_seq = seq;
+        self.dtls.cur_body_len = body.len();
         self.dtls.read_seq = seq.wrapping_add(1);
         Ok(())
     }
@@ -792,10 +796,19 @@ impl Connection {
     }
 
     /// `dtls1_process_out_of_seq_message`: buffers a message (or fragment) ahead of its
-    /// turn, within reach; drops the rest.
-    fn out_of_seq(&mut self, h: &DtlsHeader, foff: usize, flen: usize, mlen: usize, body: Vec<u8>) {
+    /// turn, within reach; drops the rest. A fragment past its message's end, or a message
+    /// longer than allowed, ends the handshake as OpenSSL's does: with no alert and no error
+    /// recorded (its `-1` there).
+    fn out_of_seq(
+        &mut self,
+        h: &DtlsHeader,
+        foff: usize,
+        flen: usize,
+        mlen: usize,
+        body: Vec<u8>,
+    ) -> Result<()> {
         if foff.saturating_add(flen) > mlen {
-            return;
+            return Err(Error::quiet(0));
         }
         let seq = h.message_seq;
         let exists = self.dtls.frags.contains_key(&seq);
@@ -806,14 +819,13 @@ impl Connection {
             || (exists && !partial_of_existing)
             || (read_seq == 0 && h.typ == msgs_type(abi::SSL3_MT_FINISHED))
         {
-            return;
+            return Ok(());
         }
         if flen != mlen {
-            self.reassemble(h, foff, flen, mlen, &body);
-            return;
+            return self.reassemble(h, foff, flen, mlen, &body);
         }
         if flen > max_message_len(self) {
-            return;
+            return Err(Error::quiet(0));
         }
         self.dtls.frags.insert(
             seq,
@@ -824,16 +836,28 @@ impl Connection {
                 mask: None,
             },
         );
+        Ok(())
     }
 
     /// `dtls1_reassemble_fragment`: adds a fragment to its message, which is complete when
-    /// every octet arrived.
-    fn reassemble(&mut self, h: &DtlsHeader, foff: usize, flen: usize, mlen: usize, data: &[u8]) {
+    /// every octet arrived. A fragment past its message's end, or of a message longer than
+    /// allowed, ends the handshake quietly (as [`Connection::out_of_seq`] says).
+    fn reassemble(
+        &mut self,
+        h: &DtlsHeader,
+        foff: usize,
+        flen: usize,
+        mlen: usize,
+        data: &[u8],
+    ) -> Result<()> {
         let Some(end) = foff.checked_add(flen) else {
-            return;
+            return Err(Error::quiet(0));
         };
-        if end > mlen || mlen > max_message_len(self) || flen == 0 {
-            return;
+        if end > mlen || mlen > max_message_len(self) {
+            return Err(Error::quiet(0));
+        }
+        if flen == 0 {
+            return Ok(());
         }
         let f = self
             .dtls
@@ -846,11 +870,11 @@ impl Connection {
                 mask: Some(vec![0; mlen.div_ceil(8)]),
             });
         if f.len != mlen {
-            return;
+            return Err(Error::quiet(0));
         }
         let Some(mask) = f.mask.as_mut() else {
             // Already whole: the octets are discarded.
-            return;
+            return Ok(());
         };
         if let Some(dst) = f.body.get_mut(foff..end) {
             dst.copy_from_slice(data.get(..flen).unwrap_or_default());
@@ -864,6 +888,7 @@ impl Connection {
         if complete {
             f.mask = None;
         }
+        Ok(())
     }
 
     /// The message in `hs_in` (`raw`, with a TLS header) as the transcript and the message

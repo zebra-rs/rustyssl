@@ -10,6 +10,7 @@ pub mod exports;
 pub mod headers;
 mod objects;
 mod ossl;
+pub mod profiles;
 pub mod stubs;
 mod verify_strings;
 

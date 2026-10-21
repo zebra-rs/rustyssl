@@ -6320,7 +6320,20 @@ The CLI's gaps closed (2026-10-21, local, branch `cli-gaps`, macOS arm64):
     `docs/security/audit/` (scope, architecture summary, prior findings, a four-week plan; the
     threat model; building and running every suite). M7's "audit closed" stays open until a firm
     reports.
-  - the complete CVE regression suite
+  - [x] the complete CVE regression suite (2026-10-21): `tests/cve/` and `cargo xtask test-cve`
+    (TEST_PLAN L9), in the gates and CI. All 304 OpenSSL CVEs are indexed in
+    `tests/cve/cves.txt`: 203 with a check in seven TAP programs (213 checks, identical on the
+    reference and rustyssl), 1 in `test-apps`, 12 covered by `test-timing` or upstream's own
+    regression tests, 47 not applicable (with the reason), and 41 gaps (with the reason: ten
+    QUIC and seven post-handshake DTLS cases need crafted traffic, five thread races, eight
+    timing cases not yet measured by `test-timing`, four triggers needing > 2 GiB of input,
+    three CMP exchanges, three TLS cases, `dgst`'s 16 MiB one-shot). Differences it found and
+    fixed: DTLS reassembly (an empty fragment of a longer message is processed as it arrived;
+    a fragment past its message's end or of an oversized message ends the handshake quietly,
+    as OpenSSL does), and a `status_request` ResponderID of another tag now queues
+    `d2i_OCSP_RESPID`'s ASN.1 error. It also found the reference crashing on aarch64 macOS
+    when RC4-HMAC-MD5 is used (it's offered there but only implemented for x86_64), which
+    rustyssl doesn't; the check runs on x86_64 only.
   - OSS-Fuzz onboarding (start after M2). The user's decision (2026-10-21): the project files
     live in our repository and run in our CI; the user submits them to google/oss-fuzz.
     **Done:** `oss-fuzz/` (build.sh, Dockerfile, project.yaml, README.md) and ClusterFuzzLite
@@ -6340,12 +6353,70 @@ The CLI's gaps closed (2026-10-21, local, branch `cli-gaps`, macOS arm64):
     used); now branch-free behind optimization barriers, |t| 0.98–1.84, and the target takes
     160 000. Every `test-timing` target under 10 after the fix. Left: tlsfuzzer's timing scripts
     and a valgrind taint run on Linux, more dudect targets, x86_64 measurements.
-- [ ] **12.3 Packaging:** Debian/Fedora/Alpine (musl)/Homebrew layouts, pkg-config files, a
+- [x] **12.3 Packaging:** Debian/Fedora/Alpine (musl)/Homebrew layouts, pkg-config files, a
   default `openssl.cnf`, MODULESDIR, side-by-side installation and an alternatives mechanism,
   and migration docs. Decide the Fedora ABI extras found in 0.10 (MD2, SCTP, and the
   `OPENSSL_3.1.0` versions of `EVP_{MD,CIPHER}_CTX_dup`). Rerun `cargo xtask usage-scan`
   against the distributions current at release.
-- [ ] **12.4 Distro validation:** the system tests in TEST_PLAN L11.
+  *Done (2026-10-21).*
+  - **Fedora's ABI extras** (the user's decision): a build-time profile,
+    `cargo xtask dist --profile fedora` (Linux; the default build is unchanged).
+    `xtask/src/codegen/profiles.rs` names the `.num` features it enables (MD2, SCTP) and its
+    version aliases, and codegen writes `libs/libcrypto/exports/<target>-fedora.map` from
+    `libcrypto.num`: 12 extra functions at `OPENSSL_3.0.0`, plus `EVP_MD_CTX_dup` and
+    `EVP_CIPHER_CTX_dup` also at `OPENSSL_3.1.0`, a non-default version (`.symver`) beside
+    upstream's `@@OPENSSL_3.2.0`. MD2 is `lowlevel::hash::Md2` (`MD2_*` over `MD2_CTX`),
+    `EVP_md2`, and the legacy provider's MD2 (the `md2` crate). SCTP has no transport in
+    rustyssl: `BIO_new_dgram_sctp` fails as on a kernel without SCTP-AUTH (DEVIATIONS.md).
+    `abi-check --profile fedora` checks the extras and aliases (CI runs it on x86_64; arm64 Linux
+    checked in Docker: symbols, metadata, binary ok).
+  - **`cargo xtask package <debian|fedora|el|alpine|homebrew>`**: the layout's directories
+    compiled in (`RUSTYSSL_OPENSSLDIR`/`_ENGINESDIR`/`_MODULESDIR`), and a staged tree and
+    tarball in `target/package/`. On Linux rustyssl goes **side by side**, in
+    `<libdir>/rustyssl/` (libraries, development links and archives, `ossl-modules/legacy.so`,
+    `engines-3/`, `bin/openssl`, headers, pkg-config files with absolute paths), reading the
+    system's OPENSSLDIR (so the distribution's `openssl.cnf` and crypto policies apply);
+    upstream's `openssl.cnf` and `ct_log_list.cnf` (now vendored) are installed as `.dist`.
+    **The alternatives mechanism:** `bin/rustyssl-select rustyssl|system|status` puts
+    rustyssl's directory first in the dynamic loader's search for every program (an
+    `/etc/ld.so.conf.d` drop-in and `ldconfig`, or musl's `/etc/ld-musl-<arch>.path`) and links
+    `/usr/local/bin/openssl`; the system's files are never touched. Homebrew is a keg-only keg
+    with its final install names. Recipes: `packaging/` (a Debian source directory, an RPM
+    spec for Fedora and RHEL 10, an APKBUILD, a Homebrew formula; templates, not built here).
+    Migration: [docs/MIGRATION.md](MIGRATION.md).
+  - **Found and fixed:** `rustyssl-capi` didn't compile on musl (`FIONBIO` is an `int` and
+    `pthread_t` a pointer there); the `openssl` tool was linked statically on musl, where it
+    can't `dlopen` the libraries (now `-crt-static` off); the tool stopped at a library on its
+    search path that exists but doesn't load (a multilib system's 32-bit `/usr/lib/libcrypto`)
+    instead of going on as the loader does; a tarball with `usr/sbin/` replaced Fedora 42+'s
+    `/usr/sbin` symlink (nothing goes in the system's directories now).
+  - Not done: the `usage-scan` rerun belongs to the release (12.5), against the distributions
+    current then.
+- [x] **12.4 Distro validation:** the system tests in TEST_PLAN L11.
+  *Done (2026-10-21, arm64 containers on macOS).* `cargo xtask test-distro` builds each layout's
+  package in a builder container (Debian 12's glibc 2.36, so it loads on Ubuntu 24.04 and
+  EL10's 2.39; Alpine's musl), installs it in the distribution's own container, and runs
+  `tests/distro/scenarios.sh` on the system's OpenSSL, then after `rustyssl-select rustyssl`.
+  Every scenario passes on both, and the policy and `agree-` probes give the system's results:
+  | Distribution | OpenSSL replaced | Scenarios |
+  |---|---|---|
+  | Debian 13 | 3.5.7 | 20 |
+  | Ubuntu 24.04 | 3.0.13 | 20 |
+  | Fedora 44 | 3.5.9 | 43 (21 crypto-policy probes) |
+  | AlmaLinux 10 | 3.5.8 | 43 |
+  | Alpine (latest) | its openssl package | 20 |
+  | Homebrew (macOS) | openssl@3 | 5 |
+  The scenarios: the package manager over HTTPS (dnf and apk use OpenSSL; apt uses GnuTLS), sshd
+  logins with Ed25519, ECDSA, and RSA keys, nginx and httpd over TLS 1.3 and 1.2, curl, wget, git
+  clone, pip install from a local index, PostgreSQL with `sslmode=verify-full`, the `openssl`
+  tool (`dgst`, `s_client`), that Python and sshd loaded rustyssl's libraries; on Fedora and EL
+  the Fedora profile's MD2 through Fedora's own perl-Net-SSLeay, and
+  `update-crypto-policies --set DEFAULT|LEGACY|FUTURE` against seven server configurations
+  (RSA-2048 and -3072, TLS 1.1 to 1.3, a SHA-1-signed certificate, RSA key exchange, CBC with
+  SHA-1). Homebrew: Python 3.13 (urllib over TLS 1.3 and 1.2, hashlib) on rustyssl's keg
+  through `DYLD_LIBRARY_PATH`; Homebrew's curl and Python 3.15 link `openssl@4`, so they can't
+  use the 3.x ABI. Left: x86_64 containers (the same images; not run here), and Debian's and
+  Ubuntu's apt over OpenSSL (it uses GnuTLS).
 - [ ] **12.5 Release 1.0.** The ABI stability promise is OpenSSL's 3.x ABI. The Rust crates
   follow SemVer.
 

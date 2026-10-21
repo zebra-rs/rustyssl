@@ -1,0 +1,16 @@
+#!/usr/bin/make -f
+# Builds with the pinned Rust toolchain (rustup), which Debian's rustc may be older than.
+%:
+	dh $@
+
+override_dh_auto_build:
+	cargo xtask package debian
+
+override_dh_auto_install:
+	mkdir -p debian/rustyssl
+	cp -a target/package/debian/root/. debian/rustyssl/
+
+override_dh_auto_test:
+override_dh_auto_clean:
+override_dh_strip:
+override_dh_makeshlibs:
