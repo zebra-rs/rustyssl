@@ -5954,12 +5954,12 @@ and libcrypto all 5899.
 Until this phase, the upstream `apps/` sources compiled against our libraries serve as the
 CLI, both for users and for the upstream test recipes.
 
-- [ ] **11.1** Write a Rust implementation of the `openssl` binary with **identical options,
+- [x] **11.1** Write a Rust implementation of the `openssl` binary with **identical options,
   exit codes, and byte-exact output**. Golden tests are generated from the reference.
   Priority: `version`, `x509`, `req`, `genpkey`, `pkey`, `pkeyutl`, `dgst`, `enc`, `rand`,
   `s_client`, `s_server`, `verify`, `crl`, `ca`, `pkcs12`, `cms`, `smime`, `pkcs7`, `ocsp`,
   `ts`, `asn1parse`, `ciphers`, `list`, `speed`, `rehash`, then the rest.
-- [ ] **11.2** Run the upstream app-driven test recipes with our CLI in place of upstream's.
+- [x] **11.2** Run the upstream app-driven test recipes with our CLI in place of upstream's.
 
 Progress (2026-10-20): the design is [ADR 0007](adr/0007-openssl-cli.md). It covers how the
 CLI reaches the library, its packaging, the generated option tables, the three-run golden tests,
@@ -6230,6 +6230,29 @@ callback kind), `sock` and `ocsp_status`.
   own format, so their length (and `SSL handshake has read N bytes`) differs from OpenSSL's when
   a session's contents vary (those lines use `-no_ticket`); rustyssl's TLS core makes its
   security-callback checks in a different order and number (`-security_debug_verbose`).
+
+G5 merged last (2026-10-21, with its macOS fix of `rustyssl-ossl`'s sockets). The paired lines'
+masking also covers a TLS 1.3 ticket's dump cut short by the peer's reply, which can land
+mid-line in the client's printout on either library: the ticket's octets are masked, the reply
+is kept and compared. `s_client`'s unit tests that need libcrypto run as `live_*` tests (on both
+libraries, under `test-apps`).
+
+**Phase 11 done (2026-10-21, macOS arm64, OpenSSL 3.6.5).** Every command upstream's tool has is
+ported, and `cargo xtask dist` installs ours as `target/dist/bin/openssl` (decision 3; no
+`openssl-rs` alias; the drivers that need upstream's tool run the reference's,
+`target/ref/bin/openssl`).
+- **11.1:** `cargo xtask test-apps`: 4342 command lines behave the same with our tool, on
+  rustyssl and on the reference, as upstream's tool on the reference (exit 0);
+  `test-interop --cli ours`: 65 of 65 cases in all four pairings.
+- **11.2:** `cargo xtask test-openssl-suite --all --cli ours`: all 4334 eligible upstream
+  subtests pass with our tool on rustyssl (100.00%, exit 0), the same as upstream's tool on
+  rustyssl; 103 internal, 83 skipped on both, none failing on the reference. No fix was needed.
+- **Gates** (`scripts/gates.sh`): every gate exit 0, Miri 20 ok and 0 failed on the host and on
+  x86_64 Linux.
+- **Left:** the gaps listed above (tickets' length, `-starttls` against real servers, the
+  security-callback trace, `ocsp -multi`, some `cmp` paths, `speed -mb` with `-async_jobs`,
+  `engine` with an unknown ID); x86_64 Linux runs of test-apps and the recipes with our tool
+  (CI runs the gates there).
 
 ## Phase 12: Hardening, performance, release 1.0 → M7
 

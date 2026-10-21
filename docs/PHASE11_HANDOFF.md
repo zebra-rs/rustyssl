@@ -91,6 +91,9 @@ Once every command is ported: switch `target/dist/bin/openssl` to our binary (de
 `cargo xtask test-openssl-suite --all --cli ours`, and match upstream's binary on our libraries
 (4334 of 4334 eligible subtests on macOS today). Then mark Phase 11 done with its exit status.
 
+**Done (2026-10-21):** dist installs ours as `bin/openssl`, and the run passes 4334 of 4334 on
+macOS; `docs/IMPLEMENTATION_PLAN.md`, Phase 11, has the results and what's left.
+
 ## Running in Claude Code's cloud
 
 - **Environment:** network access **Custom** with the default package-manager list plus

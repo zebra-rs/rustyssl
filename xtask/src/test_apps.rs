@@ -6,14 +6,14 @@
 //!   loader at each.
 //! - **The per-command corpora, `tests/apps/<command>.txt`:** each line runs three times: (1)
 //!   upstream's tool on the reference libraries, the expectation; (2) our tool
-//!   (`target/dist/bin/openssl-rs`) on rustyssl's libraries; (3) our tool on the reference
+//!   (`target/dist/bin/openssl`) on rustyssl's libraries; (3) our tool on the reference
 //!   libraries, which tells a CLI bug from a library bug. Lines of the smoke list whose command
 //!   is ported (`crates/rustyssl-cli/src/cmd/<command>.rs` exists) also run (2) and (3).
 //!
 //! Every run must print the same and exit the same as (1), after masking what differs by
 //! design: the library's version metadata (`+rustyssl...`), the directories it was built with
 //! (OPENSSLDIR, ENGINESDIR, MODULESDIR, the libraries' own), errors' thread id and file and
-//! line, dlopen's message, our tool's name (`openssl-rs`), and every `PID=n`.
+//! line, dlopen's message, and every `PID=n`.
 //!
 //! In a line, `{bin}` is 100,000 octets of fixed data, `{txt}` a line of text, `{dir}` the work
 //! directory, `{src}` the reference's source tree (its `test/certs/`, ...), and `{tests}`
@@ -120,9 +120,7 @@ fn run_tool(
 fn masked(text: &str) -> String {
     text.lines()
         .map(|line| {
-            // Our tool's own name, which commands show through `opt_appname` ("openssl cmp").
-            let mut l =
-                mask_apps_line(&mask_pid(line)).replace(&format!("{CLI_NAME} "), "openssl ");
+            let mut l = mask_apps_line(&mask_pid(line));
             if let Some(at) = l.find("+rustyssl") {
                 let end = l[at..].find(' ').map_or(l.len(), |e| at + e);
                 l.replace_range(at..end, "");
