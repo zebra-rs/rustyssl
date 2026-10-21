@@ -233,7 +233,7 @@ impl Montgomery {
         // The table of b^0 .. b^(size - 1), one entry of `nl` limbs after another, and the
         // buffers every product reuses: nothing is allocated in the loop.
         let mut table = vec![0; size.saturating_mul(nl)];
-        let mut scratch = vec![0; nl.saturating_add(2)];
+        let mut scratch = vec![0; nl.saturating_mul(2).saturating_add(2)];
         let mut prod = vec![0; nl];
         let mut entry = vec![0; nl];
         let mut acc = one.clone();
@@ -285,19 +285,22 @@ impl Montgomery {
     /// `a * b / R mod N` into `out`, for `a` and `b` of `nl` limbs: the same value as
     /// [`Montgomery::redc`] of [`mul_fixed`]'s product (both are `(ab + qN) / R` for the one `q`
     /// that makes it whole, with `N` subtracted at most once), with the product and the
-    /// reduction interleaved (Montgomery's CIOS) in `t`, `nl + 2` limbs of scratch. No
+    /// reduction interleaved (Montgomery's CIOS) in `scratch`, `2 nl` limbs or more. No
     /// allocation, and no branch or index on the values.
-    pub fn mul_into(&self, out: &mut [Limb], a: &[Limb], b: &[Limb], t: &mut [Limb]) {
+    pub fn mul_into(&self, out: &mut [Limb], a: &[Limb], b: &[Limb], scratch: &mut [Limb]) {
         let np = self.n.limbs();
         let nl = np.len();
-        t.fill(0);
-        let Some(lo_t) = t.get_mut(..nl.saturating_add(2)) else {
+        let (t, rest) = scratch.split_at_mut(nl.min(scratch.len()));
+        let (Some(u), Some(&n_low)) = (rest.get_mut(..nl), np.first()) else {
             return;
         };
+        let (mut t, mut u) = (t, u);
+        t.fill(0);
+        let mut top: Limb = 0;
         for &bi in b.iter().take(nl) {
             // t += a * b_i
             let mut c: Limb = 0;
-            for (tj, &aj) in lo_t.iter_mut().zip(a.iter().take(nl)) {
+            for (tj, &aj) in t.iter_mut().zip(a.iter().take(nl)) {
                 let v = u128::from(aj)
                     .wrapping_mul(u128::from(bi))
                     .wrapping_add(u128::from(*tj))
@@ -305,44 +308,77 @@ impl Montgomery {
                 *tj = lo(v);
                 c = hi(v);
             }
-            if let [.., top, over] = lo_t {
-                let (s, carry) = top.overflowing_add(c);
-                *top = s;
-                *over = Limb::from(carry);
-            }
-            // t = (t + m N) / 2^64, with m making the low limb zero.
-            let m = lo_t.first().copied().unwrap_or(0).wrapping_mul(self.n0);
-            let mut c: Limb = 0;
-            for j in 0..nl {
-                let tj = lo_t.get(j).copied().unwrap_or(0);
-                let nj = np.get(j).copied().unwrap_or(0);
+            let (s1, over) = top.overflowing_add(c);
+            // u = (t + m N) / 2^64, with m making the low limb zero.
+            let t0 = t.first().copied().unwrap_or(0);
+            let m = t0.wrapping_mul(self.n0);
+            let v = u128::from(m)
+                .wrapping_mul(u128::from(n_low))
+                .wrapping_add(u128::from(t0));
+            let mut c = hi(v);
+            for ((&tj, &nj), uj) in t.iter().zip(np).skip(1).zip(u.iter_mut()) {
                 let v = u128::from(m)
                     .wrapping_mul(u128::from(nj))
                     .wrapping_add(u128::from(tj))
                     .wrapping_add(u128::from(c));
-                if let Some(prev) = j.checked_sub(1).and_then(|k| lo_t.get_mut(k)) {
-                    *prev = lo(v);
-                }
+                *uj = lo(v);
                 c = hi(v);
             }
-            let top = lo_t.get(nl).copied().unwrap_or(0);
-            let over = lo_t.get(nl.saturating_add(1)).copied().unwrap_or(0);
-            let (s, carry) = top.overflowing_add(c);
-            if let Some(x) = nl.checked_sub(1).and_then(|k| lo_t.get_mut(k)) {
-                *x = s;
+            let (s2, carry) = s1.overflowing_add(c);
+            if let Some(last) = u.last_mut() {
+                *last = s2;
             }
-            if let Some(x) = lo_t.get_mut(nl) {
-                *x = over.wrapping_add(Limb::from(carry));
-            }
+            top = Limb::from(over).wrapping_add(Limb::from(carry));
+            core::mem::swap(&mut t, &mut u);
         }
         // One masked subtraction of N.
-        let top = lo_t.get(nl).copied().unwrap_or(0);
-        let low = lo_t.get(..nl).unwrap_or(&[]);
-        let borrow = sub_into(out, low, np);
+        let borrow = sub_into(out, t, np);
         let keep = barrier(mask(top == 0) & mask(borrow));
-        for (o, &x) in out.iter_mut().zip(low) {
+        for (o, &x) in out.iter_mut().zip(t.iter()) {
             *o = (keep & x) | (!keep & *o);
         }
+    }
+
+    /// `base^exp mod N` for a public exponent (RSA's `e`): square and multiply over the
+    /// exponent's bits, which its value decides; the base's arithmetic is constant time. For
+    /// a non-negative `base` below `N` and a nonzero `exp`; the result fully reduced.
+    pub fn exp_public(&self, base: &BigNum, exp: &BigNum) -> BigNum {
+        let nl = self.limbs();
+        let np = self.n.limbs();
+        let pad = |v: &[Limb]| -> Vec<Limb> {
+            let mut l = v.to_vec();
+            l.resize(nl, 0);
+            l
+        };
+        let mut scratch = vec![0; nl.saturating_mul(2).saturating_add(2)];
+        let rr = pad(self.rr.limbs());
+        let mut b = vec![0; nl];
+        self.mul_into(&mut b, &pad(base.limbs()), &rr, &mut scratch);
+        let mut acc = b.clone();
+        let mut prod = vec![0; nl];
+        // The top bit is the starting value; then each bit below it.
+        for i in (0..exp.num_bits().saturating_sub(1)).rev() {
+            self.mul_into(&mut prod, &acc, &acc, &mut scratch);
+            core::mem::swap(&mut acc, &mut prod);
+            // The exponent is public.
+            if exp.is_bit_set(i) {
+                self.mul_into(&mut prod, &acc, &b, &mut scratch);
+                core::mem::swap(&mut acc, &mut prod);
+            }
+        }
+        // Out of Montgomery form: a product with 1.
+        let mut one = vec![0; nl];
+        if let Some(first) = one.first_mut() {
+            *first = 1;
+        }
+        self.mul_into(&mut prod, &acc, &one, &mut scratch);
+        let mut reduced = vec![0; nl];
+        let borrow = sub_into(&mut reduced, &prod, np);
+        let keep = barrier(mask(borrow));
+        for (r, &o) in reduced.iter_mut().zip(&prod) {
+            *r = (keep & o) | (!keep & *r);
+        }
+        BigNum::from_limbs(false, reduced).unwrap_or_default()
     }
 }
 

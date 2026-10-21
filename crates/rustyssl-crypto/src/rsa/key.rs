@@ -89,7 +89,7 @@ fn mont_mul_mod(mont: &Montgomery, a: &[Limb], b: &[Limb]) -> Option<Vec<Limb>> 
     let (a, b) = (pad(a), pad(b));
     let mut rr = mont.rr().limbs().to_vec();
     rr.resize(nl, 0);
-    let mut t = Zeroizing::new(vec![0; nl.saturating_add(2)]);
+    let mut t = Zeroizing::new(vec![0; nl.saturating_mul(2).saturating_add(2)]);
     let mut x = Zeroizing::new(vec![0; nl]);
     let mut out = vec![0; nl];
     mont.mul_into(&mut x, &a, &b, &mut t);
@@ -197,7 +197,8 @@ impl Key {
             && bn::ucmp(f, n).is_lt()
             && let Some(mont) = self.mont.get(n, false)
         {
-            return Some(mont.exp_consttime(f, e.limbs()));
+            // The exponent is the public one.
+            return Some(mont.exp_public(f, e));
         }
         exp_mod(f, e, n).ok()
     }
