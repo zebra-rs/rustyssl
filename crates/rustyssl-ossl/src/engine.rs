@@ -246,11 +246,11 @@ unsafe extern "C" fn engine_close(ctx: *mut OSSL_STORE_LOADER_CTX) -> c_int {
 
 /// `setup_engine_loader`: registers the `org.openssl.engine:<id>:<key id>` store loader.
 pub fn setup_loader() -> bool {
-    let Some(scheme) = cstring(ENGINE_SCHEME) else {
-        return false;
-    };
-    // SAFETY: NULL engine; the scheme is copied.
-    let l = unsafe { ffi::OSSL_STORE_LOADER_new(core::ptr::null_mut(), scheme.as_ptr()) };
+    // OSSL_STORE_LOADER_new keeps the pointer (it doesn't copy the scheme), so it is static.
+    const SCHEME: &core::ffi::CStr = c"org.openssl.engine";
+    debug_assert_eq!(SCHEME.to_str(), Ok(ENGINE_SCHEME));
+    // SAFETY: NULL engine; the scheme is a static C string, which outlives the loader.
+    let l = unsafe { ffi::OSSL_STORE_LOADER_new(core::ptr::null_mut(), SCHEME.as_ptr()) };
     if l.is_null() {
         return false;
     }

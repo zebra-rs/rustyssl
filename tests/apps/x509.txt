@@ -170,3 +170,7 @@ x509 -noout -subject < {src}/test/certs/ca-cert.pem
 x509 -in {src}/test/certs/ee-cert.pem extra
 x509 -nosuchoption -sha256
 x509 -in
+x509 -engine dynamic -in {src}/test/certs/ee-cert.pem -noout -subject
+x509 -engine dynamic -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -keyform ENGINE
+x509 -provparam default:x=1 -in {src}/test/certs/ee-cert.pem -noout -subject
+x509 -provparam bad -in {src}/test/certs/ee-cert.pem -noout -subject

@@ -32,3 +32,6 @@ spkac -in {tests}/pki/spkac.cnf -provider-path {dir} -provider default
 spkac -in {tests}/pki/spkac.cnf extra
 spkac -nosuchoption
 spkac -in
+spkac -engine dynamic -in {tests}/pki/spkac.cnf -noout -verify
+spkac -engine dynamic -key {src}/test/testrsa.pem -keyform ENGINE
+spkac -provparam default:x=1 -in {tests}/pki/spkac.cnf -noout -verify

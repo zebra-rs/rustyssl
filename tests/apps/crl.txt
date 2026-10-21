@@ -69,3 +69,4 @@ crl -in {tests}/pki/crl1.pem -provider-path {dir} -provider default -noout
 crl -in {tests}/pki/crl1.pem extra
 crl -in {tests}/pki/crl1.pem -nosuchoption -sha256
 crl -nosuchoption
+crl -in {tests}/pki/crl1.pem -provparam default:x=1 -noout -crlnumber

@@ -131,3 +131,7 @@ req -keyout
 ~req -config {tests}/pki/req.cnf -newkey rsa:1024 -passout pass:pw -x509 -days 1
 ~req -config {tests}/pki/req.cnf -newkey ec:{tests}/pki/p256.param -nodes -x509 -CA {src}/test/certs/ca-cert.pem -CAkey {src}/test/certs/ca-key.pem
 ~req -config {tests}/pki/req.cnf -section ask -newkey ed25519 -batch
+req -config {tests}/pki/req.cnf -engine dynamic -new -key {src}/test/certs/ee-key.pem -noout -subject
+req -config {tests}/pki/req.cnf -keygen_engine dynamic -newkey rsa:1024 -quiet -noenc -noout
+req -config {tests}/pki/req.cnf -keygen_engine dynamic -newkey param:{tests}/pki/p256.param -quiet -noenc -keyout {dir}/ec.key -noout -subject
+req -config {tests}/pki/req.cnf -provparam default:x=1 -new -key {src}/test/certs/ee-key.pem -noout -subject

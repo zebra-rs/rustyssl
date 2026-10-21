@@ -138,3 +138,8 @@ ca -config {txt} -status 10
 ca -status 10
 ca -nosuchoption
 ca -crldays
+@pki/cadb ca -config {dir}/cadb/ca.cnf -engine dynamic -status 11
+@pki/cadb ca -config {dir}/cadb/ca.cnf -provparam default:x=1 -status 11
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -keyform ENGINE -engine dynamic
+# A random serial: the certificate differs from run to run.
+@pki/cadb ~ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -rand_serial -verbose

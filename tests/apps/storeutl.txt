@@ -60,3 +60,5 @@ storeutl -noout -provider-path {dir} -provider default {src}/test/certs/ca-cert.
 storeutl
 storeutl a b
 storeutl -nosuchoption
+storeutl -engine dynamic -noout {src}/test/certs/ca-cert.pem
+storeutl -provparam default:x=1 -noout {src}/test/certs/ca-cert.pem

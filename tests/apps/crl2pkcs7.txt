@@ -23,3 +23,4 @@ crl2pkcs7 -in {src}/test/testcrl.pem -provider default
 crl2pkcs7 -in {src}/test/testcrl.pem -propquery provider=default -provider-path {dir}
 crl2pkcs7 -in {src}/test/testcrl.pem extra
 crl2pkcs7 -nosuchoption
+crl2pkcs7 -in {src}/test/testcrl.pem -provparam default:x=1
