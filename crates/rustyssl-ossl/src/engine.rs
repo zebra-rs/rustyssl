@@ -246,11 +246,11 @@ unsafe extern "C" fn engine_close(ctx: *mut OSSL_STORE_LOADER_CTX) -> c_int {
 
 /// `setup_engine_loader`: registers the `org.openssl.engine:<id>:<key id>` store loader.
 pub fn setup_loader() -> bool {
-    let Some(scheme) = cstring(ENGINE_SCHEME) else {
-        return false;
-    };
-    // SAFETY: NULL engine; the scheme is copied.
-    let l = unsafe { ffi::OSSL_STORE_LOADER_new(core::ptr::null_mut(), scheme.as_ptr()) };
+    // OSSL_STORE_LOADER_new keeps the pointer (it doesn't copy the scheme), so it is static.
+    const SCHEME: &core::ffi::CStr = c"org.openssl.engine";
+    debug_assert_eq!(SCHEME.to_str(), Ok(ENGINE_SCHEME));
+    // SAFETY: NULL engine; the scheme is a static C string, which outlives the loader.
+    let l = unsafe { ffi::OSSL_STORE_LOADER_new(core::ptr::null_mut(), SCHEME.as_ptr()) };
     if l.is_null() {
         return false;
     }
@@ -284,4 +284,46 @@ pub fn destroy_loader() {
     let l = unsafe { ffi::OSSL_STORE_unregister_loader(scheme.as_ptr()) };
     // SAFETY: NULL or the loader setup_loader registered.
     unsafe { ffi::OSSL_STORE_LOADER_free(l) };
+}
+
+/// `get_legacy_pkey_id` of `apps/lib/engine.c`: the NID of an engine's key type named
+/// `algname`, or `NID_undef`.
+pub fn legacy_pkey_id(algname: &str, e: Option<&Engine>) -> c_int {
+    let Some(n) = cstring(algname) else {
+        return 0;
+    };
+    let mut tmpeng: *mut ENGINE = core::ptr::null_mut();
+    // SAFETY: no arguments.
+    unsafe { ffi::ERR_set_mark() };
+    // SAFETY: tmpeng is a valid out-pointer; n a valid C string.
+    let mut ameth = unsafe { ffi::EVP_PKEY_asn1_find_str(&mut tmpeng, n.as_ptr(), -1) };
+    // SAFETY: tmpeng is NULL or a functional reference to finish.
+    unsafe { ffi::ENGINE_finish(tmpeng) };
+    if ameth.is_null()
+        && let Some(e) = e
+    {
+        // SAFETY: the engine is live; n a valid C string.
+        ameth = unsafe { ffi::ENGINE_get_pkey_asn1_meth_str(e.as_ptr(), n.as_ptr(), -1) };
+    } else if tmpeng.is_null() {
+        // Only one from an engine counts.
+        ameth = core::ptr::null();
+    }
+    // SAFETY: no arguments.
+    unsafe { ffi::ERR_pop_to_mark() };
+    if ameth.is_null() {
+        return 0;
+    }
+    let mut id: c_int = 0;
+    // SAFETY: ameth is live; the out-pointers are valid or NULL.
+    unsafe {
+        ffi::EVP_PKEY_asn1_get0_info(
+            &mut id,
+            core::ptr::null_mut(),
+            core::ptr::null_mut(),
+            core::ptr::null_mut(),
+            core::ptr::null_mut(),
+            ameth,
+        )
+    };
+    id
 }

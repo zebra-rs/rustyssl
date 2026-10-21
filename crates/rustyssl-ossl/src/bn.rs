@@ -82,4 +82,33 @@ impl Bn {
         // SAFETY: as in to_hex.
         take_string(unsafe { ffi::BN_bn2dec(self.as_ptr()) })
     }
+
+    /// `BN_hex2bn`: the number, and how many characters it used (0 on failure).
+    pub fn hex2bn(s: &str) -> (Option<Self>, c_int) {
+        let Some(c) = cstring(s) else {
+            return (None, 0);
+        };
+        let mut p: *mut crate::abi::BIGNUM = core::ptr::null_mut();
+        // SAFETY: p is a valid out-pointer; c a valid C string.
+        let n = unsafe { ffi::BN_hex2bn(&mut p, c.as_ptr()) };
+        (Self::from_ptr(p), n)
+    }
+
+    /// `BN_add_word`.
+    pub fn add_word(&self, w: core::ffi::c_ulong) -> bool {
+        // SAFETY: the number is live.
+        unsafe { ffi::BN_add_word(self.as_ptr(), w) == 1 }
+    }
+
+    /// `BN_is_zero`.
+    pub fn is_zero(&self) -> bool {
+        // SAFETY: the number is live.
+        unsafe { ffi::BN_is_zero(self.as_ptr()) == 1 }
+    }
+
+    /// `BN_rand(bn, bits, top, bottom)`.
+    pub fn rand(&self, bits: c_int, top: c_int, bottom: c_int) -> bool {
+        // SAFETY: the number is live.
+        unsafe { ffi::BN_rand(self.as_ptr(), bits, top, bottom) == 1 }
+    }
 }

@@ -987,3 +987,202 @@ pub fn builtin_curves() -> Vec<(c_int, Option<String>)> {
     unsafe { ffi::EC_get_builtin_curves(v.as_mut_ptr(), n) };
     v.iter().map(|c| (c.nid, string_at(c.comment))).collect()
 }
+
+impl Pkey {
+    /// `PEM_write_bio_PUBKEY`: what it returns.
+    pub fn write_pubkey_pem(&self, out: &crate::Bio) -> core::ffi::c_int {
+        // SAFETY: both are live.
+        unsafe { ffi::PEM_write_bio_PUBKEY(out.as_ptr(), self.as_ptr()) }
+    }
+}
+
+impl Pkey {
+    /// `PEM_write_bio_Parameters`.
+    pub fn write_params_pem(&self, out: &crate::Bio) -> core::ffi::c_int {
+        // SAFETY: both are live.
+        unsafe { ffi::PEM_write_bio_Parameters(out.as_ptr(), self.as_ptr()) }
+    }
+
+    /// `PEM_write_bio_PrivateKey(out, pkey, NULL, NULL, 0, NULL, NULL)`.
+    pub fn write_private_pem(&self, out: &crate::Bio) -> core::ffi::c_int {
+        // SAFETY: both are live; no cipher or callback.
+        unsafe {
+            ffi::PEM_write_bio_PrivateKey(
+                out.as_ptr(),
+                self.as_ptr(),
+                core::ptr::null(),
+                core::ptr::null_mut(),
+                0,
+                None,
+                core::ptr::null_mut(),
+            )
+        }
+    }
+}
+
+crate::handle!(
+    /// An owned `EVP_PKEY_CTX` for generating a key (`req -newkey`).
+    KeygenCtx, EVP_PKEY_CTX, EVP_PKEY_CTX_free
+);
+
+/// The keygen progress callback (`EVP_PKEY_gen_cb`), in Rust: it gets
+/// `EVP_PKEY_CTX_get_keygen_info(ctx, 0)`.
+pub type ProgressCb = fn(core::ffi::c_int);
+
+static PROGRESS_CB: std::sync::Mutex<Option<ProgressCb>> = std::sync::Mutex::new(None);
+
+unsafe extern "C" fn progress_trampoline(ctx: *mut EVP_PKEY_CTX) -> core::ffi::c_int {
+    let cb = PROGRESS_CB.lock().map(|g| *g).unwrap_or(None);
+    if let Some(cb) = cb {
+        // SAFETY: the library passes its live context.
+        let p = unsafe { ffi::EVP_PKEY_CTX_get_keygen_info(ctx, 0) };
+        let _ = std::panic::catch_unwind(|| cb(p));
+    }
+    1
+}
+
+impl KeygenCtx {
+    /// `EVP_PKEY_CTX_new_from_name(libctx, name, propq)`.
+    pub fn from_name(libctx: Option<&LibCtx>, name: &str, propq: Option<&str>) -> Option<Self> {
+        let n = cstring(name)?;
+        let pq = match propq {
+            Some(p) => Some(cstring(p)?),
+            None => None,
+        };
+        let ctx = libctx.map_or(core::ptr::null_mut(), LibCtx::as_ptr);
+        // SAFETY: ctx is NULL or live; the strings are valid or NULL.
+        Self::from_ptr(unsafe {
+            ffi::EVP_PKEY_CTX_new_from_name(
+                ctx,
+                n.as_ptr(),
+                pq.as_ref().map_or(core::ptr::null(), |p| p.as_ptr()),
+            )
+        })
+    }
+
+    /// `EVP_PKEY_CTX_new_from_pkey(libctx, pkey, propq)`.
+    pub fn from_pkey(libctx: Option<&LibCtx>, pkey: &Pkey, propq: Option<&str>) -> Option<Self> {
+        let pq = match propq {
+            Some(p) => Some(cstring(p)?),
+            None => None,
+        };
+        let ctx = libctx.map_or(core::ptr::null_mut(), LibCtx::as_ptr);
+        // SAFETY: all are live or NULL.
+        Self::from_ptr(unsafe {
+            ffi::EVP_PKEY_CTX_new_from_pkey(
+                ctx,
+                pkey.as_ptr(),
+                pq.as_ref().map_or(core::ptr::null(), |p| p.as_ptr()),
+            )
+        })
+    }
+
+    /// `EVP_PKEY_CTX_new(pkey, e)`.
+    pub fn with_engine(pkey: &Pkey, e: &crate::engine::Engine) -> Option<Self> {
+        // SAFETY: both are live.
+        Self::from_ptr(unsafe { ffi::EVP_PKEY_CTX_new(pkey.as_ptr(), e.as_ptr()) })
+    }
+
+    /// `EVP_PKEY_CTX_new_id(id, e)`.
+    pub fn from_id(id: core::ffi::c_int, e: &crate::engine::Engine) -> Option<Self> {
+        // SAFETY: the engine is live.
+        Self::from_ptr(unsafe { ffi::EVP_PKEY_CTX_new_id(id, e.as_ptr()) })
+    }
+
+    /// The context, borrowed (for `pkey_ctrl_string`).
+    pub fn as_ref(&self) -> PkeyCtxRef<'_> {
+        PkeyCtxRef(self.as_ptr(), core::marker::PhantomData)
+    }
+
+    /// `EVP_PKEY_CTX_is_a`.
+    pub fn is_a(&self, name: &str) -> bool {
+        let Some(n) = cstring(name) else {
+            return false;
+        };
+        // SAFETY: the context is live; n is a valid C string.
+        unsafe { ffi::EVP_PKEY_CTX_is_a(self.as_ptr(), n.as_ptr()) == 1 }
+    }
+
+    /// `EVP_PKEY_keygen_init`: what it returns.
+    pub fn keygen_init(&self) -> core::ffi::c_int {
+        // SAFETY: the context is live.
+        unsafe { ffi::EVP_PKEY_keygen_init(self.as_ptr()) }
+    }
+
+    /// `EVP_PKEY_CTX_set_params` with `OSSL_PKEY_PARAM_BITS` (a `size_t`): what it returns.
+    pub fn set_bits(&self, bits: usize) -> core::ffi::c_int {
+        let mut b = bits;
+        // SAFETY: the key is a static string; b outlives the params.
+        let first = unsafe {
+            ffi::OSSL_PARAM_construct_size_t(crate::abi::OSSL_PKEY_PARAM_BITS.as_ptr(), &mut b)
+        };
+        // SAFETY: no arguments.
+        let end = unsafe { ffi::OSSL_PARAM_construct_end() };
+        let params = [first, end];
+        // SAFETY: the context is live; params is a terminated array.
+        unsafe { ffi::EVP_PKEY_CTX_set_params(self.as_ptr(), params.as_ptr()) }
+    }
+
+    /// `EVP_PKEY_CTX_set_cb(ctx, progress)`, with `cb` the Rust callback (one per program).
+    pub fn set_progress_cb(&self, cb: ProgressCb) {
+        if let Ok(mut g) = PROGRESS_CB.lock() {
+            *g = Some(cb);
+        }
+        // SAFETY: the context is live; the trampoline has the callback's C type.
+        unsafe { ffi::EVP_PKEY_CTX_set_cb(self.as_ptr(), Some(progress_trampoline)) };
+    }
+
+    /// `EVP_PKEY_keygen`: the key, if it worked.
+    pub fn keygen(&self) -> Option<Pkey> {
+        let mut k: *mut EVP_PKEY = core::ptr::null_mut();
+        // SAFETY: the context is live; k is a valid out-pointer.
+        let r = unsafe { ffi::EVP_PKEY_keygen(self.as_ptr(), &mut k) };
+        let key = Pkey::from_raw(k);
+        if r <= 0 { None } else { key }
+    }
+}
+
+impl Pkey {
+    /// `PEM_read_bio_Parameters(bio, NULL)`.
+    pub fn read_params_pem(bio: &crate::Bio) -> Option<Self> {
+        // SAFETY: the BIO is live.
+        Self::from_ptr(unsafe { ffi::PEM_read_bio_Parameters(bio.as_ptr(), core::ptr::null_mut()) })
+    }
+
+    /// `PEM_write_bio_PrivateKey(out, pkey, cipher, NULL, 0, NULL, pass)`: with no
+    /// password, the library's default callback asks for one.
+    pub fn write_private_pem_enc(
+        &self,
+        out: &crate::Bio,
+        cipher: Option<&crate::evp::Cipher>,
+        pass: Option<&str>,
+    ) -> core::ffi::c_int {
+        let p = match pass {
+            Some(p) => match cstring(p) {
+                Some(c) => Some(c),
+                None => return 0,
+            },
+            None => None,
+        };
+        // SAFETY: all are live or NULL; the password is a C string the default callback
+        // reads as its user data.
+        unsafe {
+            ffi::PEM_write_bio_PrivateKey(
+                out.as_ptr(),
+                self.as_ptr(),
+                cipher.map_or(core::ptr::null(), |c| c.as_ptr().cast_const()),
+                core::ptr::null_mut(),
+                0,
+                None,
+                p.as_ref()
+                    .map_or(core::ptr::null_mut(), |c| c.as_ptr().cast_mut().cast()),
+            )
+        }
+    }
+}
+
+/// `RAND_status()`.
+pub fn rand_status() -> bool {
+    // SAFETY: no arguments.
+    unsafe { ffi::RAND_status() == 1 }
+}

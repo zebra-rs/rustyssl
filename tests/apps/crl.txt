@@ -1,0 +1,75 @@
+# `openssl crl` (cargo xtask test-apps: upstream's tool on the reference, then ours on rustyssl
+# and on the reference). pki/crl1.pem and pki/crl2.pem are CRLs of {src}/test/certs/ca-cert.pem
+# (CRL numbers 1000 and 1001, the second revoking serial 02), made by the reference's `ca`.
+crl -help
+crl -in {src}/test/testcrl.pem
+crl -in {src}/test/testcrl.pem -text
+crl -in {src}/test/testcrl.pem -text -noout
+crl -in {src}/test/testcrl.pem -noout -issuer
+crl -in {src}/test/testcrl.pem -noout -issuer -hash -hash_old -lastupdate -nextupdate -crlnumber -fingerprint
+crl -in {src}/test/testcrl.pem -noout -fingerprint -issuer -crlnumber -nextupdate -lastupdate -hash_old -hash
+crl -in {src}/test/testcrl.pem -noout -hash
+crl -in {src}/test/testcrl.pem -noout -hash_old
+crl -in {src}/test/testcrl.pem -noout -fingerprint -sha256
+crl -in {src}/test/testcrl.pem -noout -fingerprint -md5
+crl -in {src}/test/testcrl.pem -noout -fingerprint -sha3-512
+crl -in {src}/test/testcrl.pem -noout -fingerprint -nosuchdigest
+crl -in {src}/test/testcrl.pem -noout -sha256 -sha512
+crl -in {src}/test/testcrl.pem -noout -lastupdate -nextupdate -dateopt iso_8601
+crl -in {src}/test/testcrl.pem -noout -lastupdate -dateopt rfc_822
+crl -in {src}/test/testcrl.pem -noout -lastupdate -dateopt xyz
+crl -in {src}/test/certs/cyrillic_crl.pem -noout -text
+crl -in {src}/test/certs/cyrillic_crl.pem -noout -issuer -nameopt utf8
+crl -in {src}/test/certs/cyrillic_crl.pem -noout -issuer -nameopt oneline,-esc_msb
+crl -in {src}/test/certs/cyrillic_crl.pem -noout -issuer -nameopt RFC2253
+crl -in {src}/test/certs/cyrillic_crl.pem -noout -issuer -nameopt multiline
+crl -in {src}/test/certs/cyrillic_crl.pem -noout -issuer -nameopt nosuchopt
+crl -in {src}/test/certs/cyrillic_crl.pem -text -nameopt compat -noout
+crl -in {src}/test/certs/delta-crl-as-complete-delta-reasons.pem -text -noout
+crl -in {src}/test/certs/cve-2026-28388-crls.pem -noout -crlnumber
+crl -in {tests}/pki/crl2.pem -text
+crl -in {tests}/pki/crl2.pem -outform DER -out {dir}/crl2.der
+crl -in {dir}/crl2.der -inform DER -noout -text
+crl -in {dir}/crl2.der -noout -crlnumber
+crl -in {dir}/crl2.der -inform PEM -noout -crlnumber
+crl -in {tests}/pki/crl2.pem -outform DER -noout
+crl -in {tests}/pki/crl1.pem -outform PEM
+crl -in {tests}/pki/crl1.pem -inform XYZ
+crl -in {tests}/pki/crl1.pem -outform SMIME
+crl -in {tests}/pki/crl1.pem -out {dir}/crl1-copy.pem
+crl -in {dir}/crl1-copy.pem -noout -crlnumber -out {dir}/x.pem
+crl -in {tests}/pki/crl1.pem -verify -CAfile {src}/test/certs/ca-cert.pem -noout
+crl -in {tests}/pki/crl2.pem -CAfile {src}/test/certs/ca-cert.pem -noout -crlnumber
+crl -in {tests}/pki/crl2.pem -badsig -verify -CAfile {src}/test/certs/ca-cert.pem -noout
+crl -in {tests}/pki/crl2.pem -verify -CAfile {src}/test/certs/root-cert.pem -noout
+crl -in {tests}/pki/crl2.pem -verify -CAfile {src}/test/certs/ee-cert.pem -noout
+crl -in {tests}/pki/crl2.pem -verify -CAfile {src}/test/certs/nonexistent.pem -noout
+crl -in {tests}/pki/crl2.pem -verify -no-CAfile -no-CApath -no-CAstore -noout
+crl -in {tests}/pki/crl2.pem -verify -CApath {dir} -no-CAfile -noout
+crl -in {tests}/pki/crl2.pem -CAstore {src}/test/certs/ca-cert.pem -no-CAfile -no-CApath -noout
+crl -in {tests}/pki/crl2.pem -CApath {txt}
+crl -in {tests}/pki/crl2.pem -badsig
+crl -in {tests}/pki/crl1.pem -gendelta {tests}/pki/crl2.pem -key {src}/test/certs/ca-key.pem
+crl -in {tests}/pki/crl1.pem -gendelta {tests}/pki/crl2.pem -key {src}/test/certs/ca-key.pem -text -noout -sha512
+crl -in {tests}/pki/crl1.pem -gendelta {tests}/pki/crl2.pem -key {src}/test/certs/ca-key.pem -keyform PEM -noout -crlnumber
+crl -in {tests}/pki/crl1.pem -gendelta {tests}/pki/crl2.pem -key {src}/test/certs/ca-key.pem -keyform XYZ
+crl -in {tests}/pki/crl1.pem -gendelta {tests}/pki/crl2.pem
+crl -in {tests}/pki/crl1.pem -gendelta {tests}/pki/nonexistent.pem -key {src}/test/certs/ca-key.pem
+crl -in {tests}/pki/crl1.pem -gendelta {tests}/pki/crl2.pem -key {src}/test/certs/nonexistent.pem
+crl -in {tests}/pki/crl1.pem -gendelta {src}/test/testcrl.pem -key {src}/test/certs/ca-key.pem
+crl -in {tests}/pki/crl1.pem -gendelta {tests}/pki/crl2.pem -key {src}/test/certs/root-key.pem
+crl -in {dir}/nonexistent.pem
+crl -in {src}/test/certs/ca-cert.pem
+crl -inform DER -in {tests}/pki/crl1.pem
+crl < {tests}/pki/crl1.pem
+crl -noout -issuer < {tests}/pki/crl1.pem
+crl
+crl -in {tests}/pki/crl1.pem -provider default -propquery provider=default -noout -fingerprint
+crl -in {tests}/pki/crl1.pem -provider-path {dir} -provider default -noout
+crl -in {tests}/pki/crl1.pem extra
+crl -in {tests}/pki/crl1.pem -nosuchoption -sha256
+crl -nosuchoption
+crl -in {tests}/pki/crl1.pem -provparam default:x=1 -noout -crlnumber
+# The man page's examples.
+crl -in {tests}/pki/crl2.pem -outform DER -out {dir}/man-crl.der
+crl -in {dir}/man-crl.der -text -noout

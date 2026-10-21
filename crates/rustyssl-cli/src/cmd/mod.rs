@@ -6,14 +6,14 @@
 //! ([`crate::unported`]). Each command fork uncomments only its own lines.
 
 pub mod asn1parse;
+pub mod ca;
 pub mod version;
-// pub mod ca;
 // pub mod ciphers;
 // pub mod cmp;
 // pub mod cms;
 // pub mod configutl;
-// pub mod crl;
-// pub mod crl2pkcs7;
+pub mod crl;
+pub mod crl2pkcs7;
 pub mod dgst;
 pub mod dhparam;
 pub mod dsa;
@@ -43,7 +43,7 @@ pub mod pkeyutl;
 pub mod prime;
 pub mod rand;
 pub mod rehash;
-// pub mod req;
+pub mod req;
 pub mod rsa;
 pub mod rsautl;
 // pub mod s_client;
@@ -53,12 +53,12 @@ pub mod rsautl;
 pub mod skeyutl;
 // pub mod smime;
 // pub mod speed;
-// pub mod spkac;
+pub mod spkac;
 // pub mod srp;
-// pub mod storeutl;
+pub mod storeutl;
 // pub mod ts;
-// pub mod verify;
-// pub mod x509;
+pub mod verify;
+pub mod x509;
 
 /// The command's `main`, if it is ported.
 pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
@@ -66,13 +66,13 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         "help" => crate::help_main,
         "version" => version::main,
         "asn1parse" => asn1parse::main,
-        // "ca" => ca::main,
+        "ca" => ca::main,
         // "ciphers" => ciphers::main,
         // "cmp" => cmp::main,
         // "cms" => cms::main,
         // "configutl" => configutl::main,
-        // "crl" => crl::main,
-        // "crl2pkcs7" => crl2pkcs7::main,
+        "crl" => crl::main,
+        "crl2pkcs7" => crl2pkcs7::main,
         "dgst" => dgst::main,
         "dhparam" => dhparam::main,
         "dsa" => dsa::main,
@@ -102,7 +102,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         "prime" => prime::main,
         "rand" => rand::main,
         "rehash" => rehash::main,
-        // "req" => req::main,
+        "req" => req::main,
         "rsa" => rsa::main,
         "rsautl" => rsautl::main,
         // "s_client" => s_client::main,
@@ -112,12 +112,12 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         "skeyutl" => skeyutl::main,
         // "smime" => smime::main,
         // "speed" => speed::main,
-        // "spkac" => spkac::main,
+        "spkac" => spkac::main,
         // "srp" => srp::main,
-        // "storeutl" => storeutl::main,
+        "storeutl" => storeutl::main,
         // "ts" => ts::main,
-        // "verify" => verify::main,
-        // "x509" => x509::main,
+        "verify" => verify::main,
+        "x509" => x509::main,
         _ => return None,
     })
 }

@@ -1,0 +1,185 @@
+# `openssl x509` (cargo xtask test-apps: upstream's tool on the reference, then ours on rustyssl
+# and on the reference). Signatures are RSA PKCS#1 v1.5 (deterministic) with fixed dates and
+# serials; `@pki/x509ca` lines start from a fresh copy of that CA and its serial files.
+x509 -help
+x509 -in {src}/test/certs/ee-cert.pem
+x509 -in {src}/test/certs/ee-cert.pem -text
+x509 -in {src}/test/certs/ee-cert.pem -noout -text
+x509 -in {src}/test/certs/ee-cert.pem -noout -text -certopt no_header,no_version,no_serial,no_signame
+x509 -in {src}/test/certs/ee-cert.pem -noout -text -certopt no_validity,no_subject,no_issuer,no_pubkey
+x509 -in {src}/test/certs/ee-cert.pem -noout -text -certopt no_extensions,no_sigdump,no_aux,no_attributes
+x509 -in {src}/test/certs/ee-cert.pem -noout -text -certopt ca_default
+x509 -in {src}/test/certs/ee-cert.pem -noout -text -certopt compatible,ext_default
+x509 -in {src}/test/certs/ee-cert-crit-unknown-ext.pem -noout -text -certopt ext_error
+x509 -in {src}/test/certs/ee-cert-crit-unknown-ext.pem -noout -text -certopt ext_parse
+x509 -in {src}/test/certs/ee-cert-crit-unknown-ext.pem -noout -text -certopt ext_dump
+x509 -in {src}/test/certs/ee-cert.pem -noout -text -certopt nosuchopt
+x509 -in {src}/test/certs/ee-cert.pem -noout -subject -issuer -serial -next_serial
+x509 -in {src}/test/certs/ee-cert.pem -noout -issuer -subject -nameopt RFC2253
+x509 -in {src}/test/certs/ee-cert.pem -noout -subject -nameopt multiline,-esc_msb
+x509 -in {src}/test/certs/ee-cert.pem -noout -subject -nameopt bogus
+x509 -in {src}/test/certs/cyrillic.pem -noout -subject -nameopt utf8,sep_comma_plus_space
+x509 -in {src}/test/certs/cyrillic.pem -noout -text -nameopt oneline
+x509 -in {src}/test/certs/ee-cert.pem -noout -dates
+x509 -in {src}/test/certs/ee-cert.pem -noout -startdate -enddate -dateopt iso_8601
+x509 -in {src}/test/certs/ee-cert.pem -noout -enddate -dateopt rfc_822
+x509 -in {src}/test/certs/ee-cert.pem -noout -enddate -dateopt bad
+x509 -in {src}/test/certs/ee-cert.pem -noout -hash -subject_hash -subject_hash_old -issuer_hash -issuer_hash_old
+x509 -in {src}/test/certs/ee-cert.pem -noout -fingerprint
+x509 -in {src}/test/certs/ee-cert.pem -noout -fingerprint -sha256
+x509 -in {src}/test/certs/ee-cert.pem -noout -fingerprint -md5 -sha512
+x509 -in {src}/test/certs/ee-cert.pem -noout -fingerprint -nosuchdigest
+x509 -in {src}/test/certs/ee-cert.pem -noout -fingerprint -shake128
+x509 -in {src}/test/certs/ee-cert.pem -noout -purpose
+x509 -in {src}/test/certs/ca-cert.pem -noout -purpose
+x509 -in {src}/test/certs/ee-cert.pem -noout -pubkey -modulus
+x509 -in {src}/test/certs/server-dsa-cert.pem -noout -modulus
+x509 -in {src}/test/certs/server-ecdsa-cert.pem -noout -modulus -pubkey
+x509 -in {src}/test/certs/ee-pss-cert.pem -noout -modulus
+x509 -in {src}/test/certs/ee-cert.pem -noout -ocspid
+x509 -in {src}/test/certs/ee-cert-ocsp-nocheck.pem -noout -ocsp_uri -email
+x509 -in {src}/test/certs/ee-cert.pem -noout -alias
+x509 -in {src}/test/certs/ee-cert.pem -noout -email -ocsp_uri
+x509 -in {src}/test/certs/ee-cert.pem -noout -ext subjectAltName
+x509 -in {src}/test/certs/ee-cert.pem -noout -ext subjectAltName,basicConstraints,keyUsage
+x509 -in {src}/test/certs/ee-cert.pem -noout -ext ,,
+x509 -in {src}/test/certs/ee-cert.pem -noout -ext nosuchext
+x509 -in {src}/test/certs/ee-cert.pem -noout -ext subjectAltName,subjectAltName
+x509 -in {src}/test/v3-cert1.pem -noout -ext basicConstraints
+x509 -in {src}/test/testx509.pem -noout -ext basicConstraints
+x509 -in {src}/test/certs/ee-cert.pem -noout -checkhost server.example -checkemail a@b.example -checkip 127.0.0.1
+x509 -in {src}/test/certs/ee-cert.pem -checkhost other.example
+x509 -in {src}/test/certs/ee-cert.pem -noout -checkend 0
+x509 -in {src}/test/certs/ee-cert.pem -noout -checkend 9999999999
+x509 -in {src}/test/certs/ee-expired.pem -noout -checkend 0
+x509 -in {src}/test/certs/ee-cert.pem -noout -checkend x
+x509 -in {src}/test/certs/leaf-chain.pem -multi -noout -subject
+x509 -in {src}/test/certs/leaf-chain.pem -multi -noout -subject -checkend 0
+x509 -in {src}/test/certs/leaf-chain.pem -multi -subject -issuer
+x509 -in {src}/test/certs/leaf-chain.pem -multi -new -subj /CN=x -key {src}/test/certs/ee-key.pem
+x509 -in {src}/test/certs/ee-cert.pem -outform DER -out {dir}/ee.der
+x509 -in {dir}/ee.der -inform DER -noout -subject
+x509 -in {dir}/ee.der -noout -subject
+x509 -in {dir}/ee.der -inform PEM -noout -subject
+x509 -in {src}/test/certs/ee-cert.pem -inform XYZ
+x509 -in {src}/test/certs/ee-cert.pem -outform SMIME
+x509 -in {src}/test/certs/ee-cert.pem -outform XYZ
+x509 -in {src}/test/certs/ee-cert.pem -nocert -subject
+x509 -in {src}/test/certs/ee-cert.pem -noout
+x509 -in {src}/test/certs/ee-cert.pem -trustout -addtrust serverAuth -addreject clientAuth -setalias myalias
+x509 -in {src}/test/certs/ee-cert.pem -trustout -addtrust serverAuth -noout -text -alias
+x509 -in {src}/test/certs/ee-cert.pem -addtrust nosuch.oid
+x509 -in {src}/test/certs/ee-cert.pem -addreject nosuch.oid
+x509 -in {src}/test/certs/ee-cert.pem -trustout -clrtrust -clrreject
+x509 -in {src}/test/certs/ee-cert.pem -badsig -noout -text -certopt no_extensions
+x509 -in {src}/test/certs/ee-cert.pem -clrext -noout -text -certopt no_sigdump
+x509 -in {src}/test/certs/ee-cert.pem -ext basicConstraints -clrext -noout
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -not_before 20250101000000Z -not_after 20350101000000Z -set_serial 7
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -not_before 20250101000000Z -not_after 20350101000000Z -set_serial 7 -noout -text
+x509 -in {src}/test/certs/ee-cert.pem -signkey {src}/test/certs/ee-key.pem -not_before 250101000000Z -not_after today -set_serial 0x10 -noout -serial -issuer -startdate
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -preserve_dates -set_serial 7 -sha512
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ca-key.pem -preserve_dates -set_serial 7 -noout -subject
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -preserve_dates -not_before 20250101000000Z
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -preserve_dates -not_after 20250101000000Z
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -preserve_dates -days 3
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -not_before 20350101000000Z -not_after 20250101000000Z
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -not_before bad
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -not_after bad
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -days 3 -not_after 20350101000000Z -not_before 20250101000000Z -set_serial 1 -noout -dates
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -days -2
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -set_serial 1 -set_serial 2
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -set_serial xyz
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -set_serial 3 -not_before 20250101000000Z -not_after 20350101000000Z -set_subject /CN=renamed -set_issuer /O=Issuer/CN=other -noout -subject -issuer
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -set_serial 3 -subj noslash
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -set_serial 3 -set_issuer /CN
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -set_serial 3 -not_before 20250101000000Z -not_after 20350101000000Z -extfile {tests}/pki/x509.cnf -noout -text
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -set_serial 3 -not_before 20250101000000Z -not_after 20350101000000Z -extfile {tests}/pki/x509.cnf -extensions v3_ca -clrext -noout -text
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -set_serial 3 -not_before 20250101000000Z -not_after 20350101000000Z -extfile {tests}/pki/x509.cnf -extensions noaki -noout -text
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -set_serial 3 -extfile {tests}/pki/x509.cnf -extensions bad
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -set_serial 3 -extfile {tests}/pki/x509.cnf -extensions nosuchsection
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -set_serial 3 -extfile {dir}/nonexistent.cnf
+x509 -in {src}/test/certs/ee-cert.pem -extensions v3_ca -noout
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -set_serial 3 -not_before 20250101000000Z -not_after 20350101000000Z -sigopt rsa_padding_mode:pss -sigopt rsa_pss_saltlen:20 -noout -text -certopt no_sigdump
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -set_serial 3 -sigopt nosuch:1
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -set_serial 3 -sigopt bad
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/nonexistent.pem
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/key-pass-12345.pem -passin pass:12345 -set_serial 3 -not_before 20250101000000Z -not_after 20350101000000Z -noout -subject
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/key-pass-12345.pem -passin pass:bad
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/key-pass-12345.pem -passin bad
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -keyform PEM -set_serial 3 -not_before 20250101000000Z -not_after 20350101000000Z -noout -issuer
+x509 -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -keyform XYZ
+x509 -in {src}/test/certs/ee-cert.pem -force_pubkey {src}/test/certs/root-cert.pem -key {src}/test/certs/ee-key.pem -set_serial 3 -not_before 20250101000000Z -not_after 20350101000000Z -noout -pubkey
+x509 -in {src}/test/certs/ee-cert.pem -force_pubkey {src}/test/certs/nonexistent.pem
+x509 -new -subj /CN=new -key {src}/test/certs/ee-key.pem -set_serial 1 -not_before 20250101000000Z -not_after 20350101000000Z
+x509 -new -subj /CN=new -key {src}/test/certs/ee-key.pem -set_serial 1 -not_before 20250101000000Z -not_after 20350101000000Z -text -noout
+x509 -new -subj /CN=new -key {src}/test/certs/ee-key.pem -set_serial 1 -not_before 20250101000000Z -not_after 20350101000000Z -extfile {tests}/pki/x509.cnf -extensions v3_ca -text
+x509 -new -subj /CN=new -force_pubkey {src}/test/certs/ee-cert.pem -CA {src}/test/certs/ca-cert.pem -CAkey {src}/test/certs/ca-key.pem -set_serial 1 -not_before 20250101000000Z -not_after 20350101000000Z -text
+x509 -new -subj /CN=new -force_pubkey {src}/test/certs/ee-cert.pem
+x509 -new -key {src}/test/certs/ee-key.pem
+x509 -new -subj /CN=new
+x509 -new -subj /CN=new -key {src}/test/certs/ee-key.pem -in {src}/test/certs/ee-cert.pem
+x509 -new -subj /CN=new -key {src}/test/certs/ee-key.pem -req
+x509 -new -subj /CN=new -key {src}/test/certs/ee-key.pem -not_before 20250101000000Z -not_after 20350101000000Z -noout -subject -issuer -dates
+x509 -req -in {tests}/pki/ee.csr -key {src}/test/certs/ee-key.pem -set_serial 5 -not_before 20250101000000Z -not_after 20350101000000Z
+x509 -req -in {tests}/pki/ee.csr -key {src}/test/certs/ee-key.pem -set_serial 5 -not_before 20250101000000Z -not_after 20350101000000Z -copy_extensions copy -text -noout
+x509 -req -in {tests}/pki/ee.csr -key {src}/test/certs/ee-key.pem -set_serial 5 -not_before 20250101000000Z -not_after 20350101000000Z -copy_extensions copyall -extfile {tests}/pki/x509.cnf -text -noout
+x509 -req -in {tests}/pki/ee.csr -key {src}/test/certs/ee-key.pem -set_serial 5 -not_before 20250101000000Z -not_after 20350101000000Z -copy_extensions none -text -noout
+x509 -req -in {tests}/pki/ee.csr -key {src}/test/certs/ee-key.pem -set_serial 5 -copy_extensions copy -clrext
+x509 -req -in {tests}/pki/ee.csr -key {src}/test/certs/ee-key.pem -copy_extensions bad
+x509 -req -in {tests}/pki/ee.csr -key {src}/test/certs/ee-key.pem -set_serial 5 -not_before 20250101000000Z -not_after 20350101000000Z -preserve_dates
+x509 -req -in {tests}/pki/ee.csr.der -inform DER -key {src}/test/certs/ee-key.pem -set_serial 5 -not_before 20250101000000Z -not_after 20350101000000Z -noout -subject
+x509 -req -in {tests}/pki/ee.csr.der -key {src}/test/certs/ee-key.pem -set_serial 5 -not_before 20250101000000Z -not_after 20350101000000Z -noout -subject
+x509 -req -in {tests}/pki/ee.csr -inform DER -key {src}/test/certs/ee-key.pem
+x509 -req -in {tests}/pki/ee.csr -set_serial 5
+x509 -req -in {tests}/pki/ee.csr -CA {src}/test/certs/ca-cert.pem -CAkey {src}/test/certs/ca-key.pem -set_serial 5 -not_before 20250101000000Z -not_after 20350101000000Z -text
+x509 -req -in {tests}/pki/ee.csr -CA {src}/test/certs/ca-cert.pem -CAkey {src}/test/certs/root-key.pem -set_serial 5
+x509 -req -in {tests}/pki/ee.csr -CA {src}/test/certs/ca-cert.pem -set_serial 5
+x509 -req -in {tests}/pki/ee.csr -CA {src}/test/certs/ca-cert.pem -key {src}/test/certs/ee-key.pem
+x509 -req -in {tests}/pki/ee.csr -CA {src}/test/certs/nonexistent.pem -CAkey {src}/test/certs/ca-key.pem -set_serial 5
+x509 -req -in {src}/test/certs/sm2-csr.pem -key {src}/test/certs/sm2.key -vfyopt distid:1234567812345678 -set_serial 5 -noout -subject
+x509 -req -in {src}/test/certs/sm2-csr.pem -key {src}/test/certs/sm2.key -set_serial 5 -noout -subject
+x509 -req -in {src}/test/certs/x509-check.csr -key {src}/test/certs/ee-key.pem -set_serial 5 -noout -subject
+x509 -req -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem
+x509 -req -in {dir}/nonexistent.csr -key {src}/test/certs/ee-key.pem
+@pki/x509ca x509 -req -in {tests}/pki/ee.csr -CA {dir}/x509ca/ca.pem -CAkey {dir}/x509ca/ca.key -not_before 20250101000000Z -not_after 20350101000000Z -noout -serial -subject -issuer
+@pki/x509ca x509 -req -in {tests}/pki/ee.csr -CA {dir}/x509ca/ca.pem -CAkey {dir}/x509ca/ca.key -CAserial {dir}/x509ca/alt.srl -not_before 20250101000000Z -not_after 20350101000000Z
+@pki/x509ca x509 -req -in {tests}/pki/ee.csr -CA {dir}/x509ca/ca.pem -CAkey {dir}/x509ca/ca.key -CAserial {dir}/x509ca/bad.srl
+@pki/x509ca x509 -req -in {tests}/pki/ee.csr -CA {dir}/x509ca/ca.pem -CAkey {dir}/x509ca/ca.key -CAserial {dir}/x509ca/none.srl
+@pki/x509ca x509 -in {src}/test/certs/ee-cert.pem -CA {dir}/x509ca/ca.pem -CAkey {dir}/x509ca/ca.key -CAserial {dir}/x509ca/alt.srl -not_before 20250101000000Z -not_after 20350101000000Z -noout -serial -text
+@pki/x509ca x509 -in {src}/test/certs/root-cert.pem -CA {dir}/x509ca/ca.pem -CAkey {dir}/x509ca/ca.key -CAserial {dir}/x509ca/alt.srl -noout -serial
+@pki/x509ca x509 -in {src}/test/certs/ee-cert.pem -CA {dir}/x509ca/ca.pem -CAkey {dir}/x509ca/ca.key -CAserial {dir}/x509ca/alt.srl -CAform PEM -CAkeyform PEM -not_before 20250101000000Z -not_after 20350101000000Z -noout -next_serial
+@pki/x509ca x509 -in {src}/test/certs/ee-cert.pem -CA {dir}/x509ca/ca.pem -CAkey {dir}/x509ca/ca.key -CAserial {dir}/x509ca/alt.srl -x509toreq -noout
+@pki/x509ca ~x509 -req -in {tests}/pki/ee.csr -CA {dir}/x509ca/ca.pem -CAkey {dir}/x509ca/ca.key -CAserial {dir}/x509ca/new.srl -CAcreateserial
+@pki/x509ca ~x509 -new -subj /CN=random -key {dir}/x509ca/ca.key
+x509 -in {src}/test/certs/ee-cert.pem -CAkey k -CAkeyform PEM -CAform PEM -CAserial s -CAcreateserial -noout -subject
+x509 -in {src}/test/certs/ee-cert.pem -x509toreq -key {src}/test/certs/ee-key.pem
+x509 -in {src}/test/certs/ee-cert.pem -x509toreq -key {src}/test/certs/ee-key.pem -copy_extensions copy -ext subjectAltName,subjectKeyIdentifier
+x509 -in {src}/test/certs/ee-cert.pem -x509toreq -key {src}/test/certs/ee-key.pem -copy_extensions copy -clrext
+x509 -in {src}/test/certs/ee-cert.pem -x509toreq -key {src}/test/certs/ee-key.pem -extfile {tests}/pki/x509.cnf -outform DER
+x509 -in {src}/test/certs/ee-cert.pem -x509toreq -key {src}/test/certs/ee-key.pem -noout -subject
+x509 -in {src}/test/certs/ee-cert.pem -x509toreq
+x509 -in {src}/test/certs/ee-cert.pem -copy_extensions copy -noout
+x509 -in {src}/test/certs/ee-cert.pem -rand {txt} -writerand {dir}/x509.rnd -noout -subject
+x509 -in {src}/test/certs/ee-cert.pem -rand {dir}/nonexistent.rnd -noout -subject
+x509 -in {src}/test/certs/ee-cert.pem -provider default -propquery provider=default -noout -fingerprint -sha256
+x509 -in {src}/test/certs/ee-cert.pem -provider-path {dir} -provider default -noout -subject
+x509 -in {txt}
+x509 -in {dir}/nonexistent.pem
+x509 < {src}/test/certs/ee-cert.pem
+x509 -noout -subject < {src}/test/certs/ca-cert.pem
+x509 -in {src}/test/certs/ee-cert.pem extra
+x509 -nosuchoption -sha256
+x509 -in
+x509 -engine dynamic -in {src}/test/certs/ee-cert.pem -noout -subject
+x509 -engine dynamic -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -keyform ENGINE
+x509 -provparam default:x=1 -in {src}/test/certs/ee-cert.pem -noout -subject
+x509 -provparam bad -in {src}/test/certs/ee-cert.pem -noout -subject
+# The man page's examples.
+x509 -in {src}/test/certs/ee-cert.pem -noout -ext subjectAltName,nsCertType
+x509 -sha1 -in {src}/test/certs/ee-cert.pem -noout -fingerprint
+x509 -in {src}/test/certs/ee-cert.pem -inform PEM -out {dir}/man-cert.der -outform DER
+x509 -x509toreq -in {src}/test/certs/ee-cert.pem -out {dir}/man-req.pem -key {src}/test/certs/ee-key.pem
+x509 -req -in {tests}/pki/ee.csr -extfile {tests}/pki/x509.cnf -extensions v3_ca -CA {src}/test/certs/ca-cert.pem -CAkey {src}/test/certs/ca-key.pem -set_serial 3 -not_before 20250101000000Z -not_after 20350101000000Z
+x509 -in {src}/test/certs/ee-cert.pem -addtrust clientAuth -setalias Steve's_Class_1_CA -out {dir}/man-trust.pem
+x509 -in {dir}/man-trust.pem -noout -alias -text -certopt no_pubkey,no_sigdump
+x509 -in {src}/test/certs/leaf-chain.pem -multi -checkend 2592000

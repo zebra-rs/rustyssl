@@ -18,6 +18,9 @@
 //! In a line, `{bin}` is 100,000 octets of fixed data, `{txt}` a line of text, `{dir}` the work
 //! directory, `{src}` the reference's source tree (its `test/certs/`, ...), and `{tests}`
 //! `tests/apps/`; a final `< file` gives the command its standard input (otherwise empty).
+//! A line starting with `@<fixture> ` (after any `~`) is stateful: before each of its runs, the
+//! directory `tests/apps/<fixture>` is copied afresh to `{dir}/<its last component>` (a CA's
+//! database and serial files, which the command changes), so every run starts the same.
 //!
 //! Output that is random by design (key and parameter generation, randomized signatures) is
 //! compared structurally: in `command ... | check ...`, each run of `command` is followed by
@@ -180,6 +183,8 @@ struct Setup {
     ref_lib: PathBuf,
     our_lib: PathBuf,
     work: PathBuf,
+    /// `tests/apps/`.
+    tests: PathBuf,
     subst: Vec<(&'static str, String)>,
 }
 
@@ -191,6 +196,27 @@ struct Line {
     args: Vec<String>,
     stdin: Option<PathBuf>,
     checks: Vec<Vec<String>>,
+    /// The fixture directory copied afresh before each run, and where it goes.
+    reset: Option<(PathBuf, PathBuf)>,
+}
+
+/// Copies the directory `from` to `to`, replacing what was there.
+fn copy_fresh(from: &Path, to: &Path) -> Result {
+    if to.exists() {
+        fs::remove_dir_all(to)?;
+    }
+    fs::create_dir_all(to)?;
+    for entry in fs::read_dir(from)? {
+        let entry = entry?;
+        let path = entry.path();
+        let dest = to.join(entry.file_name());
+        if path.is_dir() {
+            copy_fresh(&path, &dest)?;
+        } else {
+            fs::copy(&path, &dest)?;
+        }
+    }
+    Ok(())
 }
 
 fn parse_list(text: &str, setup: &Setup) -> Vec<Line> {
@@ -202,6 +228,16 @@ fn parse_list(text: &str, setup: &Setup) -> Vec<Line> {
         let (compare, rest) = match line.strip_prefix('~') {
             Some(rest) => (false, rest),
             None => (true, line),
+        };
+        let mut reset = None;
+        let rest = match rest.strip_prefix('@').and_then(|r| r.split_once(' ')) {
+            Some((fixture, r)) => {
+                let from = setup.tests.join(fixture);
+                let name = from.file_name().map(PathBuf::from).unwrap_or_default();
+                reset = Some((from, setup.work.join(name)));
+                r
+            }
+            None => rest,
         };
         let mut args: Vec<String> = rest
             .split_whitespace()
@@ -229,6 +265,7 @@ fn parse_list(text: &str, setup: &Setup) -> Vec<Line> {
             args,
             stdin,
             checks,
+            reset,
         });
     }
     out
@@ -251,6 +288,9 @@ fn ported(root: &Path, command: &str) -> bool {
 /// the command's exit status and the last check's output, hex dumps collapsed.
 fn run_line(setup: &Setup, line: &Line, tool: &Path, lib: &Path) -> Result<Output> {
     let w = &setup.work;
+    if let Some((from, to)) = &line.reset {
+        copy_fresh(from, to)?;
+    }
     let first = run_tool(tool, lib, &line.args, line.stdin.as_deref(), w)?;
     if line.checks.is_empty() {
         return Ok(first);
@@ -362,6 +402,7 @@ pub fn run(args: &[String]) -> Result {
         ref_lib: reference.join("lib"),
         our_lib: dist.join("lib"),
         work: work.clone(),
+        tests: root.join("tests/apps"),
         subst: vec![
             ("{bin}", bin.display().to_string()),
             ("{txt}", txt.display().to_string()),
@@ -584,14 +625,21 @@ mod tests {
             ours: PathBuf::new(),
             ref_lib: PathBuf::new(),
             our_lib: PathBuf::new(),
-            work: PathBuf::new(),
+            work: PathBuf::from("/w"),
+            tests: PathBuf::from("/t"),
             subst: vec![("{txt}", "/w/t".to_owned())],
         };
         let lines = parse_list(
-            "# c\n\n~speed -seconds 1\nenc -base64 -in {txt}\nx509 -noout < {txt}\n",
+            "# c\n\n~speed -seconds 1\nenc -base64 -in {txt}\nx509 -noout < {txt}\n~@pki/db ca -x\n",
             &setup,
         );
-        assert_eq!(lines.len(), 3);
+        assert_eq!(lines.len(), 4);
+        assert!(!lines[3].compare);
+        assert_eq!(lines[3].args, ["ca", "-x"]);
+        assert_eq!(
+            lines[3].reset,
+            Some((PathBuf::from("/t/pki/db"), PathBuf::from("/w/db")))
+        );
         assert!(!lines[0].compare);
         assert_eq!(lines[1].args, ["enc", "-base64", "-in", "/w/t"]);
         assert_eq!(lines[2].args, ["x509", "-noout"]);

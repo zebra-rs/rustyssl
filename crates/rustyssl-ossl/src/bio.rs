@@ -160,7 +160,8 @@ impl Drop for Bio {
 
 impl io::Write for &Bio {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.write_all(buf)?;
+        // The inherent method: `self.write_all` would be this trait's, which calls `write`.
+        Bio::write_all(self, buf)?;
         Ok(buf.len())
     }
 

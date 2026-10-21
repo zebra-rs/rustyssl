@@ -37,6 +37,7 @@ pub mod engine;
 pub mod pkey;
 pub mod store;
 pub mod sys;
+pub mod txt_db;
 pub mod ui;
 pub mod verify;
 pub mod x509;
