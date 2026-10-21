@@ -6023,6 +6023,42 @@ database and serial-file helpers of `apps.c` (G3, `ca`), its HTTP and TLS-for-HT
 (G4, `ocsp`/`cmp`), `http_server.c`, `cmp_mock_srv.c`, `app_params.c`, `names.c`, `log.c`, and
 `s_cb.c`/`s_socket.c` (G5).
 
+G3, the certificate commands (2026-10-21, branch `cli-g3`), is done: `x509`, `req`, `verify`,
+`crl`, `crl2pkcs7`, `ca`, `spkac`, and `storeutl` are ported (`src/cmd/<command>.rs`), each
+with a corpus `tests/apps/<command>.txt` that covers every option (`-engine` with the built-in
+`dynamic` engine), the error paths, and the man page's examples: 747 lines, byte-exact with
+the same exit codes in all three `test-apps` runs. `verify -help`'s purposes and parameter
+names are in its corpus. Signed output is byte-compared: RSA PKCS#1 v1.5 keys from the
+reference's `test/certs/`, fixed dates and serials, and committed fixtures in
+`tests/apps/pki/` (CRLs, SPKACs, requests, configurations, a CA in `pki/cadb/`); new keys are
+generated with `-quiet` and written to files, and the few lines that print random keys or
+serials must only succeed (`~`). Prompts (`req`'s DN and `ca`'s questions) read standard
+input, as upstream's `fgets` does.
+- **Shared helpers:** `src/lib/ca_db.rs`, apps.c's CA database and serial files
+  (`load_serial`, `save_serial`, `rotate_serial`, `rand_serial`, `load_index`, `index_index`,
+  `save_index`, `rotate_index`), on the library's `TXT_DB`. In command files, for others to
+  use or move: `cmd/x509.rs` has `set_cert_times`, `check_cert_time_string`, and
+  `check_cert_attributes`; `cmd/ca.rs` has `unpack_revinfo` (for `ocsp`) and
+  `set_crl_lastupdate`/`set_crl_nextupdate`; `cmd/verify.rs` has `policies_print` and
+  `store_setup_crl_download` (for `s_client`/`s_server`); `cmd/req.rs` has `progress_cb` and
+  `app_keygen`.
+- **rustyssl-ossl:** wrappers in `x509` (certificates, requests, CRLs, revoked entries, names
+  and entries, extensions, times, integers, BIGNUMs, PKCS#7, SPKI), `verify` (a borrowing
+  verification context, verification and CRL-lookup callbacks behind trampolines that catch
+  panics), `store` (searches), `pkey` (a keygen context with a progress callback), `evp`,
+  `engine` (`get_legacy_pkey_id`), and a new module `txt_db`. Two F0 fixes: `io::Write for
+  &Bio` called itself (a stack overflow on any `write!` to a `BIO`), and the engine store
+  loader's scheme dangled (`OSSL_STORE_LOADER_new` keeps the pointer), so
+  `org.openssl.engine:` URIs never reached it.
+- **test-apps:** a line starting with `@<fixture>` copies `tests/apps/<fixture>` afresh into
+  the work directory before each of its runs (`ca`'s database and serial files, `x509
+  -CAserial`).
+- **Library differences seen** (upstream's tool on rustyssl differs too; those lines are left
+  out of the corpora): the error queue's function name for PEM's "no start line" (`get_name`
+  on the reference, `PEM_read_bio_ex` on rustyssl) and for `storeutl` on a directory without
+  `-r` (`get_string_ptr_internal` against `OSSL_PARAM_get_octet_string_ptr`); and the module
+  and engine directories in DSO errors, which differ by design.
+
 ## Phase 12: Hardening, performance, release 1.0 → M7
 
 - [ ] **12.1 Performance:** benchmark against the reference (per TEST_PLAN L10). Close the gaps
