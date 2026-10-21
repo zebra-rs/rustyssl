@@ -32,6 +32,7 @@ pub mod conf;
 pub mod engine;
 pub mod pkey;
 pub mod sock;
+pub mod srp;
 pub mod ssl;
 pub mod ssl_cb;
 pub mod store;

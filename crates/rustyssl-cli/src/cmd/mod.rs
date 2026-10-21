@@ -54,7 +54,7 @@ pub mod ciphers;
 // pub mod smime;
 // pub mod speed;
 // pub mod spkac;
-// pub mod srp;
+pub mod srp;
 // pub mod storeutl;
 // pub mod ts;
 // pub mod verify;
@@ -113,7 +113,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "smime" => smime::main,
         // "speed" => speed::main,
         // "spkac" => spkac::main,
-        // "srp" => srp::main,
+        "srp" => srp::main,
         // "storeutl" => storeutl::main,
         // "ts" => ts::main,
         // "verify" => verify::main,

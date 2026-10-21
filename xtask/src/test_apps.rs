@@ -18,6 +18,8 @@
 //! In a line, `{bin}` is 100,000 octets of fixed data, `{txt}` a line of text, `{dir}` the work
 //! directory, `{src}` the reference's source tree (its `test/certs/`, ...), and `{tests}`
 //! `tests/apps/`; a final `< file` gives the command its standard input (otherwise empty).
+//! `{fresh:NAME}` is `fresh/NAME` in the work directory, a pristine copy of `tests/apps/NAME`
+//! made again before each run, for commands that change the files they're given.
 //!
 //! Run whole (no list named), it also runs the CLI's library-backed unit tests (`live_*`, the
 //! shared helpers) on each library.
@@ -157,6 +159,8 @@ struct Setup {
     ref_lib: PathBuf,
     our_lib: PathBuf,
     work: PathBuf,
+    /// `tests/apps/`.
+    tests: PathBuf,
     subst: Vec<(&'static str, String)>,
 }
 
@@ -166,6 +170,46 @@ struct Line {
     compare: bool,
     args: Vec<String>,
     stdin: Option<PathBuf>,
+    /// The `{fresh:NAME}` files.
+    fresh: Vec<String>,
+}
+
+/// Replaces each `{fresh:NAME}` of `arg` with its path, recording the names.
+fn fresh_files(arg: &str, work: &Path, names: &mut Vec<String>) -> String {
+    let mut out = String::new();
+    let mut rest = arg;
+    while let Some(at) = rest.find("{fresh:") {
+        let Some(end) = rest[at..].find('}') else {
+            break;
+        };
+        let name = &rest[at + 7..at + end];
+        out.push_str(&rest[..at]);
+        out.push_str(&work.join("fresh").join(name).display().to_string());
+        names.push(name.to_owned());
+        rest = &rest[at + end + 1..];
+    }
+    out.push_str(rest);
+    out
+}
+
+/// Makes the `{fresh:NAME}` copies again (`tests/apps/NAME` when it exists).
+fn refresh(setup: &Setup, line: &Line) -> Result {
+    if line.fresh.is_empty() {
+        return Ok(());
+    }
+    let dir = setup.work.join("fresh");
+    fresh_dir(&dir)?;
+    for name in &line.fresh {
+        let src = setup.tests.join(name);
+        let dst = dir.join(name);
+        if let Some(parent) = dst.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        if src.is_file() {
+            fs::copy(&src, &dst)?;
+        }
+    }
+    Ok(())
 }
 
 fn parse_list(text: &str, setup: &Setup) -> Vec<Line> {
@@ -178,10 +222,11 @@ fn parse_list(text: &str, setup: &Setup) -> Vec<Line> {
             Some(rest) => (false, rest),
             None => (true, line),
         };
+        let mut fresh = Vec::new();
         let mut args: Vec<String> = rest
             .split_whitespace()
             .map(|a| {
-                let mut a = a.to_owned();
+                let mut a = fresh_files(a, &setup.work, &mut fresh);
                 for (key, value) in &setup.subst {
                     a = a.replace(key, value);
                 }
@@ -198,6 +243,7 @@ fn parse_list(text: &str, setup: &Setup) -> Vec<Line> {
             compare,
             args,
             stdin,
+            fresh,
         });
     }
     out
@@ -223,6 +269,7 @@ fn check(
     runs: &[(&Path, &Path, &str)],
 ) -> Result<std::result::Result<(), String>> {
     let w = &setup.work;
+    refresh(setup, line)?;
     let expected = run_tool(
         &setup.upstream,
         &setup.ref_lib,
@@ -231,6 +278,7 @@ fn check(
         w,
     )?;
     for (tool, lib, label) in runs {
+        refresh(setup, line)?;
         let got = run_tool(tool, lib, &line.args, line.stdin.as_deref(), w)?;
         let verdict = if line.compare {
             compare(&expected, &got, label)
@@ -277,6 +325,7 @@ pub fn run(args: &[String]) -> Result {
         ref_lib: reference.join("lib"),
         our_lib: dist.join("lib"),
         work: work.clone(),
+        tests: root.join("tests/apps"),
         subst: vec![
             ("{bin}", bin.display().to_string()),
             ("{txt}", txt.display().to_string()),
@@ -491,7 +540,8 @@ mod tests {
             ours: PathBuf::new(),
             ref_lib: PathBuf::new(),
             our_lib: PathBuf::new(),
-            work: PathBuf::new(),
+            work: PathBuf::from("/w"),
+            tests: PathBuf::new(),
             subst: vec![("{txt}", "/w/t".to_owned())],
         };
         let lines = parse_list(
@@ -503,5 +553,11 @@ mod tests {
         assert_eq!(lines[1].args, ["enc", "-base64", "-in", "/w/t"]);
         assert_eq!(lines[2].args, ["x509", "-noout"]);
         assert_eq!(lines[2].stdin.as_deref(), Some(Path::new("/w/t")));
+        let lines = parse_list("srp -srpvfile {fresh:srp/v.txt} -list\n", &setup);
+        assert_eq!(
+            lines[0].args,
+            ["srp", "-srpvfile", "/w/fresh/srp/v.txt", "-list"]
+        );
+        assert_eq!(lines[0].fresh, ["srp/v.txt"]);
     }
 }

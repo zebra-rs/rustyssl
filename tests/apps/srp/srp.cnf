@@ -1,0 +1,11 @@
+[ srp ]
+default_srp = srpdef
+
+[ srpdef ]
+srpvfile = fresh/srp/users.txt
+
+[ other ]
+srpvfile = fresh/srp/index.txt
+
+[ nofile ]
+x = y
