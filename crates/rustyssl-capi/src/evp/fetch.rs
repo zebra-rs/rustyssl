@@ -18,7 +18,8 @@
 //! Providers' functions and method constructors run without a lock held.
 
 use core::ffi::{CStr, c_int, c_void};
-use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use rustyssl_abi::{
     CRYPTO_R_BAD_ALGORITHM_NAME, CRYPTO_R_CONFLICTING_NAMES, ERR_LIB_CRYPTO, ERR_LIB_EVP,
@@ -151,11 +152,24 @@ pub(crate) struct State {
 
 /// A context's names and EVP method store, behind their lock.
 #[derive(Default)]
-pub(crate) struct Store(Mutex<State>);
+pub(crate) struct Store(RwLock<State>, AtomicBool);
 
 impl Store {
-    pub(crate) fn lock(&self) -> MutexGuard<'_, State> {
-        self.0.lock().unwrap_or_else(PoisonError::into_inner)
+    /// The store, to change.
+    pub(crate) fn lock(&self) -> RwLockWriteGuard<'_, State> {
+        self.0.write().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Whether the name map has been pre-filled ([`prefill`]): once it has, every fetch knows
+    /// without taking the lock.
+    fn filled(&self) -> bool {
+        self.1.load(Ordering::Acquire)
+    }
+
+    /// The store, to read: every fetch looks a name and its cached method up, so the lookups
+    /// share the store instead of queuing for it.
+    pub(crate) fn read(&self) -> RwLockReadGuard<'_, State> {
+        self.0.read().unwrap_or_else(PoisonError::into_inner)
     }
 
     /// Gives up the stored methods as the context goes ([`crate::handle::Handle::teardown`]):
@@ -472,14 +486,14 @@ unsafe fn inner_fetch(
     };
     let propq = properties.map_or(&b""[..], CStr::to_bytes);
     prefill(&ctx);
-    let mut name_id = name.map_or(0, |n| ctx.evp.lock().names.number(n.to_bytes()));
+    let mut name_id = name.map_or(0, |n| ctx.evp.read().names.number(n.to_bytes()));
     let id = method_id(name_id, kind.operation);
     let mut unsupported = name_id == 0;
     let cached = if id == 0 {
         None
     } else {
         ctx.evp
-            .lock()
+            .read()
             .store
             .cache_get(id, propq, prov.map(|p| key(p)))
     };
@@ -632,7 +646,11 @@ pub(crate) unsafe fn all(libctx: *mut OSSL_LIB_CTX, kind: &'static Kind) -> Vec<
 /// `OPENSSL_INIT_ADD_ALL_CIPHERS` and `_DIGESTS`, then the key types' of the built-in ASN.1
 /// methods (an alias's base type's names first, and the PEM name last).
 pub(crate) fn prefill(ctx: &libctx::LibCtx) {
-    if !ctx.evp.lock().names.is_empty() {
+    if ctx.evp.filled() {
+        return;
+    }
+    if !ctx.evp.read().names.is_empty() {
+        ctx.evp.1.store(true, Ordering::Release);
         return;
     }
     // Gathered without the lock: adding the ciphers and digests runs the library's
@@ -742,7 +760,7 @@ pub(crate) fn number_in(prov: *const OSSL_PROVIDER, name: &[u8]) -> u32 {
     // SAFETY: as above.
     unsafe { libctx::resolve(libctx) }.map_or(0, |ctx| {
         prefill(&ctx);
-        ctx.evp.lock().names.number(name)
+        ctx.evp.read().names.number(name)
     })
 }
 
@@ -754,7 +772,7 @@ pub(crate) unsafe fn number_in_libctx(libctx: *mut OSSL_LIB_CTX, name: &[u8]) ->
     // SAFETY: the caller's guarantee.
     unsafe { libctx::resolve(libctx) }.map_or(0, |ctx| {
         prefill(&ctx);
-        ctx.evp.lock().names.number(name)
+        ctx.evp.read().names.number(name)
     })
 }
 

@@ -169,7 +169,11 @@ impl crate::lowlevel::modes::Ctr128 for KeyCtr<'_> {
         let (head, tail) = iv.split_at(12);
         let mut counter = u32::from_be_bytes(tail.try_into().unwrap_or([0; 4]));
         let len = blocks.saturating_mul(16).min(data.len());
-        for chunk in data.get_mut(..len).unwrap_or_default().chunks_mut(BATCH * 16) {
+        for chunk in data
+            .get_mut(..len)
+            .unwrap_or_default()
+            .chunks_mut(BATCH * 16)
+        {
             let Some(buf) = stream.get_mut(..chunk.len()) else {
                 return;
             };
