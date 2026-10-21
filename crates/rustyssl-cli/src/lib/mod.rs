@@ -7,6 +7,7 @@
 #![allow(dead_code)]
 
 pub mod app_libctx;
+pub mod app_params;
 pub mod app_rand;
 pub mod apps;
 pub mod engine;

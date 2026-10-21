@@ -19,9 +19,11 @@ pub use generated::ffi;
 pub use rustyssl_abi as abi;
 
 pub mod bio;
+pub mod bn;
 pub mod crypto;
 pub mod err;
 pub mod evp;
+pub mod params;
 pub mod provider;
 pub mod rand;
 mod util;

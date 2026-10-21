@@ -530,3 +530,112 @@ pub fn load_http_crl(url: &str) -> Option<Crl> {
         ffi::X509_CRL_load_http(u.as_ptr(), core::ptr::null_mut(), core::ptr::null_mut(), 0)
     })
 }
+
+// PEM certificates and Netscape certificate sequences (`nseq`).
+
+impl Cert {
+    /// `PEM_read_bio_X509(bio, NULL, NULL, NULL)`.
+    pub fn read_pem(bio: &Bio) -> Option<Self> {
+        // SAFETY: the BIO is live; NULL callback and data use the library's defaults.
+        Self::from_ptr(unsafe {
+            ffi::PEM_read_bio_X509(
+                bio.as_ptr(),
+                core::ptr::null_mut(),
+                None,
+                core::ptr::null_mut(),
+            )
+        })
+    }
+
+    /// `PEM_write_bio_X509`.
+    pub fn write_pem(&self, bio: &Bio) -> bool {
+        // SAFETY: both are live.
+        unsafe { ffi::PEM_write_bio_X509(bio.as_ptr(), self.as_ptr()) == 1 }
+    }
+
+    /// `X509_up_ref`, as a second owner.
+    pub fn up_ref(&self) -> Option<Self> {
+        // SAFETY: the certificate is live; the new reference is freed by the new owner.
+        (unsafe { ffi::X509_up_ref(self.as_ptr()) } == 1).then(|| Self(self.0))
+    }
+}
+
+crate::handle!(
+    /// An owned `NETSCAPE_CERT_SEQUENCE`.
+    CertSeq, NETSCAPE_CERT_SEQUENCE, NETSCAPE_CERT_SEQUENCE_free
+);
+
+impl CertSeq {
+    /// `NETSCAPE_CERT_SEQUENCE_new()`, with an empty `certs` stack.
+    pub fn new() -> Option<Self> {
+        // SAFETY: no arguments.
+        let s = Self::from_ptr(unsafe { ffi::NETSCAPE_CERT_SEQUENCE_new() })?;
+        // SAFETY: no arguments.
+        let sk = unsafe { ffi::OPENSSL_sk_new_null() }.cast::<stack_st_X509>();
+        if sk.is_null() {
+            return None;
+        }
+        // SAFETY: s is live; its `certs` (NULL when new) now owns the stack, freed with it.
+        unsafe { (*s.as_ptr()).certs = sk };
+        Some(s)
+    }
+
+    /// `PEM_read_bio_NETSCAPE_CERT_SEQUENCE(bio, NULL, NULL, NULL)`.
+    pub fn read_pem(bio: &Bio) -> Option<Self> {
+        // SAFETY: the BIO is live; NULL callback and data use the library's defaults.
+        Self::from_ptr(unsafe {
+            ffi::PEM_read_bio_NETSCAPE_CERT_SEQUENCE(
+                bio.as_ptr(),
+                core::ptr::null_mut(),
+                None,
+                core::ptr::null_mut(),
+            )
+        })
+    }
+
+    /// `PEM_write_bio_NETSCAPE_CERT_SEQUENCE`.
+    pub fn write_pem(&self, bio: &Bio) -> bool {
+        // SAFETY: both are live.
+        unsafe { ffi::PEM_write_bio_NETSCAPE_CERT_SEQUENCE(bio.as_ptr(), self.as_ptr()) == 1 }
+    }
+
+    fn certs(&self) -> *mut OPENSSL_STACK {
+        // SAFETY: the sequence is live; reading its public field.
+        unsafe { (*self.as_ptr()).certs }.cast()
+    }
+
+    /// `sk_X509_push(seq->certs, cert)`, which takes the certificate.
+    pub fn push(&self, cert: Cert) -> bool {
+        let sk = self.certs();
+        if sk.is_null() {
+            return false;
+        }
+        // SAFETY: the stack is live; on success it owns the certificate.
+        if unsafe { ffi::OPENSSL_sk_push(sk, cert.as_ptr().cast()) } > 0 {
+            core::mem::forget(cert);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// `sk_X509_num(seq->certs)` (-1 for no stack, as the macro returns, read as 0).
+    pub fn len(&self) -> usize {
+        // SAFETY: the stack is NULL or live; sk_num accepts NULL.
+        usize::try_from(unsafe { ffi::OPENSSL_sk_num(self.certs()) }).unwrap_or(0)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// `sk_X509_value(seq->certs, i)`, as a new reference.
+    pub fn get(&self, i: usize) -> Option<Cert> {
+        let i = c_int::try_from(i).ok()?;
+        // SAFETY: the stack is NULL or live; sk_value checks the index.
+        let p = unsafe { ffi::OPENSSL_sk_value(self.certs(), i) }.cast::<crate::abi::X509>();
+        let c = core::ptr::NonNull::new(p)?;
+        // SAFETY: c is a live certificate the stack owns; the new reference is ours.
+        (unsafe { ffi::X509_up_ref(c.as_ptr()) } == 1).then_some(Cert(c))
+    }
+}
