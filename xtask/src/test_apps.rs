@@ -111,7 +111,8 @@ fn masked(text: &str) -> String {
     text.lines()
         .map(|line| {
             // Our tool's own name, which commands show through `opt_appname` ("openssl cmp").
-            let mut l = mask_pid(line).replace(&format!("{CLI_NAME} "), "openssl ");
+            let mut l =
+                mask_apps_line(&mask_pid(line)).replace(&format!("{CLI_NAME} "), "openssl ");
             if let Some(at) = l.find("+rustyssl") {
                 let end = l[at..].find(' ').map_or(l.len(), |e| at + e);
                 l.replace_range(at..end, "");
@@ -162,6 +163,41 @@ fn mask_libdir(line: &str) -> String {
         l.replace_range(at..at + end + "/lib/".len(), "LIBDIR/");
     }
     l
+}
+
+/// The line of an `apps/<file>.c:<line>:` location (`cmp`'s log lines) as `LINE`: it is
+/// `__LINE__` of a macro call that may span lines, which GCC and clang report differently.
+fn mask_apps_line(line: &str) -> String {
+    let mut out = String::new();
+    let mut rest = line;
+    while let Some(at) = rest.find("apps/") {
+        let (before, after) = rest.split_at(at);
+        out.push_str(before);
+        let file_end = after.find(".c:").filter(|&e| {
+            after[..e]
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'/')
+        });
+        let Some(e) = file_end else {
+            out.push_str("apps/");
+            rest = &after["apps/".len()..];
+            continue;
+        };
+        let digits = after[e + 3..]
+            .bytes()
+            .take_while(u8::is_ascii_digit)
+            .count();
+        if digits > 0 && after[e + 3 + digits..].starts_with(':') {
+            out.push_str(&after[..e + 3]);
+            out.push_str("LINE");
+            rest = &after[e + 3 + digits..];
+        } else {
+            out.push_str("apps/");
+            rest = &after["apps/".len()..];
+        }
+    }
+    out.push_str(rest);
+    out
 }
 
 /// `PID=<digits>` as `PID=PID` (a server's `ACCEPT` line).
@@ -1017,6 +1053,11 @@ mod tests {
             masked("ACCEPT [::]:8888 PID=4242"),
             "ACCEPT [::]:8888 PID=PID"
         );
+        assert_eq!(
+            masked("opt_str:apps/cmp.c:2853:CMP warning: x"),
+            "opt_str:apps/cmp.c:LINE:CMP warning: x"
+        );
+        assert_eq!(masked("see apps/lib/x.c: here"), "see apps/lib/x.c: here");
     }
 
     #[test]
