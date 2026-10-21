@@ -5,7 +5,7 @@
 
 use std::io::Write;
 
-use rustyssl_ossl::params::{ParamDefs, TextParams};
+use rustyssl_ossl::params::{Params, ParamsRef};
 use rustyssl_ossl::skey::{Skey, SkeyMgmt};
 
 use crate::generated::options::skeyutl::{OPTIONS, Opt};
@@ -14,12 +14,9 @@ use crate::lib::{app_libctx, io};
 
 /// `app_params_new_from_opts`: `None` without options, or (the message printed) on an
 /// option the descriptions don't accept.
-pub fn app_params_new_from_opts(
-    opts: Option<&[String]>,
-    defs: ParamDefs<'_>,
-) -> Option<TextParams> {
+pub fn app_params_new_from_opts(opts: Option<&[String]>, defs: ParamsRef<'_>) -> Option<Params> {
     let opts = opts?;
-    match TextParams::from_opts(opts, defs) {
+    match Params::from_text(defs, opts) {
         Ok(p) => Some(p),
         Err(e) => {
             eprintf!(

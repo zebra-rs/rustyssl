@@ -366,7 +366,7 @@ ffi_export! {
         };
         // SAFETY: as above.
         let out = (!buf.is_null()).then(|| unsafe { core::slice::from_raw_parts_mut(buf, buf_n) });
-        let Some(count) = decode_hex(text, out, sep, "OPENSSL_hexstr2buf_ex") else {
+        let Some(count) = decode_hex(text, out, sep, "hexstr2buf_sep") else {
             return 0;
         };
         if !buflen.is_null() {
@@ -393,7 +393,7 @@ ffi_export! {
             return ptr::null_mut();
         };
         if text.len() <= 1 {
-            err::raise(ERR_LIB_CRYPTO, CRYPTO_R_HEX_STRING_TOO_SHORT, "OPENSSL_hexstr2buf");
+            err::raise(ERR_LIB_CRYPTO, CRYPTO_R_HEX_STRING_TOO_SHORT, "ossl_hexstr2buf_sep");
             return ptr::null_mut();
         }
         let size = text.len() / 2;
@@ -407,7 +407,7 @@ ffi_export! {
         }
         // SAFETY: a fresh block of `size` bytes, only written.
         let out = unsafe { core::slice::from_raw_parts_mut(block, size) };
-        let Some(count) = decode_hex(text, Some(out), DEFAULT_SEPARATOR, "OPENSSL_hexstr2buf") else {
+        let Some(count) = decode_hex(text, Some(out), DEFAULT_SEPARATOR, "hexstr2buf_sep") else {
             // SAFETY: the block is ours, from CRYPTO_malloc.
             unsafe { mem::release(block.cast()) };
             return ptr::null_mut();
@@ -467,7 +467,7 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_CRYPTO
     {
         let Some(len) = hex_length(buflen, sep) else {
-            err::raise(ERR_LIB_CRYPTO, CRYPTO_R_TOO_MANY_BYTES, "OPENSSL_buf2hexstr_ex");
+            err::raise(ERR_LIB_CRYPTO, CRYPTO_R_TOO_MANY_BYTES, "buf2hexstr_sep");
             return 0;
         };
         if !strlength.is_null() {
@@ -478,7 +478,7 @@ ffi_export! {
             return 1;
         }
         if str_n < len {
-            err::raise(ERR_LIB_CRYPTO, CRYPTO_R_TOO_SMALL_BUFFER, "OPENSSL_buf2hexstr_ex");
+            err::raise(ERR_LIB_CRYPTO, CRYPTO_R_TOO_SMALL_BUFFER, "buf2hexstr_sep");
             return 0;
         }
         if buf.is_null() && buflen > 0 {
@@ -509,7 +509,7 @@ ffi_export! {
             .ok()
             .and_then(|n| Some((n, hex_length(n, DEFAULT_SEPARATOR)?)));
         let Some((n, len)) = sized else {
-            err::raise(ERR_LIB_CRYPTO, CRYPTO_R_TOO_MANY_BYTES, "OPENSSL_buf2hexstr");
+            err::raise(ERR_LIB_CRYPTO, CRYPTO_R_TOO_MANY_BYTES, "ossl_buf2hexstr_sep");
             return ptr::null_mut();
         };
         // SAFETY: the caller's guarantee.

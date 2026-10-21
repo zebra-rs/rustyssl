@@ -172,7 +172,7 @@ pub fn main(argv: &[String]) -> i32 {
         let n = pkey.bn_param(c"n");
         let _ = out.write_all(b"Modulus=");
         if let Some(n) = &n {
-            rustyssl_ossl::bn::print(&out, n);
+            n.print(&out);
         }
         let _ = out.write_all(b"\n");
     }

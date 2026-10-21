@@ -1,0 +1,18 @@
+# `openssl info` (apps/info.c). The directories differ by library build (each its own
+# OPENSSLDIR, ENGINESDIR, MODULESDIR), and -cpusettings depends on the machine (rustyssl
+# reports none): those lines must only succeed.
+~info -configdir
+~info -enginesdir
+~info -modulesdir
+info -dsoext
+info -dirnamesep
+info -listsep
+info -seeds
+~info -cpusettings
+info -windowscontext
+info
+info -seeds -dsoext
+info -listsep -listsep
+info -seeds extra
+info -help
+info -x

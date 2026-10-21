@@ -1,0 +1,36 @@
+# `openssl rehash` (apps/rehash.c). It works on the work directory itself (openssl can't make
+# a directory): the certificates and CRLs copied there below, and whatever the earlier lists
+# left. Its exit status is its error count. Each mode is first applied without -v, so the three
+# runs of a -v line start from the same links.
+enc -in {src}/test/certs/root-cert.pem -out {dir}/rh-root.pem
+enc -in {src}/test/certs/root-cert2.pem -out {dir}/rh-root2.pem
+enc -in {src}/test/certs/ca-cert.pem -out {dir}/rh-ca.crt
+enc -in {src}/test/certs/ca-cert.pem -out {dir}/rh-ca-copy.cer
+enc -in {src}/test/certs/ee-cert.pem -out {dir}/rh-ee.PEM
+enc -in {src}/test/testcrl.pem -out {dir}/rh-test.crl
+enc -in {src}/test/certs/cyrillic_crl.pem -out {dir}/rh-cyrillic.crl
+enc -in {src}/test/certs/ee-key.pem -out {dir}/rh-key.pem
+enc -in {src}/test/certs/ee-ecdsa-client-chain.pem -out {dir}/rh-chain.pem
+enc -in {txt} -out {dir}/rh-text.pem
+enc -in {src}/test/certs/ee-cert.pem -out {dir}/rh-ee.txt
+rehash {dir}
+rehash -v {dir}
+rehash -v {dir}/
+rehash -n -v {dir}
+rehash -old {dir}
+rehash -old -v {dir}
+rehash -compat {dir}
+rehash -compat -v {dir}
+rehash -old -n {dir}
+rehash -v -n {dir}
+rehash {dir}
+rehash -v {dir}
+rehash -v {dir} {dir}
+rehash /nonexistent/dir
+rehash -v /nonexistent/dir {dir}
+rehash -provider default -v {dir}
+rehash -propquery provider=default -v {dir}
+rehash -provider-path {dir} -provider nosuch {dir}
+rehash -help
+rehash -h
+rehash -x

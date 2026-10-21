@@ -1,0 +1,41 @@
+# `openssl mac` (apps/mac.c).
+mac -digest SHA256 -macopt hexkey:00112233 -in {bin} HMAC
+mac -digest SHA256 -macopt key:secret -in {txt} HMAC
+mac -digest SHA1 -macopt key:secret -in {txt} -binary -out {dir}/mac.bin HMAC
+dgst -sha256 -r {dir}/mac.bin
+mac -digest SHA256 -macopt key:secret -in {txt} -out {dir}/mac.txt HMAC
+dgst -sha256 -r {dir}/mac.txt
+mac -macopt digest:SHA512 -macopt key:secret -in {txt} HMAC
+mac -digest SHA256 -macopt key:secret HMAC < {txt}
+mac -digest SHA256 -macopt key:secret -in - HMAC < {bin}
+mac -cipher AES-128-CBC -macopt hexkey:00112233445566778899aabbccddeeff -in {bin} CMAC
+mac -macopt cipher:AES-256-CBC -macopt hexkey:00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff -in {txt} CMAC
+mac -cipher AES-128-GCM -macopt hexkey:00112233445566778899aabbccddeeff -macopt hexiv:000000000000000000000000 -in {txt} GMAC
+mac -macopt hexkey:000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f -in {txt} Poly1305
+mac -macopt hexkey:000102030405060708090a0b0c0d0e0f -in {txt} SipHash
+mac -macopt hexkey:000102030405060708090a0b0c0d0e0f -macopt size:8 -in {txt} SipHash
+mac -macopt hexkey:000102030405060708090a0b0c0d0e0f -in {txt} KMAC128
+mac -macopt hexkey:000102030405060708090a0b0c0d0e0f -macopt custom:abc -macopt size:20 -in {txt} KMAC256
+mac -macopt key:k -in {txt} BLAKE2BMAC
+mac -macopt key:k -macopt size:16 -in {txt} BLAKE2SMAC
+mac -digest SHA256 -in {txt} HMAC
+mac -in {txt} HMAC
+mac -cipher AES-128-CBC -in {txt} CMAC
+mac -macopt nosuch:1 -in {txt} HMAC
+mac -macopt bad -in {txt} HMAC
+mac -macopt digest:nosuch -macopt key:k -in {txt} HMAC
+mac -digest nosuch -macopt key:k -in {txt} HMAC
+mac -macopt size:0 -macopt hexkey:000102030405060708090a0b0c0d0e0f -in {txt} SipHash
+mac -macopt hexkey:zz -in {txt} SipHash
+mac -digest SHA256 -macopt key:k -in /nonexistent/in HMAC
+mac -digest SHA256 -macopt key:k -in {txt} -out /nonexistent/out HMAC
+mac -in {txt} NOSUCH
+mac -in {txt}
+mac -in {txt} HMAC extra
+mac -provider default -digest SHA256 -macopt key:k -in {txt} HMAC
+mac -provider-path {dir} -provider nosuch -in {txt} HMAC
+mac -propquery provider=default -digest SHA256 -macopt key:k -in {txt} HMAC
+mac -propquery provider=nosuch -in {txt} HMAC
+mac -provparam default:x=y -digest SHA256 -macopt key:k -in {txt} HMAC
+mac -help
+mac -x

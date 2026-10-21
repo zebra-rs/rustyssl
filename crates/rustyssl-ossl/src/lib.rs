@@ -18,10 +18,14 @@ pub use generated::ffi;
 /// The C API's types and constants (generated from the vendored headers).
 pub use rustyssl_abi as abi;
 
+pub mod algorithm;
+pub mod asn1;
 pub mod bio;
+pub mod bn;
 pub mod crypto;
 pub mod err;
 pub mod evp;
+pub mod params;
 pub mod provider;
 pub mod rand;
 mod util;
@@ -32,13 +36,12 @@ pub mod conf;
 pub mod engine;
 pub mod pkey;
 pub mod store;
+pub mod sys;
 pub mod ui;
 pub mod verify;
 pub mod x509;
 // The key commands' (fork G2).
-pub mod bn;
 pub mod encoder;
 pub mod obj;
-pub mod params;
 pub mod pkcs8;
 pub mod skey;

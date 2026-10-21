@@ -1,0 +1,62 @@
+# `openssl passwd` (apps/passwd.c). A salt made at random can't be compared: those lines must
+# only succeed. Passwords are given as arguments or from a file or standard input (decision 4:
+# no terminal prompts).
+passwd -salt xxxxxxxx password
+passwd -1 -salt xxxxxxxx password
+passwd -1 -salt abcdefghij password
+passwd -1 -salt a pw
+passwd -apr1 -salt xxxxxxxx password
+passwd -apr1 -salt 12345678 pw1 pw2 pw3
+passwd -aixmd5 -salt xxxxxxxx password
+passwd -aixmd5 -salt abc pw
+passwd -5 -salt saltstring Hello
+passwd -5 -salt saltstringsaltstringsalt Hello
+passwd -5 -salt rounds=10000$saltstringsaltstring Hello
+passwd -5 -salt rounds=5000$toolongsaltstring Hello
+passwd -5 -salt rounds=1400$anotherlongsaltstring abcdefghijklmnopqrstuvwxyz0123456789
+passwd -5 -salt rounds=10$roundstoolow Hello
+passwd -5 -salt rounds=$x pw
+passwd -5 -salt rounds=abc pw
+passwd -5 -salt rounds=1000$ pw
+passwd -6 -salt saltstring Hello
+passwd -6 -salt rounds=1400$anotherlongsaltstring abcdefghijklmnopqrstuvwxyz0123456789012345678901234567890123456789
+passwd -6 -salt rounds=77777$short "we have a short salt string but not a short password"
+passwd -6 -salt +rounds=1000$x pw
+passwd -table -salt xxxxxxxx pw1 pw2
+passwd -table -reverse -salt xxxxxxxx pw1 pw2
+passwd -reverse -salt xxxxxxxx pw1
+passwd -5 -salt x yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+passwd -quiet -table -salt x yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+passwd -in {tests}/passwd-list.dat -salt xxxxxxxx
+passwd -in {tests}/passwd-list.dat -5 -salt xxxxxxxx -table
+passwd -in {tests}/passwd-long.dat -6 -salt xxxxxxxx -table -reverse
+rand -out {dir}/empty
+passwd -in {dir}/empty -salt x
+passwd -in /nonexistent/pw -salt x
+passwd -stdin -salt xxxxxxxx < {tests}/passwd-list.dat
+passwd -stdin -aixmd5 -salt xxxxxxxx -table < {tests}/passwd-list.dat
+passwd -stdin -salt x < {txt}
+passwd -noverify -stdin -salt x < {txt}
+~passwd password
+~passwd -1 password
+~passwd -apr1 password
+~passwd -aixmd5 password
+~passwd -5 password pw2
+~passwd -6 -table password
+~passwd -stdin < {tests}/passwd-list.dat
+~passwd -rand {bin} -6 password
+~passwd -writerand {dir}/rand.out password
+passwd -rand /nonexistent/rand -salt x pw
+passwd -provider default -salt x pw
+passwd -propquery provider=default -salt x pw
+passwd -provider-path {dir} -provider nosuch -salt x pw
+passwd -1 -5 pw
+passwd -6 -6 pw
+passwd -apr1 -aixmd5 pw
+passwd -in {tests}/passwd-list.dat -stdin
+passwd -stdin -in {tests}/passwd-list.dat
+passwd -in {tests}/passwd-list.dat pw
+passwd -stdin pw < {txt}
+passwd -salt
+passwd -help
+passwd -x

@@ -1,0 +1,38 @@
+# `openssl rand` (apps/rand.c). Random output can't be compared: lines that print random bytes
+# must only succeed, as must -engine (its message names the engines directory of each library);
+# the rest check the size arguments, errors, and empty output.
+rand -hex 0
+rand -base64 0
+rand 0
+rand -hex
+rand -base64
+rand
+~rand 16
+~rand -hex 16
+~rand -base64 48
+~rand -hex 1K
+~rand -base64 2K
+~rand -out {dir}/rand.bin 1M
+~rand -hex -out {dir}/rand.txt 100
+~rand -rand {bin} -hex 8
+~rand -writerand {dir}/rand.seed -hex 8
+~rand -provider default -hex 8
+~rand -propquery provider=default -hex 8
+~rand -hex 010
+rand -hex -1
+rand -hex 09
+rand -hex 1KB
+rand -hex 1k
+rand -hex K
+rand -hex 1X
+rand -hex 1K2
+rand -hex 16777216T
+rand -hex 2097152T
+rand -hex 99999999999999999999
+rand -hex 1 2
+rand -out /nonexistent/rand 1
+rand -rand /nonexistent/rand 0
+~rand -engine nosuch -hex
+rand -provider-path {dir} -provider nosuchprov 1
+rand -help
+rand -x

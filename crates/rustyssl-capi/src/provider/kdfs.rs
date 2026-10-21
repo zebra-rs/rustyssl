@@ -270,7 +270,8 @@ pub(super) fn utf8(p: &OSSL_PARAM) -> Option<*const c_char> {
 }
 
 /// `ossl_prov_set_macctx` without a key: the digest (or `mdname`), cipher (or `ciphername`),
-/// engine, and `properties` onto the MAC context.
+/// engine, and `properties` onto the MAC context. The `cipher` parameter is read only when
+/// `cipher_param` is set.
 ///
 /// # Safety
 /// `macctx` is a live MAC context; `params` is NULL or a parameter array.
@@ -280,6 +281,7 @@ unsafe fn set_macctx(
     ciphername: *const c_char,
     mdname: *const c_char,
     properties: *const c_char,
+    cipher_param: bool,
 ) -> bool {
     let (mut md, mut cipher, mut engine) = (mdname, ciphername, ptr::null());
     if !params.is_null() {
@@ -288,7 +290,7 @@ unsafe fn set_macctx(
             (OSSL_ALG_PARAM_CIPHER, &mut cipher),
             (OSSL_ALG_PARAM_ENGINE, &mut engine),
         ] {
-            if !slot.is_null() {
+            if !slot.is_null() || (name == OSSL_ALG_PARAM_CIPHER && !cipher_param) {
                 continue;
             }
             // SAFETY: the caller's guarantee.
@@ -333,6 +335,48 @@ pub(super) unsafe fn macctx_load(
     mdname: *const c_char,
     libctx: *mut OSSL_LIB_CTX,
 ) -> bool {
+    // SAFETY: the caller's guarantee.
+    unsafe { load_macctx(macctx, params, macname, ciphername, mdname, libctx, true) }
+}
+
+/// `ossl_prov_macctx_load` as the HMAC DRBG calls it: the `mac`, `digest`, `properties` and
+/// `engine` parameters, but never `cipher` (upstream passes no cipher parameter there, so a
+/// `cipher` alongside `mac=CMAC` is ignored rather than set on the MAC).
+///
+/// # Safety
+/// As [`macctx_load`].
+pub(super) unsafe fn macctx_load_without_cipher(
+    macctx: &mut *mut EVP_MAC_CTX,
+    params: *const OSSL_PARAM,
+    libctx: *mut OSSL_LIB_CTX,
+) -> bool {
+    // SAFETY: the caller's guarantee.
+    unsafe {
+        load_macctx(
+            macctx,
+            params,
+            ptr::null(),
+            ptr::null(),
+            ptr::null(),
+            libctx,
+            false,
+        )
+    }
+}
+
+/// [`macctx_load`], reading the `cipher` parameter only when `cipher_param` is set.
+///
+/// # Safety
+/// As [`macctx_load`].
+unsafe fn load_macctx(
+    macctx: &mut *mut EVP_MAC_CTX,
+    params: *const OSSL_PARAM,
+    macname: *const c_char,
+    ciphername: *const c_char,
+    mdname: *const c_char,
+    libctx: *mut OSSL_LIB_CTX,
+    cipher_param: bool,
+) -> bool {
     let mut macname = macname;
     let mut properties = ptr::null();
     if macname.is_null() {
@@ -368,7 +412,16 @@ pub(super) unsafe fn macctx_load(
         return true;
     }
     // SAFETY: the live context; the caller's array and names.
-    if unsafe { set_macctx(*macctx, params, ciphername, mdname, properties) } {
+    if unsafe {
+        set_macctx(
+            *macctx,
+            params,
+            ciphername,
+            mdname,
+            properties,
+            cipher_param,
+        )
+    } {
         return true;
     }
     // SAFETY: the context, dropped on failure.

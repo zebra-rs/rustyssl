@@ -1382,10 +1382,26 @@ macro_rules! list {
     };
 }
 
-// `ossl_cipher_var_keylen_settable_ctx_params`.
-static VAR_SETTABLE_CTX: Params<4> = Params([
+// `ossl_cipher_var_keylen_settable_ctx_params` (3.6's lists the generic parameters, then
+// `keylen`).
+static VAR_SETTABLE_CTX: Params<7> = Params([
     defn(OSSL_CIPHER_PARAM_PADDING, OSSL_PARAM_UNSIGNED_INTEGER, UINT),
     defn(OSSL_CIPHER_PARAM_NUM, OSSL_PARAM_UNSIGNED_INTEGER, UINT),
+    defn(
+        OSSL_CIPHER_PARAM_USE_BITS,
+        OSSL_PARAM_UNSIGNED_INTEGER,
+        UINT,
+    ),
+    defn(
+        OSSL_CIPHER_PARAM_TLS_VERSION,
+        OSSL_PARAM_UNSIGNED_INTEGER,
+        UINT,
+    ),
+    defn(
+        OSSL_CIPHER_PARAM_TLS_MAC_SIZE,
+        OSSL_PARAM_UNSIGNED_INTEGER,
+        SIZE_T,
+    ),
     defn(
         OSSL_CIPHER_PARAM_KEYLEN,
         OSSL_PARAM_UNSIGNED_INTEGER,

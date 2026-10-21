@@ -159,7 +159,7 @@ fn show_gen_pkeyopt(algname: Option<&str>) {
         return;
     }
     eprintf!("\nThe possible -pkeyopt arguments are:\n");
-    for (key, t) in params.entries() {
+    for (key, t) in params.iter().map(|p| (p.key(), p.data_type())) {
         if let Some((name, ishex)) = param_datatype_2name(t) {
             eprintf!("    {}{key}:{name}\n", if ishex { "hex" } else { "" });
         }

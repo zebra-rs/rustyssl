@@ -1,7 +1,7 @@
 //! Opaque symmetric keys (`EVP_SKEY`) and their key managers.
 
 use crate::ffi;
-use crate::params::{ParamDefs, TextParams};
+use crate::params::{Params, ParamsRef};
 use crate::provider::LibCtx;
 use crate::util::{cstring, string_at};
 
@@ -32,12 +32,9 @@ impl SkeyMgmt {
     }
 
     /// `EVP_SKEYMGMT_get0_gen_settable_params`.
-    pub fn gen_settable_params(&self) -> ParamDefs<'_> {
+    pub fn gen_settable_params(&self) -> ParamsRef<'_> {
         // SAFETY: self is live; the array belongs to it.
-        ParamDefs(
-            unsafe { ffi::EVP_SKEYMGMT_get0_gen_settable_params(self.as_ptr()) },
-            core::marker::PhantomData,
-        )
+        ParamsRef::from_raw(unsafe { ffi::EVP_SKEYMGMT_get0_gen_settable_params(self.as_ptr()) })
     }
 }
 
@@ -47,7 +44,7 @@ impl Skey {
         libctx: Option<&LibCtx>,
         name: &str,
         propq: Option<&str>,
-        params: Option<&TextParams>,
+        params: Option<&Params>,
     ) -> Option<Self> {
         let n = cstring(name)?;
         let q = match propq {
@@ -55,7 +52,7 @@ impl Skey {
             None => None,
         };
         let lc = libctx.map_or(core::ptr::null_mut(), LibCtx::as_ptr);
-        let pp = params.map_or(core::ptr::null(), TextParams::as_ptr);
+        let pp = params.map_or(core::ptr::null(), Params::as_ptr);
         // SAFETY: lc is NULL or live; the strings are valid or NULL; pp is NULL or an ended
         // array.
         Self::from_ptr(unsafe { ffi::EVP_SKEY_generate(lc, n.as_ptr(), propq_ptr(&q), pp) })

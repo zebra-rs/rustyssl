@@ -108,3 +108,13 @@ pub fn snapshot() -> Vec<Entry> {
         });
     }
 }
+
+/// `ERR_error_string_n(e, buf, 256)`: the code's text, as `errstr` prints it.
+pub fn error_string_n(e: c_ulong) -> String {
+    let mut buf = [0u8; 256];
+    // SAFETY: buf is writable for its length, which the call never exceeds (it NUL-terminates
+    // within it).
+    unsafe { ffi::ERR_error_string_n(e, buf.as_mut_ptr().cast(), buf.len()) };
+    let end = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
+    String::from_utf8_lossy(buf.get(..end).unwrap_or_default()).into_owned()
+}

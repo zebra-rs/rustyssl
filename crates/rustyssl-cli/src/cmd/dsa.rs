@@ -138,7 +138,7 @@ fn run(argv: &[String]) -> i32 {
             return 1;
         };
         let _ = out.write_all(b"Public Key=");
-        rustyssl_ossl::bn::print(&out, &pub_key);
+        pub_key.print(&out);
         let _ = out.write_all(b"\n");
     }
     if noout {

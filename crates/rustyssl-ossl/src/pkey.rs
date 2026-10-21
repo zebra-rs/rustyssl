@@ -118,6 +118,18 @@ impl PkeyCtxRef<'_> {
     }
 }
 
+impl<'a> PkeyCtxRef<'a> {
+    /// A context the caller keeps alive for `'a` (NULL allowed).
+    pub(crate) fn from_raw(p: *mut EVP_PKEY_CTX) -> Self {
+        Self(p, core::marker::PhantomData)
+    }
+
+    /// Whether it is NULL.
+    pub fn is_null(self) -> bool {
+        self.0.is_null()
+    }
+}
+
 // ---- Keys, their contexts, and the key commands' calls (Phase 11, fork G2) ----
 
 use core::ffi::{CStr, c_int};
@@ -127,7 +139,7 @@ use crate::bio::Bio;
 use crate::bn::Bn;
 use crate::engine::Engine;
 use crate::evp::Cipher;
-use crate::params::{ParamDefs, ParamList};
+use crate::params::{ParamList, ParamsRef};
 
 fn engine_ptr(e: Option<&Engine>) -> *mut crate::abi::ENGINE {
     e.map_or(core::ptr::null_mut(), Engine::as_ptr)
@@ -157,6 +169,14 @@ pub fn bits_of(pkey: Option<&Pkey>) -> c_int {
 }
 
 impl Pkey {
+    /// `EVP_PKEY_new_raw_private_key(kind, e, key, len)`.
+    pub fn new_raw_private_key(kind: c_int, e: Option<&Engine>, key: &[u8]) -> Option<Self> {
+        // SAFETY: the engine is NULL or live; key is valid for its length.
+        Self::from_ptr(unsafe {
+            ffi::EVP_PKEY_new_raw_private_key(kind, engine_ptr(e), key.as_ptr(), key.len())
+        })
+    }
+
     /// `EVP_PKEY_get_bits`.
     pub fn bits(&self) -> c_int {
         // SAFETY: the key is live.
@@ -562,12 +582,9 @@ impl PkeyCtx {
     }
 
     /// `EVP_PKEY_CTX_settable_params`.
-    pub fn settable_params(&self) -> ParamDefs<'_> {
+    pub fn settable_params(&self) -> ParamsRef<'_> {
         // SAFETY: the context is live; the array belongs to it (or its provider).
-        ParamDefs(
-            unsafe { ffi::EVP_PKEY_CTX_settable_params(self.as_ptr()) },
-            core::marker::PhantomData,
-        )
+        ParamsRef::from_raw(unsafe { ffi::EVP_PKEY_CTX_settable_params(self.as_ptr()) })
     }
 
     /// `EVP_PKEY_check`.
