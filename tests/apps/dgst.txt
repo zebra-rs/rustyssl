@@ -96,7 +96,7 @@ dgst -sign {src}/test/certs/root-ed25519.privkey.pem -hex < {txt}
 dgst -sha256 -verify {src}/test/certs/ee-key.pem -signature {dir}/sig.rsa < {txt}
 ~dgst -d {txt}
 ~dgst -debug -sha1 {txt} {bin}
-~dgst -engine nosuch {txt}
+dgst -engine nosuch {txt}
 dgst -engine_impl {txt}
 dgst -provider default -sha256 {txt}
 dgst -provider-path {dir} -provider nosuch {txt}

@@ -32,7 +32,7 @@ rand -hex 99999999999999999999
 rand -hex 1 2
 rand -out /nonexistent/rand 1
 rand -rand /nonexistent/rand 0
-~rand -engine nosuch -hex
+rand -engine nosuch -hex
 rand -provider-path {dir} -provider nosuchprov 1
 rand -help
 rand -x

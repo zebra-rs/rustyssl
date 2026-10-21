@@ -4,11 +4,15 @@
 # are under tests/apps/s_server/; {src}/test/certs/ is the reference's. Lines marked ~ only
 # have to succeed: -nbio_test retries at random, split records arrive as the scheduler has
 # them, and rustyssl's TLS core makes its security checks (-security_debug) in another order. -starttls needs a server speaking
-# the protocol, so only its errors are tested; -engine's name the build's directories.
+# the protocol, so only its errors are tested. -engine and -provider errors name the build's
+# directories, which are masked.
 s_client -help
 s_client -bogus
 s_client extra arg
 s_client -connect 127.0.0.1:1
+s_client -engine nosuch -connect 127.0.0.1:1
+s_client -ssl_client_engine nosuch -connect 127.0.0.1:1
+s_client -provider nosuch -connect 127.0.0.1:1
 s_client -connect bogus:host:spec
 s_client -host 127.0.0.1 -port 1
 s_client -connect 127.0.0.1:1 -4

@@ -148,6 +148,10 @@ fn masked(text: &str) -> String {
                 }
             }
             for (dir, name) in OPENSSLDIRS.get().into_iter().flatten() {
+                // A line that is the directory itself (`info -enginesdir`) has no `/` after it.
+                if l == dir.trim_end_matches('/') {
+                    l = name.trim_end_matches('/').to_owned();
+                }
                 l = l.replace(dir.as_str(), name);
             }
             l
