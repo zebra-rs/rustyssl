@@ -37,6 +37,7 @@ pub mod pkcs7;
 pub mod pkey;
 pub mod session;
 pub mod store;
+pub mod ts;
 pub mod ui;
 pub mod verify;
 pub mod x509;

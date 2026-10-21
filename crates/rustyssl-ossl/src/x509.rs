@@ -679,3 +679,24 @@ impl CrlStack {
         crls_of(self.as_ptr())
     }
 }
+
+impl Cert {
+    /// `X509_get_extension_flags`.
+    pub fn extension_flags(&self) -> u32 {
+        // SAFETY: the certificate is live.
+        unsafe { ffi::X509_get_extension_flags(self.as_ptr()) }
+    }
+
+    /// `X509_cmp_timeframe(vpm, X509_get0_notBefore(x), X509_get0_notAfter(x))`: 0 when
+    /// valid now (or at the parameters' time), positive when expired, negative when not yet
+    /// valid.
+    pub fn cmp_timeframe(&self, vpm: Option<&crate::verify::VerifyParam>) -> c_int {
+        // SAFETY: the certificate is live; the times are owned by it.
+        let nb = unsafe { ffi::X509_get0_notBefore(self.as_ptr()) };
+        // SAFETY: as above.
+        let na = unsafe { ffi::X509_get0_notAfter(self.as_ptr()) };
+        let v = vpm.map_or(core::ptr::null(), |v| v.as_ptr().cast_const());
+        // SAFETY: v is NULL or live; the times are live.
+        unsafe { ffi::X509_cmp_timeframe(v, nb, na) }
+    }
+}

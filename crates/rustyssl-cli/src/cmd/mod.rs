@@ -56,7 +56,7 @@ pub mod smime;
 // pub mod spkac;
 // pub mod srp;
 // pub mod storeutl;
-// pub mod ts;
+pub mod ts;
 // pub mod verify;
 // pub mod x509;
 
@@ -115,7 +115,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "spkac" => spkac::main,
         // "srp" => srp::main,
         // "storeutl" => storeutl::main,
-        // "ts" => ts::main,
+        "ts" => ts::main,
         // "verify" => verify::main,
         // "x509" => x509::main,
         _ => return None,

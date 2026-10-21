@@ -1,0 +1,44 @@
+# The time stamp authority configuration of tests/apps/ts.txt (its serial file can't be
+# written, so every reply has serial number 1; keys and certificates are given on the
+# command line).
+oid_section = new_oids
+
+[ new_oids ]
+tsa_policy1 = 1.2.3.4.1
+tsa_policy2 = 1.2.3.4.5.6
+tsa_policy3 = 1.2.3.4.5.7
+
+[ tsa ]
+default_tsa = tsa_config1
+
+[ tsa_config1 ]
+serial = ./nonexistent/tsa_serial
+signer_digest = sha256
+default_policy = tsa_policy1
+other_policies = tsa_policy2, tsa_policy3
+digests = sha1, sha256, sha384, sha512
+accuracy = secs:1, millisecs:500, microsecs:100
+clock_precision_digits = 0
+ordering = yes
+tsa_name = yes
+ess_cert_id_chain = no
+ess_cert_id_alg = sha1
+
+[ tsa_config2 ]
+serial = ./nonexistent/tsa_serial
+default_policy = tsa_policy1
+digests = sha256
+ess_cert_id_chain = yes
+ess_cert_id_alg = sha256
+crypto_device = builtin
+
+[ tsa_config3 ]
+serial = ./nonexistent/tsa_serial
+signer_cert = ./nonexistent/tsa_cert.pem
+default_policy = 1.2.3.4.1
+digests = sha256
+accuracy = secs:x
+
+[ tsa_config4 ]
+serial = ./nonexistent/tsa_serial
+default_policy = tsa_policy1
