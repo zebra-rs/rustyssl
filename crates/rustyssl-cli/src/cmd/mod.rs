@@ -50,7 +50,7 @@ pub mod rsautl;
 // pub mod s_server;
 // pub mod s_time;
 // pub mod sess_id;
-// pub mod skeyutl;
+pub mod skeyutl;
 // pub mod smime;
 // pub mod speed;
 // pub mod spkac;
@@ -109,7 +109,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "s_server" => s_server::main,
         // "s_time" => s_time::main,
         // "sess_id" => sess_id::main,
-        // "skeyutl" => skeyutl::main,
+        "skeyutl" => skeyutl::main,
         // "smime" => smime::main,
         // "speed" => speed::main,
         // "spkac" => spkac::main,
