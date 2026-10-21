@@ -159,14 +159,16 @@ ffi_export! {
         let (name, head, octets) = match unsafe { read_pem(bp, flags) } {
             Ok(parts) => parts,
             Err(e) => {
+                // Each raised by the function OpenSSL raises it in (its error queue names
+                // the function).
                 let reason = match e {
-                    Error::NoStartLine => Some(PEM_R_NO_START_LINE),
-                    Error::BadEndLine => Some(PEM_R_BAD_END_LINE),
-                    Error::BadBase64Decode => Some(PEM_R_BAD_BASE64_DECODE),
+                    Error::NoStartLine => Some((PEM_R_NO_START_LINE, "get_name")),
+                    Error::BadEndLine => Some((PEM_R_BAD_END_LINE, "get_header_and_data")),
+                    Error::BadBase64Decode => Some((PEM_R_BAD_BASE64_DECODE, "PEM_read_bio_ex")),
                     Error::Silent => None,
                 };
-                if let Some(reason) = reason {
-                    err::raise(ERR_LIB_PEM, reason, "PEM_read_bio_ex");
+                if let Some((reason, func)) = reason {
+                    err::raise(ERR_LIB_PEM, reason, func);
                 }
                 return 0;
             }
