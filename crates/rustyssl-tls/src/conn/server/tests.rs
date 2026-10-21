@@ -1217,6 +1217,9 @@ fn key_update_after_the_handshake() {
 fn ticket_session_encoding_round_trips() {
     let s = crate::conn::Session {
         version: v::TLS1_3,
+        not_resumable: false,
+        psk_identity: None,
+        psk_identity_hint: None,
         cipher_id: 0x0300_1301,
         session_id: vec![1; 32],
         sid_ctx: b"ctx".to_vec(),

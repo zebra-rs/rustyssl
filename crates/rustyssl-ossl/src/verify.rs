@@ -395,6 +395,11 @@ pub struct StoreCtxRef<'a>(
 );
 
 impl<'a> StoreCtxRef<'a> {
+    /// A context the caller keeps alive for `'a`.
+    pub(crate) fn from_raw(p: *mut crate::abi::X509_STORE_CTX) -> Self {
+        Self(p, core::marker::PhantomData)
+    }
+
     /// `X509_STORE_CTX_get_error`.
     pub fn error(self) -> c_int {
         // SAFETY: the context is live.

@@ -950,6 +950,8 @@ pub(crate) fn callbacks(st: &SslState, snap: &CtxSnapshot) -> Callbacks {
         info: st.info_callback.is_some() || snap.info_callback.is_some(),
         msg: st.msg_callback.is_some(),
         keylog: snap.keylog_callback.is_some(),
+        tlsext_debug: st.debug_cb.is_some(),
+        not_resumable: st.not_resumable_session_cb.is_some(),
         servername: snap.servername_cb.is_some() || session_servername(st).0.is_some(),
         client_hello: snap.client_hello_cb.is_some(),
         cert: st.cert.cert_cb.is_some(),

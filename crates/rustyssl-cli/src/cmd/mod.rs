@@ -7,8 +7,7 @@
 
 pub mod asn1parse;
 pub mod ca;
-pub mod version;
-// pub mod ciphers;
+pub mod ciphers;
 pub mod cmp;
 pub mod cms;
 pub mod configutl;
@@ -46,18 +45,19 @@ pub mod rehash;
 pub mod req;
 pub mod rsa;
 pub mod rsautl;
-// pub mod s_client;
-// pub mod s_server;
-// pub mod s_time;
+pub mod s_client;
+pub mod s_server;
+pub mod s_time;
 pub mod sess_id;
 pub mod skeyutl;
 pub mod smime;
 pub mod speed;
 pub mod spkac;
-// pub mod srp;
+pub mod srp;
 pub mod storeutl;
 pub mod ts;
 pub mod verify;
+pub mod version;
 pub mod x509;
 
 /// The command's `main`, if it is ported.
@@ -67,7 +67,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         "version" => version::main,
         "asn1parse" => asn1parse::main,
         "ca" => ca::main,
-        // "ciphers" => ciphers::main,
+        "ciphers" => ciphers::main,
         "cmp" => cmp::main,
         "cms" => cms::main,
         "configutl" => configutl::main,
@@ -105,15 +105,15 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         "req" => req::main,
         "rsa" => rsa::main,
         "rsautl" => rsautl::main,
-        // "s_client" => s_client::main,
-        // "s_server" => s_server::main,
-        // "s_time" => s_time::main,
+        "s_client" => s_client::main,
+        "s_server" => s_server::main,
+        "s_time" => s_time::main,
         "sess_id" => sess_id::main,
         "skeyutl" => skeyutl::main,
         "smime" => smime::main,
         "speed" => speed::main,
         "spkac" => spkac::main,
-        // "srp" => srp::main,
+        "srp" => srp::main,
         "storeutl" => storeutl::main,
         "ts" => ts::main,
         "verify" => verify::main,

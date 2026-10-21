@@ -1,0 +1,207 @@
+# `openssl s_client` (cargo xtask test-apps). Paired lines (SERVER || CLIENT) run the client
+# against an s_server on loopback, ours and the reference's both ways (xtask/src/test_apps/pair.rs);
+# what is random (session IDs, tickets, master keys, times) is masked. The servers' fixtures
+# are under tests/apps/s_server/; {src}/test/certs/ is the reference's. Lines marked ~ only
+# have to succeed: -nbio_test retries at random, split records arrive as the scheduler has
+# them, and rustyssl's TLS core makes its security checks (-security_debug) in another order. -starttls needs a server speaking
+# the protocol, so only its errors are tested; -engine's name the build's directories.
+s_client -help
+s_client -bogus
+s_client extra arg
+s_client -connect 127.0.0.1:1
+s_client -connect bogus:host:spec
+s_client -host 127.0.0.1 -port 1
+s_client -connect 127.0.0.1:1 -4
+s_client -connect [::1]:1 -6
+s_client -unix {dir}/nonexistent.sock
+s_client -connect 127.0.0.1:1 -bind 127.0.0.1:0
+s_client -connect 127.0.0.1:1 -bind bogus:host:spec
+s_client -connect 127.0.0.1:1 -proxy 127.0.0.1:1
+s_client -connect 127.0.0.1:1 -proxy 127.0.0.1:1 -proxy_user user -proxy_pass pass:secret
+s_client -connect 127.0.0.1:1 -proxy_user user
+s_client -connect 127.0.0.1:1 -starttls bogus
+s_client -connect 127.0.0.1:1 -starttls smtp -xmpphost x
+s_client -connect 127.0.0.1:1 -quic
+s_client -connect 127.0.0.1:1 -quic -alpn h3 -tls1_2
+s_client -connect 127.0.0.1:1 -dtls -quic
+s_client -connect 127.0.0.1:1 -early_data {dir}/nonexistent.txt
+s_client -connect 127.0.0.1:1 -sess_in {dir}/nonexistent.pem
+s_client -connect 127.0.0.1:1 -psk xyz
+s_client -connect 127.0.0.1:1 -psk_session {dir}/nonexistent.pem
+s_client -connect 127.0.0.1:1 -cert {dir}/nonexistent.pem
+s_client -connect 127.0.0.1:1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/ee-key.pem
+s_client -connect 127.0.0.1:1 -key {dir}/nonexistent.pem
+s_client -connect 127.0.0.1:1 -cert {src}/test/certs/servercert.pem -key {tests}/s_server/serverkey-enc.pem -pass pass:wrong
+s_client -connect 127.0.0.1:1 -maxfraglen 1000
+s_client -connect 127.0.0.1:1 -max_send_frag 100
+s_client -connect 127.0.0.1:1 -split_send_frag 100000
+s_client -connect 127.0.0.1:1 -max_pipelines 100
+s_client -connect 127.0.0.1:1 -cipher bogus
+s_client -connect 127.0.0.1:1 -ciphersuites bogus
+s_client -connect 127.0.0.1:1 -sigalgs bogus
+s_client -connect 127.0.0.1:1 -groups bogus
+s_client -connect 127.0.0.1:1 -alpn
+s_client -connect 127.0.0.1:1 -nextprotoneg
+s_client -connect 127.0.0.1:1 -use_srtp BOGUS
+s_client -connect 127.0.0.1:1 -min_protocol bogus
+s_client -connect 127.0.0.1:1 -verify_depth x
+s_client -connect 127.0.0.1:1 -verify x
+s_client -connect 127.0.0.1:1 -dane_tlsa_rrdata "3 1 1 00"
+s_client -connect 127.0.0.1:1 -dane_tlsa_domain example.com -dane_tlsa_rrdata bogus
+s_client -connect 127.0.0.1:1 -ctlogfile {dir}/nonexistent.txt -ct
+s_client -connect 127.0.0.1:1 -serverinfo x
+s_client -connect 127.0.0.1:1 -srpuser alice -tls1_3
+s_client -connect 127.0.0.1:1 -srp_strength 1
+s_client -connect 127.0.0.1:1 -keymatexportlen 0 -keymatexport x
+s_client -connect 127.0.0.1:1 -ssl_config nonexistent
+s_client -connect 127.0.0.1:1 -name
+s_client -connect 127.0.0.1:1 -nameopt bogus
+s_client -connect 127.0.0.1:1 -provparam bogus
+s_client -connect 127.0.0.1:1 -rand {dir}/nonexistent.bin
+s_client -connect 127.0.0.1:1 -requestCAfile {dir}/nonexistent.pem
+s_client -connect 127.0.0.1:1 -CRL {dir}/nonexistent.pem
+s_client -connect 127.0.0.1:1 -chainCAfile {dir}/nonexistent.pem
+s_client -connect 127.0.0.1:1 -verifyCAfile {dir}/nonexistent.pem
+s_client -connect 127.0.0.1:1 -xkey {src}/test/certs/ee-key.pem
+s_client -connect 127.0.0.1:1 -xcert {dir}/nonexistent.pem -xkey {src}/test/certs/ee-key.pem
+s_client -connect 127.0.0.1:1 -msgfile {dir}/nonexistent/msg.txt
+s_client -connect 127.0.0.1:1 -keylogfile {dir}/nonexistent/keylog.txt
+s_client -connect 127.0.0.1:1 -mtu 100
+s_client -connect 127.0.0.1:1 -timeout
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -tls1_2 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -tls1_3 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -tls1_1 -cipher DEFAULT@SECLEVEL=0 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -tls1 -cipher DEFAULT@SECLEVEL=0 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -tls1 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -no_tls1_3 -no_tls1_1 -no_tls1 -no_ssl3 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -no_tls1_2 -no_tls1_3 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -min_protocol TLSv1.2 -max_protocol TLSv1.2 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -tls1_3 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem < {tests}/s_server/hello.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -no_ign_eof < {tests}/s_server/hello.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -quiet < {tests}/s_server/hello.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -brief < {tests}/s_server/hello.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -num_tickets 0 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -brief < {tests}/s_server/hello.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -state < {tests}/s_server/hello.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -msg < {tests}/s_server/hello.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -num_tickets 0 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -msg < {tests}/s_server/hello.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -debug < {tests}/s_server/hello.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -trace < {tests}/s_server/hello.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -num_tickets 0 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -trace < {tests}/s_server/hello.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -msg -msgfile {dir}/client-msg.txt < {tests}/s_server/hello.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -tlsextdebug < {tests}/s_server/hello.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -num_tickets 0 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -tlsextdebug < {tests}/s_server/hello.txt
+~s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -security_debug < {tests}/s_server/hello.txt
+~s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -security_debug_verbose < {tests}/s_server/hello.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -crlf < {tests}/s_server/hello.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -prexit < {tests}/s_server/hello.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -no-interactive < {tests}/s_server/hello.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -nocommands < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -adv < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -showcerts < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -cert_chain {src}/test/certs/rootcert.pem || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -showcerts < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -ign_eof < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -ign_eof -verify_return_error < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -ign_eof -verify 1 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -ign_eof -verify 1 -verify_quiet < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -ign_eof -verify 1 -verify_return_error < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -verify 1 -nameopt RFC2253 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -verify_hostname server.example < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -verify_hostname other.example < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -verify_ip 127.0.0.1 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -verify_email a@example.com < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -verify_depth 0 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -auth_level 3 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -attime 0 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -purpose sslserver -verify_name ssl_server -x509_strict -trusted_first -partial_chain -no_alt_chains -no_check_time -ignore_critical -issuer_checks -policy_check -explicit_policy -inhibit_any -inhibit_map -policy_print -check_ss_sig -allow_proxy_certs -use_deltas -extended_crl -policy 1.2.3.4 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -CRL {tests}/s_server/root-crl.pem -crl_check < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -CRL {tests}/s_server/root-crl.pem -CRLform PEM -crl_check_all < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -crl_check < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -crl_download -crl_check < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -ign_eof -CApath {dir} -CAstore file:{src}/test/certs/rootcert.pem -no-CAfile -no-CApath -no-CAstore < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -ign_eof -verifyCAfile {src}/test/certs/rootcert.pem -verify 1 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -ign_eof -verifyCApath {dir} -verifyCAstore file:{src}/test/certs/rootcert.pem -verify 1 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -verify 2 -CAfile {src}/test/certs/root-cert.pem || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -cert {src}/test/certs/ee-client.pem -key {src}/test/certs/ee-key.pem -cert_chain {src}/test/certs/ca-cert.pem < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -verify 2 -CAfile {src}/test/certs/root-cert.pem || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -cert {src}/test/certs/ee-client.pem -key {src}/test/certs/ee-key.pem -chainCAfile {src}/test/certs/ca-cert.pem -build_chain < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -verify 2 -CAfile {src}/test/certs/root-cert.pem || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -cert {src}/test/certs/ee-client.pem -key {src}/test/certs/ee-key.pem -chainCApath {dir} -chainCAstore file:{src}/test/certs/ca-cert.pem < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -Verify 2 -CAfile {src}/test/certs/root-cert.pem || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -Verify 2 -CAfile {src}/test/certs/root-cert.pem -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -verify 2 -CAfile {src}/test/certs/root-cert.pem || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -cert {tests}/s_server/servercert.der -certform DER -key {tests}/s_server/serverkey.der -keyform DER < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -verify 2 -CAfile {src}/test/certs/root-cert.pem || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -cert {src}/test/certs/servercert.pem -key {tests}/s_server/serverkey-enc.pem -pass pass:secret < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -verify 2 -CAfile {src}/test/certs/root-cert.pem || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -xcert {src}/test/certs/ee-client.pem -xkey {src}/test/certs/ee-key.pem -xchain {src}/test/certs/ca-cert.pem -xchain_build -xcertform PEM -xkeyform PEM < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -verify 2 -CAfile {src}/test/certs/root-cert.pem -client_sigalgs ECDSA+SHA256 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -cert {src}/test/certs/ee-client.pem -key {src}/test/certs/ee-key.pem < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -verify 2 -CAfile {src}/test/certs/root-cert.pem || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -cert {src}/test/certs/ee-client.pem -key {src}/test/certs/ee-key.pem -requestCAfile {src}/test/certs/root-cert.pem < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -verify 2 -CAfile {src}/test/certs/root-cert.pem || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -cert {src}/test/certs/ee-client.pem -key {src}/test/certs/ee-key.pem -client_sigalgs RSA-PSS+SHA256 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -verify 2 -CAfile {src}/test/certs/root-cert.pem -num_tickets 0 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -cert {src}/test/certs/ee-client.pem -key {src}/test/certs/ee-key.pem -enable_pha < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -cipher AES128-SHA -tls1_2 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -ciphersuites TLS_AES_128_GCM_SHA256 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -groups X25519 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -curves P-256 -tls1_2 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -named_curve P-384 -tls1_2 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -sigalgs RSA-PSS+SHA512 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -sigalgs RSA+SHA256 -tls1_2 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -tls1_2 -no_etm -no_ems -no_ticket -bugs -no_comp -legacy_renegotiation -no_resumption_on_reneg -legacy_server_connect -no_legacy_server_connect < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -tls1_2 -client_renegotiation -allow_no_dhe_kex -prefer_no_dhe_kex -prioritize_chacha -strict -serverpref < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -no_renegotiation -record_padding 512 -no_tx_cert_comp -no_rx_cert_comp -no_middlebox -comp < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -suiteB_128_only -tls1_2 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -suiteB_128 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -suiteB_192 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -debug_broken_protocol < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -fallback_scsv -tls1_2 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -fallback_scsv -no_tls1_3 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -maxfraglen 512 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -maxfraglen 1024 -tls1_2 < {tests}/s_server/close.txt
+~s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -max_send_frag 512 -split_send_frag 256 -max_pipelines 2 -read_buf 1024 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -async < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -nbio < {tests}/s_server/close.txt
+~s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -nbio_test < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -keylogfile {dir}/client-keylog.txt < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -rand {bin} -writerand {dir}/client-rand.bin < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -ignore_unexpected_eof < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -keymatexport EXPERIMENTAL-label < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -keymatexport EXPERIMENTAL-label -keymatexportlen 32 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -servername server.example < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -noservername < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -servername a -noservername < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -servername other.example -cert2 {src}/test/certs/server-ed25519-cert.pem -key2 {src}/test/certs/server-ed25519-key.pem || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -servername other.example < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -alpn h2,http/1.1 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -alpn http/1.1,h2 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -alpn h2 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -tls1_2 -nextprotoneg http/1.1 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -nextprotoneg spdy/2,http/1.1 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -tls1_2 -nextprotoneg http/1.1 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -nextprotoneg spdy/2 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -tls1_2 -use_srtp SRTP_AES128_CM_SHA1_80 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -use_srtp SRTP_AES128_CM_SHA1_32:SRTP_AES128_CM_SHA1_80 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -serverinfo {src}/test/serverinfo.pem -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -serverinfo 18,1000 < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -status_file {tests}/s_server/ocsp-resp.der || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -status < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -status_file {tests}/s_server/ocsp-resp.der -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -status < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -status < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -status_file {tests}/s_server/ocsp-resp.der || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -status -ocsp_check_leaf < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -status_file {tests}/s_server/ocsp-resp.der || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -status -ocsp_check_all < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -noct < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -ct -ctlogfile {src}/test/ct/log_list.cnf < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -enable_server_rpk || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -enable_server_rpk < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -enable_client_rpk -verify 1 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -enable_client_rpk -cert {src}/test/certs/ee-client.pem -key {src}/test/certs/ee-key.pem < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -dane_tlsa_domain server.example -dane_tlsa_rrdata "2 0 0 00" < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -dane_tlsa_domain server.example -dane_tlsa_rrdata "3 1 1 00" -dane_ee_no_namechecks < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -rev -nocert -psk 1a2b3c4d || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -psk 1a2b3c4d < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -rev -nocert -psk 1a2b3c4d -psk_identity me || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -psk 1a2b3c4d -psk_identity me < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -rev -nocert -psk 1a2b3c4d -psk_hint hint -tls1_2 -no_ticket -cipher PSK || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -psk 1a2b3c4d -cipher PSK < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -rev -nocert -psk_session {tests}/s_server/psk-sess.pem || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -psk_session {tests}/s_server/psk-sess.pem < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -rev -nocert -srpvfile {tests}/srp/users.txt -cipher SRP -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -srpuser alice -srppass password1 -cipher SRP < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -rev -nocert -srpvfile {tests}/srp/users.txt -cipher SRP -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -srpuser alice -srppass wrong -cipher SRP < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -rev -nocert -srpvfile {tests}/srp/users.txt -cipher SRP -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -srpuser alice -srppass password1 -srp_lateuser -srp_moregroups -srp_strength 1024 -cipher SRP < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 6 -tls1_2 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -reconnect < {tests}/s_server/hello.txt
+s_server -accept 127.0.0.1:0 -naccept 6 -tls1_2 -no_cache -no_ticket -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -reconnect < {tests}/s_server/hello.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -sess_out {dir}/client-sess.pem < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -sess_in {tests}/s_server/psk-sess.pem < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -sess_in {tests}/s_server/psk-sess.pem -early_data {tests}/s_server/early.txt < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -www || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -quiet < {tests}/s_server/get.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -www -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof < {tests}/s_server/get.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -dtls -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem || s_client -dtls -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem < {tests}/s_server/hello.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -dtls1_2 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem || s_client -dtls1_2 -mtu 1200 -timeout -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem < {tests}/s_server/hello.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -dtls -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -cipher DEFAULT@SECLEVEL=0 || s_client -dtls1 -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -cipher DEFAULT@SECLEVEL=0 < {tests}/s_server/hello.txt
+s_server -accept [::1]:0 -naccept 1 -rev -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem || s_client -connect [::1]:{port} -6 -CAfile {src}/test/certs/rootcert.pem -ign_eof < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -rev -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem || s_client -connect localhost:{port} -4 -CAfile {src}/test/certs/rootcert.pem -ign_eof < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -rev -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem || s_client -host 127.0.0.1 -port {port} -CAfile {src}/test/certs/rootcert.pem -ign_eof < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -rev -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem || s_client 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -rev -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem || s_client -connect 127.0.0.1:{port} -bind 127.0.0.1:0 -CAfile {src}/test/certs/rootcert.pem -ign_eof < {tests}/s_server/close.txt
+s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -provider default -provider-path {dir} -propquery provider=default < {tests}/s_server/close.txt

@@ -28,7 +28,15 @@
 //!   exit by itself, as with `-nrequest 1`);
 //! - `^`: the times within a few days of now (a reply made now) are masked.
 //!
-//! After them, `@<fixture> ` makes the line stateful: before each of its runs, the directory
+//! `{fresh:NAME}` in an argument is `fresh/NAME` in the work directory, a pristine copy of the
+//! file `tests/apps/NAME` made again before each run (for commands that change the file they're
+//! given, as `srp` does).
+//!
+//! A line `SERVER ARGS || CLIENT ARGS` pairs an `s_server` with a client (`{port}` is the
+//! server's port), each library's server with each library's client: see [`pair`]. (G5 used a
+//! lone `|`, which G2's `| check` already meant; it became `||` at the merge.)
+//!
+//! After the prefixes, `@<fixture> ` makes the line stateful: before each of its runs, the directory
 //! `tests/apps/<fixture>` is copied afresh to `{dir}/<its last component>` (a CA's database and
 //! serial files, which the command changes), so every run starts the same. (Forks G3 and G4
 //! both used `@`; G4's time masking became `^`.)
@@ -52,6 +60,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+
+mod pair;
 
 use crate::dist::CLI_NAME;
 use crate::test_c::{LOADER_PATH, prepare};
@@ -427,6 +437,48 @@ struct Line {
     background: bool,
     /// The current times masked (`^`).
     times: bool,
+    /// The `{fresh:NAME}` files.
+    fresh: Vec<String>,
+    /// A paired line's server and client (`SERVER ARGS || CLIENT ARGS`).
+    pair: Option<pair::Pair>,
+}
+
+/// Replaces each `{fresh:NAME}` of `arg` with its path, recording the names.
+fn fresh_files(arg: &str, work: &Path, names: &mut Vec<String>) -> String {
+    let mut out = String::new();
+    let mut rest = arg;
+    while let Some(at) = rest.find("{fresh:") {
+        let Some(end) = rest[at..].find('}') else {
+            break;
+        };
+        let name = &rest[at + 7..at + end];
+        out.push_str(&rest[..at]);
+        out.push_str(&work.join("fresh").join(name).display().to_string());
+        names.push(name.to_owned());
+        rest = &rest[at + end + 1..];
+    }
+    out.push_str(rest);
+    out
+}
+
+/// Makes the `{fresh:NAME}` copies again (`tests/apps/NAME` when it exists).
+fn refresh(setup: &Setup, line: &Line) -> Result {
+    if line.fresh.is_empty() {
+        return Ok(());
+    }
+    let dir = setup.work.join("fresh");
+    fresh_dir(&dir)?;
+    for name in &line.fresh {
+        let src = setup.tests.join(name);
+        let dst = dir.join(name);
+        if let Some(parent) = dst.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        if src.is_file() {
+            fs::copy(&src, &dst)?;
+        }
+    }
+    Ok(())
 }
 
 /// Copies the directory `from` to `to`, replacing what was there.
@@ -476,23 +528,27 @@ fn parse_list(text: &str, setup: &Setup) -> Vec<Line> {
             }
             None => rest,
         };
+        let mut fresh = Vec::new();
         let mut args: Vec<String> = rest
             .split_whitespace()
             .map(|a| {
-                let mut a = a.to_owned();
+                let mut a = fresh_files(a, &setup.work, &mut fresh);
                 for (key, value) in &setup.subst {
                     a = a.replace(key, value);
                 }
                 a
             })
             .collect();
+        let pair = pair::split(&args);
         let mut checks: Vec<Vec<String>> = Vec::new();
-        while let Some(at) = args.iter().rposition(|a| a == "|") {
+        while pair.is_none()
+            && let Some(at) = args.iter().rposition(|a| a == "|")
+        {
             checks.insert(0, args.split_off(at + 1));
             args.pop();
         }
         let mut stdin = None;
-        if args.len() >= 2 && args.get(args.len() - 2).is_some_and(|a| a == "<") {
+        if pair.is_none() && args.len() >= 2 && args.get(args.len() - 2).is_some_and(|a| a == "<") {
             stdin = args.pop().map(PathBuf::from);
             args.pop();
         }
@@ -506,6 +562,8 @@ fn parse_list(text: &str, setup: &Setup) -> Vec<Line> {
             reset,
             background,
             times,
+            fresh,
+            pair,
         });
     }
     out
@@ -531,6 +589,7 @@ fn run_line(setup: &Setup, line: &Line, tool: &Path, lib: &Path) -> Result<Outpu
     if let Some((from, to)) = &line.reset {
         copy_fresh(from, to)?;
     }
+    refresh(setup, line)?;
     let first = run_tool(tool, lib, &line.args, line.stdin.as_deref(), w)?;
     if line.checks.is_empty() {
         return Ok(first);
@@ -862,7 +921,14 @@ pub fn run(args: &[String]) -> Result {
                 }
                 continue;
             }
-            match check(&setup, &line, &runs)? {
+            let verdict = match &line.pair {
+                Some(p) => {
+                    refresh(&setup, &line)?;
+                    pair::check(&setup, p, line.compare, &format!("{name}-{count}"))?
+                }
+                None => check(&setup, &line, &runs)?,
+            };
+            match verdict {
                 Ok(()) => println!("PASS {name}: openssl {}", line.text),
                 Err(e) => {
                     println!("FAIL {name}: openssl {}: {e}", line.text);
@@ -1089,6 +1155,12 @@ mod tests {
         assert_eq!(lines[1].args, ["enc", "-base64", "-in", "/w/t"]);
         assert_eq!(lines[2].args, ["x509", "-noout"]);
         assert_eq!(lines[2].stdin.as_deref(), Some(Path::new("/w/t")));
+        let lines = parse_list("srp -srpvfile {fresh:srp/v.txt} -list\n", &setup);
+        assert_eq!(
+            lines[0].args,
+            ["srp", "-srpvfile", "/w/fresh/srp/v.txt", "-list"]
+        );
+        assert_eq!(lines[0].fresh, ["srp/v.txt"]);
         let piped = parse_list("genrsa 512 < {txt} | rsa -check | pkey -noout\n", &setup);
         assert_eq!(piped[0].args, ["genrsa", "512"]);
         assert_eq!(piped[0].stdin.as_deref(), Some(Path::new("/w/t")));

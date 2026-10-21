@@ -19,6 +19,8 @@ pub mod http_server;
 pub mod io;
 pub mod keygen;
 pub mod opt;
+pub mod s_cb;
+pub mod s_socket;
 
 #[cfg(test)]
 mod live_tests;

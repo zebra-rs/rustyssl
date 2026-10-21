@@ -14,6 +14,10 @@ pub struct Callbacks {
     pub msg: bool,
     /// `SSL_CTX_set_keylog_callback`.
     pub keylog: bool,
+    /// `SSL_set_tlsext_debug_callback`.
+    pub tlsext_debug: bool,
+    /// `SSL_CTX_set_not_resumable_session_callback` / `SSL_set_...`.
+    pub not_resumable: bool,
     /// `SSL_CTX_set_tlsext_servername_callback`.
     pub servername: bool,
     /// `SSL_CTX_set_client_hello_cb`.
@@ -130,6 +134,13 @@ pub enum Request {
         content_type: u8,
         /// Its length before padding.
         len: usize,
+    },
+    /// A TLS 1.2 server's new session (`not_resumable_session_cb`), with whether its key
+    /// exchange is ephemeral: answered [`Answer::Allowed`], `true` making it not resumable (no
+    /// session ID, ticket or cache entry).
+    NotResumable {
+        /// Whether the suite's key exchange is (EC)DHE.
+        forward_secure: bool,
     },
     /// A server-side session lookup (`get_session_cb`) by session ID.
     GetSession {
@@ -305,6 +316,10 @@ pub enum Request {
 
 /// The application's answer to a [`Request`].
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "answers are made once per callback; a session is the largest"
+)]
 pub enum Answer {
     /// Carry on (a callback that returned success and set its results through the API or
     /// [`super::Connection::config_mut`]).
@@ -432,6 +447,16 @@ pub enum Event {
     },
     /// A key log line (`SSL_CTX_set_keylog_callback`).
     Keylog(String),
+    /// A received extension, for the tlsext debug callback (`tls_collect_extensions`), in the
+    /// order received; unrecognised ones aren't reported.
+    TlsextDebug {
+        /// The callback's `client_server`: whether this side is the client.
+        client: bool,
+        /// The extension type.
+        typ: u16,
+        /// Its body.
+        data: Vec<u8>,
+    },
     /// A handshake ended: capi updates the session cache (`ssl_update_cache` with
     /// `SSL_SESS_CACHE_SERVER` or `_CLIENT`), as `tls_finish_handshake` does.
     UpdateCache {

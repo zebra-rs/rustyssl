@@ -386,7 +386,15 @@ fn mirror(st: &mut SslState, c: &Connection) {
     let n = c.negotiated();
     // Once the hellos chose it (`ssl_choose_server_version` sets `s->version` before the
     // certificate callback runs), or with a suite.
-    if n.cipher.is_some() || (!c.before() && c.version_decided()) {
+    if n.cipher.is_some() {
+        st.version = c_int::from(n.version);
+    } else if st.server {
+        if !c.before() && c.version_decided() {
+            st.version = c_int::from(n.version);
+        }
+    } else if c.client_version() != 0 {
+        // A client's is the method's until its ClientHello (`ssl_set_client_hello_version`
+        // sets the highest it offers), then the server's choice.
         st.version = c_int::from(n.version);
     }
     st.shutdown =
@@ -1252,7 +1260,14 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
         }
         // A handshake's start (`tls_setup_handshake`) and a TLS 1.3 server's end, which the
         // session cache counts.
-        let started = if was_before && !conn.before() {
+        // A set-up that failed (no protocols or ciphers) counted nothing.
+        let setup_failed = r
+            .as_ref()
+            .err()
+            .is_some_and(|e| e.func == Some("tls_setup_handshake"));
+        let started = if setup_failed {
+            None
+        } else if was_before && !conn.before() {
             Some(true)
         } else {
             (!was_in_init && conn.in_init() && !conn.is_tls13()).then_some(false)
@@ -1323,6 +1338,10 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                     // SAFETY: as above.
                     unsafe { super::sess_cache::on_fatal(x) };
                 }
+                if !server {
+                    // SAFETY: as above.
+                    unsafe { super::sess_cache::on_failed_client(x) };
+                }
                 // The alert goes out if the BIO takes it.
                 // SAFETY: the caller's guarantee.
                 let _ = unsafe { flush(x) };
@@ -1356,6 +1375,35 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                     // SAFETY: the application's callback with its connection and a
                     // NUL-terminated line; no lock is held.
                     unsafe { cb(s, l.as_ptr()) };
+                }
+            }
+            Event::TlsextDebug { client, typ, data } => {
+                let (cb, arg) = {
+                    let st = x.state();
+                    (st.debug_cb, st.debug_arg)
+                };
+                if let (Some(cb), Ok(len)) = (cb, c_int::try_from(data.len())) {
+                    // SAFETY: the debug callback's real type, as SSL_callback_ctrl stored it.
+                    let cb: unsafe extern "C" fn(
+                        *mut SSL,
+                        c_int,
+                        c_int,
+                        *const u8,
+                        c_int,
+                        *mut c_void,
+                    ) = unsafe { core::mem::transmute(cb) };
+                    // SAFETY: the application's callback with its connection and the
+                    // extension's body, valid for len octets; no lock is held.
+                    unsafe {
+                        cb(
+                            s,
+                            c_int::from(client),
+                            c_int::from(typ),
+                            data.as_ptr(),
+                            len,
+                            arg,
+                        )
+                    };
                 }
             }
             Event::UpdateCache { server } => {

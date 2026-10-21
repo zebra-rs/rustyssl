@@ -191,6 +191,26 @@ impl TxtDb {
             .map(|b| String::from_utf8_lossy(&b).into_owned())
     }
 
+    /// Sets the first character of field `f` of row `i` in place (`row[f][0] = c`), when the
+    /// field is a non-empty string (`srp` marks rows so).
+    pub fn set_first_char(&self, i: usize, f: usize, c: u8) {
+        if f >= self.num_fields() {
+            return;
+        }
+        let Some(row) = self.row_ptr(i) else {
+            return;
+        };
+        let Some(&p) = self.slots(row).get(f) else {
+            return;
+        };
+        // SAFETY: a non-NULL field is a NUL-terminated string the database owns, at least one
+        // byte long; a non-empty one is written in place, as the C code does.
+        if !p.is_null() && unsafe { *p } != 0 {
+            // SAFETY: as above.
+            unsafe { *p = c_char::from_ne_bytes([c]) };
+        }
+    }
+
     /// Replaces field `f` of row `i` with `value` (a new allocation the database frees),
     /// freeing the old one if the database allocated it apart from the row's block.
     pub fn set_field(&self, i: usize, f: usize, value: Option<&str>) -> bool {

@@ -54,6 +54,12 @@ pub struct CertKey {
 pub struct Session {
     /// The protocol version (`SSL3_VERSION` ... `TLS1_3_VERSION`).
     pub version: u16,
+    /// `not_resumable`: the not-resumable callback's verdict on a server's new session.
+    pub not_resumable: bool,
+    /// `psk_identity`: a TLS 1.2 PSK handshake's identity (the client's, as each side saw it).
+    pub psk_identity: Option<Vec<u8>>,
+    /// `psk_identity_hint`: the hint a TLS 1.2 PSK client received (none when empty).
+    pub psk_identity_hint: Option<Vec<u8>>,
     /// The cipher's id (`SSL_CIPHER_get_id`).
     pub cipher_id: u32,
     /// The session ID (TLS 1.2), up to 32 octets.

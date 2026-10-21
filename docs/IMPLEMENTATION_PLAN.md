@@ -6199,6 +6199,38 @@ order, on top of the HMAC DRBG fix their random differential sessions found (see
   line of an `apps/<file>.c` location (`__LINE__` of a two-line macro call: GCC and clang
   differ) are masked. 3825 command lines pass on macOS.
 
+G5, the TLS commands (2026-10-21, branch `cli-g5`): `ciphers`, `srp`, `s_client`, `s_server` and
+`s_time` are ported, with `apps/lib/s_cb.c` and `s_socket.c` as `src/lib/s_cb.rs` and
+`src/lib/s_socket.rs` (with the TLS helpers of `apps.c` they use: `ctx_set_verify_locations`,
+`ctx_set_ctlog_list_file`, `next_protos_parse`, `wait_for_async`, `policies_print`, and the SRP
+set-up of `tlssrp_depr.c`). Private copies: `srp`'s index helpers (`apps.c`'s CA database) in
+`cmd/srp.rs`, and the OCSP responder query of `s_server`'s status callback in
+`rustyssl-ossl/src/ocsp_status.rs`. `rustyssl-ossl` gains `ssl`, `ssl_cb` (one trampoline per
+callback kind), `sock` and `ocsp_status`.
+- **Harness:** `test-apps` takes `{fresh:NAME}` (a pristine copy of a fixture per run, for
+  `srp`'s verifier files) and paired lines `SERVER ARGS | CLIENT ARGS` (`xtask/src/test_apps/pair.rs`):
+  the server on loopback reports its port, and each line runs in five pairings (upstream's
+  tool on the reference for both sides, the expectation; ours on rustyssl and on the reference
+  for both; ours against upstream's in each direction), with what is random masked (the port,
+  session IDs, master keys, tickets, times, dumps' octets, pointers). `test-interop --cli ours`
+  runs our tool on the rustyssl side: 65 of 65 cases in all four pairings.
+- **Corpora:** `ciphers.txt` (50 lines), `srp.txt` (57), `s_server.txt` (178), `s_client.txt`
+  (200) and `s_time.txt` (32), all passing; fixtures in `tests/apps/srp/` and `tests/apps/s_server/`.
+  `s_time`'s runs and the lines whose output is random or build-specific (`-nbio_test`, split
+  records, `-security_debug` on the client, `-security_debug_verbose`) only have to succeed.
+- **Library fixes found by the corpora:** `SSL_get1_supported_ciphers` (DSS suites, a server's
+  client PSK callback); the tlsext debug and not-resumable-session callbacks are called;
+  `split_send_fragment` applies to every record type; a client's `SSL_get_session` is its
+  in-progress session (also after a failure), its `SSL_version` follows the ClientHello, and its
+  new sessions take the default timeout; TLS 1.2 PSK sessions keep the identity and hint; the
+  accept/connect counters skip a failed set-up; the function names of RPK, binder and SRTP
+  errors.
+- **Left:** `-starttls` needs servers speaking SMTP, IMAP, XMPP, ... (only its errors are
+  tested); `-engine`'s errors name the build's directories; rustyssl's session tickets are its
+  own format, so their length (and `SSL handshake has read N bytes`) differs from OpenSSL's when
+  a session's contents vary (those lines use `-no_ticket`); rustyssl's TLS core makes its
+  security-callback checks in a different order and number (`-security_debug_verbose`).
+
 ## Phase 12: Hardening, performance, release 1.0 → M7
 
 - [ ] **12.1 Performance:** benchmark against the reference (per TEST_PLAN L10). Close the gaps

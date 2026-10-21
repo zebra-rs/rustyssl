@@ -26,6 +26,7 @@ use crate::crypto::Provider;
 use crate::error::{Error, InFunc, Result};
 use crate::keysched::{Transcript, hash_of};
 use crate::msgs::hello::{ClientHello, ServerHello};
+use crate::suites::masks;
 
 /// The stages of ClientHello post-processing ([`State::early_stage`]).
 mod stage {
@@ -47,12 +48,14 @@ mod stage {
     pub const CERT_CB: u8 = 7;
     /// TLS 1.2's suite choice, and the signature algorithm.
     pub const CHOOSE: u8 = 8;
+    /// The not-resumable session callback.
+    pub const NOT_RESUMABLE: u8 = 9;
     /// The status request callback.
-    pub const STATUS: u8 = 9;
+    pub const STATUS: u8 = 10;
     /// TLS 1.2's ALPN callback.
-    pub const ALPN: u8 = 10;
+    pub const ALPN: u8 = 11;
     /// Done.
-    pub const DONE: u8 = 11;
+    pub const DONE: u8 = 12;
 }
 
 /// `RENEG_OPTIONS_OK`: the options allow a client to renegotiate.
@@ -569,6 +572,23 @@ pub(crate) fn post_process_client_hello(
         }
         c.neg.cipher = c.hs.new_cipher;
         c.neg.secure_renegotiation = state_ref(c).is_some_and(|s| s.send_connection_binding);
+        set_stage(c, stage::NOT_RESUMABLE)?;
+    }
+    if stage_of(c) == stage::NOT_RESUMABLE {
+        // Whether to disable resumption.
+        if !hit && c.cfg.callbacks.not_resumable {
+            let mkey = c.hs.new_cipher.map_or(0, |cp| cp.mkey);
+            let forward_secure = mkey & (masks::SSL_kDHE | masks::SSL_kECDHE) != 0;
+            match ask_once(c, Request::NotResumable { forward_secure }, 0) {
+                None => return Ok(Work::MoreB),
+                Some(Answer::Allowed(no)) => c.neg.session.not_resumable = no,
+                Some(_) => return Err(Error::internal()),
+            }
+        }
+        if !hit && c.neg.session.not_resumable {
+            // No session ticket.
+            c.hs.sh.ticket_expected = false;
+        }
         set_stage(c, stage::STATUS)?;
     }
     if stage_of(c) == stage::STATUS {

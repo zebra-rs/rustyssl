@@ -23,13 +23,19 @@ fn resumable(s: &Session) -> bool {
     !s.session_id.is_empty() || s.ticket.as_ref().is_some_and(|t| !t.is_empty())
 }
 
-/// `ssl_get_new_session` for a client: a fresh session at the version in use.
+/// `ssl_get_new_session` for a client: a fresh session at the version in use, with the
+/// session context's timeout (or the method's), not the offered session's.
 fn new_session(c: &Connection) -> Session {
+    let timeout = if c.cfg.session_timeout == 0 {
+        crate::conn::common::DEFAULT_TIMEOUT
+    } else {
+        c.cfg.session_timeout
+    };
     Session {
         version: c.neg.version,
         sid_ctx: c.cfg.sid_ctx.clone(),
         time: super::now(c),
-        timeout: c.neg.session.timeout,
+        timeout,
         ..Session::default()
     }
 }
