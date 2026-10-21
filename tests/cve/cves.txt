@@ -140,12 +140,12 @@ CVE-2016-0702 covered test-timing modular exponentiation cache-bank timing: dude
 CVE-2016-0703 n/a sslv2 SSLv2 (DROWN); SSLv2 is not implemented
 CVE-2016-0704 n/a sslv2 SSLv2 (DROWN); SSLv2 is not implemented
 CVE-2016-0705 test cve_pkey a malformed DSA private key fails without a double free
-CVE-2016-0797 gap size BN_hex2bn/BN_dec2bn with INT_MAX digits: needs > 2 GiB input; lengths are checked (rule 3)
+CVE-2016-0797 test cve_size BN_hex2bn and BN_dec2bn on INT_MAX / 4 + 2 digits (512 MiB) fail
 CVE-2016-0798 test cve_pkey SRP_VBASE_get1_by_user of an unknown user returns an owned record
 CVE-2016-0799 test cve_asn1 BIO_printf's %s, width and precision stay within bounds
 CVE-2016-0800 n/a sslv2 SSLv2 (DROWN); SSLv2 is not implemented
-CVE-2016-2105 gap size EVP_EncodeUpdate overflow: needs > 2 GiB input; lengths are checked (rule 3)
-CVE-2016-2106 gap size EVP_EncryptUpdate overflow: needs > 2 GiB input; lengths are checked (rule 3)
+CVE-2016-2105 test cve_size EVP_EncodeUpdate of 1.6 GB, whose base64 passes INT_MAX, fails reporting no length
+CVE-2016-2106 test cve_size a buffered partial block plus INT_MAX octets to a legacy cipher fails before reading
 CVE-2016-2107 test cve_cipher a TLS CBC record with bad padding and MAC fails
 CVE-2016-2108 test cve_asn1 negative zero encodes as 0; odd INTEGERs round-trip
 CVE-2016-2109 test cve_asn1 d2i_CMS_bio with a 2 GiB length on a short BIO fails
@@ -203,7 +203,7 @@ CVE-2021-3712 test cve_asn1 printing an ASN1_STRING that isn't NUL-terminated re
 CVE-2021-4044 test cve_tls a negative X509_verify_cert result fails the handshake
 CVE-2021-4160 test cve_pkey modular exponentiation equals the simple method (MIPS carry)
 CVE-2021-23839 n/a removed RSA_padding_check_SSLv23 and RSA_SSLV23_PADDING were removed in 3.0
-CVE-2021-23840 gap size EVP_CipherUpdate output length overflow: needs > 2 GiB input; lengths are checked (rule 3)
+CVE-2021-23840 test cve_size an update whose output would pass INT_MAX fails with OUTPUT_WOULD_OVERFLOW
 CVE-2021-23841 test cve_asn1 X509_issuer_and_serial_hash of a certificate without an issuer
 CVE-2022-0778 test cve_x509 BN_mod_sqrt with a composite modulus returns
 CVE-2022-1292 n/a script the c_rehash script; not shipped (rehash is the Rust tool, no shell)
