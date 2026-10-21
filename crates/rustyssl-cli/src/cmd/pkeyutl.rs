@@ -292,24 +292,20 @@ fn run(argv: &[String]) -> i32 {
     };
     let mut e = None;
     let mut _conf = None;
-    let (mut infile, mut outfile, mut secoutfile, mut sigfile, mut passinarg): (
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-    ) = (None, None, None, None, None);
+    let mut infile: Option<String> = None;
+    let mut outfile: Option<String> = None;
+    let mut secoutfile: Option<String> = None;
+    let mut sigfile: Option<String> = None;
+    let mut passinarg: Option<String> = None;
     let (mut hexdump, mut asn1parse, mut rev, mut engine_impl, mut rawin) =
         (false, false, false, false, false);
     let (mut keyform, mut peerform) = (format::UNDEF, format::UNDEF);
     let (mut pkey_op, mut key_type) = (EVP_PKEY_OP_SIGN, KeyType::Private);
-    let (mut inkey, mut peerkey, mut kdfalg, mut digestname, mut kemop): (
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-    ) = (None, None, None, None, None);
+    let mut inkey: Option<String> = None;
+    let mut peerkey: Option<String> = None;
+    let mut kdfalg: Option<String> = None;
+    let mut digestname: Option<String> = None;
+    let mut kemop: Option<String> = None;
     let mut kdflen = 0;
     let (mut pkeyopts, mut pkeyopts_passin): (Vec<String>, Vec<String>) = (Vec::new(), Vec::new());
     loop {
