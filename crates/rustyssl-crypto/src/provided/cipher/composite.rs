@@ -18,6 +18,9 @@ use super::{Error, Generic, Kind, Mode, Output, add, cbc, sub};
 pub const TLS1_AAD_LEN: usize = 13;
 /// `TLS1_1_VERSION`.
 const TLS1_1_VERSION: u16 = 0x0302;
+/// `SSL3_VERSION` and `TLS1_VERSION`: no explicit IV.
+const SSL3_VERSION: u32 = 0x0300;
+const TLS1_VERSION: u32 = 0x0301;
 /// `SSL3_RT_MAX_PLAIN_LENGTH`.
 const MAX_PLAIN: usize = 16384;
 /// SHA's block.
@@ -148,6 +151,12 @@ pub(super) struct Hmac {
     tls_ver: u16,
     tls_aad: [u8; TLS1_AAD_LEN],
     tls_aad_pad: usize,
+    /// The `tls-version` parameter (`tlsversion`): once set, decryption's `update` leaves
+    /// out the padding and `remove_tls_fixed`.
+    tls_version: u32,
+    /// The MAC and explicit IV a TLS record's decryption leaves out (`removetlsfixed`), set
+    /// with the key; less the IV for SSL 3.0 and TLS 1.0.
+    remove_tls_fixed: usize,
     mb_max_send_fragment: usize,
     mb_interleave: u32,
     mb_aad_packlen: u32,
@@ -164,6 +173,8 @@ impl Hmac {
             tls_ver: 0,
             tls_aad: [0; TLS1_AAD_LEN],
             tls_aad_pad: 0,
+            tls_version: 0,
+            remove_tls_fixed: 0,
             mb_max_send_fragment: 0,
             mb_interleave: 0,
             mb_aad_packlen: 0,
@@ -227,7 +238,40 @@ impl Generic {
             h.tail = h.head.clone();
             h.md = h.head.clone();
             h.payload_length = None;
+            h.remove_tls_fixed = h.digest_len().saturating_add(AES_BLOCK);
         }
+    }
+
+    /// The `tls-version` parameter (`aes_set_ctx_params`): SSL 3.0 and TLS 1.0 records have
+    /// no explicit IV, so each such setting takes a block off what decryption leaves out (and
+    /// fails, as the reference's assertion does, once less than a block is left).
+    pub fn set_composite_tls_version(&mut self, version: u32) -> Result<(), Error> {
+        let h = self.hmac_mut()?;
+        h.tls_version = version;
+        if version == SSL3_VERSION || version == TLS1_VERSION {
+            h.remove_tls_fixed = h
+                .remove_tls_fixed
+                .checked_sub(AES_BLOCK)
+                .ok_or(Error::Internal)?;
+        }
+        Ok(())
+    }
+
+    /// `ossl_cipher_generic_stream_update`'s TLS step after a decryption: with a TLS version
+    /// set, the output's length leaves out the padding (its last octet, plus one) and then
+    /// the MAC and explicit IV. A record too short for either fails without an error.
+    pub(super) fn composite_tls_unpad(&self, out: &mut Output) -> Result<(), Error> {
+        let h = self.hmac()?;
+        if self.enc || h.tls_version == 0 || out.failed.is_some() {
+            return Ok(());
+        }
+        let pad = usize::from(out.data.last().copied().unwrap_or(0));
+        out.len = out
+            .len
+            .checked_sub(pad.saturating_add(1))
+            .and_then(|n| n.checked_sub(h.remove_tls_fixed))
+            .ok_or(Error::Silent)?;
+        Ok(())
     }
 
     /// The `mackey` parameter (`*_set_mac_key`): HMAC's inner and outer starts.

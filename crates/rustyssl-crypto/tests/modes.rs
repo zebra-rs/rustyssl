@@ -202,4 +202,66 @@ mod tests {
             assert!(r.is_err());
         }
     }
+
+    /// AES-128-CBC-HMAC-SHA1 with a TLS 1.0 AAD (upstream's evpciph_aes_stitched.txt, line 1):
+    /// the record encrypts as the reference's, and its decryption's `update`, with
+    /// `tls-version` set, leaves out the padding and the MAC (TLS 1.0 has no explicit IV), as
+    /// `ossl_cipher_generic_stream_update` does; each SSL 3.0 or TLS 1.0 setting takes a block
+    /// off what it leaves out, until less than a block is left.
+    #[test]
+    fn composite_tls_version() {
+        let k = Kind::Block {
+            algorithm: BlockAlgorithm::Aes,
+            key_len: 16,
+            mode: Mode::CbcHmacSha1,
+        };
+        let key = unhex("feffe9928665731c6d6a8f9467308308");
+        let mac_key = unhex("cafebabefacedbaddecaf88801020304");
+        let iv = unhex("101112131415161718191a1b1c1d1e1f");
+        let aad = unhex("90a1b2c3e4f506172803010050");
+        let pt = unhex(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f\
+             202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f\
+             000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f\
+             202122232425262728292a2b2c2d2e2f",
+        );
+        let ct = unhex(
+            "18bd54842828fdc0ac5a3b459f32f0be305a77944b17f62fedd4442ae60a0b0a\
+             3e1c2c23c584c86877fbd9997b415959254ea06ef046dc2e1fdafe7950a77ba9\
+             4494683e01a0c495dc223a2de73be147d3f2b4f8d4d1e35487059ddc688544a0\
+             4dbacd1405a7b3871c3a2ab7c71c663d",
+        );
+        let record = |enc: bool, version: Option<u32>, input: &[u8]| {
+            let mut c = Ctx::new(k);
+            c.init(enc, Some(&key), Some(&iv)).unwrap();
+            let g = c.generic_mut().unwrap();
+            g.set_mac_key(&mac_key).unwrap();
+            if let Some(v) = version {
+                g.set_composite_tls_version(v).unwrap();
+            }
+            let mut a = aad.clone();
+            g.set_composite_tls_aad(&mut a).unwrap();
+            let mut data = input.to_vec();
+            if enc {
+                data.resize(ct.len(), 0);
+            }
+            let out = c.process(io(&data, data.len()), false).unwrap().unwrap();
+            assert!(out.failed.is_none());
+            let mut d = out.data.to_vec();
+            d.truncate(out.len);
+            d
+        };
+        assert_eq!(record(true, None, &pt), ct);
+        // The AAD's record length, 0x50: the rest of `pt` is the room for the MAC and padding.
+        assert_eq!(record(false, Some(0x0301), &ct), pt[..0x50]);
+        assert_eq!(record(false, None, &ct).len(), ct.len());
+
+        let mut c = Ctx::new(k);
+        c.init(false, Some(&key), Some(&iv)).unwrap();
+        let g = c.generic_mut().unwrap();
+        g.set_composite_tls_version(0x0303).unwrap();
+        g.set_composite_tls_version(0x0301).unwrap();
+        g.set_composite_tls_version(0x0300).unwrap();
+        assert!(g.set_composite_tls_version(0x0301).is_err());
+    }
 }

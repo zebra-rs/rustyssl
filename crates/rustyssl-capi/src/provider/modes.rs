@@ -794,7 +794,7 @@ ffi_callback! {
         match unsafe { get_param(params, OSSL_CIPHER_PARAM_TLS_VERSION, F, get_uint) } {
             Err(()) => return 0,
             Ok(Some(v)) => {
-                if let Err(e) = g.set_tls_version(v) {
+                if let Err(e) = g.set_composite_tls_version(v) {
                     raise(e, F);
                     return 0;
                 }
