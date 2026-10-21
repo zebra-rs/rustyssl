@@ -70,17 +70,17 @@ CVE-2011-4576 n/a sslv3 SSL 3.0 record padding; SSL 3.0 is disabled in the defau
 CVE-2011-4577 test cve_asn1 a malformed RFC 3779 address range
 CVE-2011-4619 n/a removed Server Gated Cryptography restarts; removed upstream
 CVE-2012-0027 n/a removed the GOST engine; not part of OpenSSL 3 or rustyssl
-CVE-2012-0050 gap dtls DTLS CBC records after a handshake: no in-memory DTLS handshake harness yet
+CVE-2012-0050 test cve_dtls forged CBC records (MAC then encrypt) of every short length into an established association are dropped; it lives on
 CVE-2012-0884 test cve_pkcs PKCS#7 decryption with the wrong RSA key reveals nothing (MMA)
 CVE-2012-2110 test cve_asn1 a header claiming 2 GiB on a short BIO fails
 CVE-2012-2131 test cve_asn1 a header claiming 2 GiB on a short BIO fails (0.9.8 fix)
-CVE-2012-2333 gap dtls DTLS explicit IV length check: no in-memory DTLS handshake harness yet
+CVE-2012-2333 test cve_dtls forged CBC records shorter than the explicit IV are dropped; the association lives on
 CVE-2012-2686 test cve_cipher a TLS 1.2 CBC record through the AES-NI path
 CVE-2013-0166 test cve_pkcs an OCSP signer certificate without a key fails verification
 CVE-2013-0169 test cve_tls CBC records of bad padding fail as bad MACs
 CVE-2013-4353 n/a 1.0.1 a 1.0.1 handshake-digest NULL dereference; not in 3.x's design
 CVE-2013-6449 n/a 1.0.1 a 1.0.1 TLS 1.2 digest-selection bug; not in 3.x's design
-CVE-2013-6450 gap dtls DTLS retransmission with the previous epoch's keys: no in-memory DTLS handshake harness yet
+CVE-2013-6450 test cve_dtls the server's final flight is lost; the client's retransmission is answered with the right keys
 CVE-2014-0076 covered test-timing ECDSA nonce cache timing: dudect's ecdsa-sign target (P-256)
 CVE-2014-0160 test cve_tls a heartbeat request is refused, echoing nothing
 CVE-2014-0195 test cve_tls a DTLS fragment past its message's length is dropped
@@ -93,7 +93,7 @@ CVE-2014-3506 test cve_tls DTLS message lengths can't make the server allocate 1
 CVE-2014-3507 test cve_tls zero-length DTLS fragments don't leak
 CVE-2014-3508 test cve_asn1 OBJ_obj2txt into a short buffer stays within it and NUL-terminates
 CVE-2014-3509 gap race a thread race on a resumed session's point formats: not reproducible deterministically
-CVE-2014-3510 gap dtls a DTLS client with anonymous (EC)DH: no crafted DTLS server flights yet
+CVE-2014-3510 test cve_dtls a DTLS client offering anonymous ECDH gets ServerHelloDone without ServerKeyExchange: unexpected_message
 CVE-2014-3511 test cve_tls a fragmented ClientHello still negotiates TLS 1.2
 CVE-2014-3512 test cve_pkey SRP rejects A = N and values longer than N
 CVE-2014-3513 test cve_tls a malformed use_srtp extension is refused without a leak
@@ -105,7 +105,7 @@ CVE-2014-3570 test cve_pkey BN_sqr equals BN_mul for 64- to 4096-bit all-ones va
 CVE-2014-3571 test cve_tls a zero-length DTLS record is dropped
 CVE-2014-3572 test cve_tls ECDHE without its ServerKeyExchange is refused
 CVE-2014-5139 test cve_tls a ServerHello with an SRP suite that wasn't offered is refused
-CVE-2014-8176 gap dtls DTLS application data between ChangeCipherSpec and Finished: no in-memory DTLS handshake harness yet
+CVE-2014-8176 test cve_dtls application data between ChangeCipherSpec and Finished in a resumed DTLS handshake
 CVE-2014-8275 test cve_x509 a certificate whose outer signature algorithm differs from the signed one fails
 CVE-2015-0204 test cve_tls a ServerKeyExchange for RSA key exchange is refused
 CVE-2015-0205 n/a removed fixed-DH client certificates; static DH authentication was removed upstream
@@ -309,8 +309,8 @@ CVE-2026-72897 test cve_tls switching SSL_CTX in the servername callback stays i
 CVE-2026-75803 test cve_cipher an empty ciphertext with a forged tag fails through EVP_Cipher
 CVE-2026-75804 test cve_quic STREAM data over the connection window, each stream within its own: FLOW_CONTROL_ERROR
 CVE-2026-75805 gap cmp a crafted CMP revocation response: needs a crafted CMP rp exchange
-CVE-2026-75806 gap dtls an undersized DTLS 1.2 AEAD record: no in-memory DTLS handshake harness yet
+CVE-2026-75806 test cve_dtls forged AES-GCM and ChaCha20-Poly1305 records shorter than nonce and tag are dropped; the association lives on
 CVE-2026-77696 gap timing SM2 signing timing: not measured by test-timing yet
-CVE-2026-84782 gap dtls DTLS retransmission from a stale offset: no in-memory DTLS handshake harness yet
+CVE-2026-84782 test cve_dtls the server's flight is suspended by a full datagram pair and its timer expires: the flight stays intact
 CVE-2026-84783 n/a 4.0 OpenSSL 4.0 only (rustyssl targets the 3.x ABI)
 CVE-2026-84784 test cve_quic 20000 NEW_CONNECTION_ID frames each retiring the earlier IDs: memory stays bounded
