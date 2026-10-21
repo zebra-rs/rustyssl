@@ -678,6 +678,10 @@ impl Connection {
         }
         let total = if self.sslv2_record {
             self.st.message_size
+        } else if self.cfg.dtls {
+            // The message as reassembled: its header keeps the announced length (for the
+            // transcript), its body is what arrived (`dtls_get_message_body`'s `init_num`).
+            msgs::HEADER_LEN.saturating_add(self.st.message_size.min(self.dtls.cur_body_len))
         } else {
             msgs::HEADER_LEN.saturating_add(self.st.message_size)
         };
