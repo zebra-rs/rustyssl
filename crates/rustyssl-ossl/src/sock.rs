@@ -93,7 +93,7 @@ impl AddrInfo {
     pub fn lookup_ex(
         host: Option<&str>,
         service: Option<&str>,
-        lookup_type: c_int,
+        lookup_type: BIO_lookup_type,
         family: c_int,
         socktype: c_int,
         protocol: c_int,
@@ -112,7 +112,7 @@ impl AddrInfo {
             ffi::BIO_lookup_ex(
                 h.as_ref().map_or(core::ptr::null(), |h| h.as_ptr()),
                 s.as_ref().map_or(core::ptr::null(), |s| s.as_ptr()),
-                lookup_type,
+                c_int::try_from(lookup_type).ok()?,
                 family,
                 socktype,
                 protocol,
@@ -605,4 +605,12 @@ pub fn puts(bio: &Bio, s: &str) -> c_int {
     let Some(c) = cstring(s) else { return -1 };
     // SAFETY: a valid C string.
     unsafe { ffi::BIO_puts(bio.as_ptr(), c.as_ptr()) }
+}
+
+/// The platform's socket constants the commands use.
+pub mod consts {
+    pub use libc::{
+        AF_INET, AF_INET6, AF_UNIX, AF_UNSPEC, EISCONN, IPPROTO_SCTP, IPPROTO_TCP, SOCK_DGRAM,
+        SOCK_STREAM,
+    };
 }

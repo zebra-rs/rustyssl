@@ -2188,3 +2188,157 @@ pub(crate) fn c_strdup(s: &str) -> *mut c_char {
     // SAFETY: a valid C string; the copy is the library's to free.
     unsafe { ffi::CRYPTO_strdup(c.as_ptr(), c"rustyssl-ossl".as_ptr(), 0) }
 }
+
+/// `ASN1_get_object(&p, &len, &tag, &xclass, max)` on `buf`: its result, the content length,
+/// tag and class, and how many octets the header took.
+pub fn asn1_get_object(buf: &[u8], max: c_long) -> (c_int, c_long, c_int, c_int, usize) {
+    let mut p = buf.as_ptr();
+    let (mut len, mut tag, mut class): (c_long, c_int, c_int) = (0, 0, 0);
+    let max = max.min(c_long::try_from(buf.len()).unwrap_or(c_long::MAX));
+    // SAFETY: p is valid for max (<= buf.len()) bytes; the out-pointers are valid.
+    let r = unsafe { ffi::ASN1_get_object(&mut p, &mut len, &mut tag, &mut class, max) };
+    let used = (p as usize).saturating_sub(buf.as_ptr() as usize);
+    (r, len, tag, class, used)
+}
+
+/// `ASN1_generate_nconf(genstr, cnf)` of a configuration text: `Err(line)` if the text
+/// doesn't load (`NCONF_load_bio`'s error line), `Ok(None)` if the string doesn't generate a
+/// SEQUENCE, else the SEQUENCE's content octets.
+pub fn asn1_generate_sequence(
+    conf_text: &str,
+    section: &str,
+    name: &str,
+) -> Result<Option<Vec<u8>>, c_long> {
+    let conf = crate::conf::Conf::new(None).ok_or(0)?;
+    let bio = Bio::from_bytes(conf_text.as_bytes()).ok_or(0)?;
+    let (r, errline) = conf.load_bio(&bio);
+    if r <= 0 {
+        return Err(errline);
+    }
+    let Some(genstr) = conf.get_string(Some(section), name) else {
+        return Ok(None);
+    };
+    let g = cstring(&genstr).ok_or(0)?;
+    // SAFETY: valid strings and a live conf; the result is ours.
+    let t = unsafe { ffi::ASN1_generate_nconf(g.as_ptr(), conf.as_ptr()) };
+    if t.is_null() {
+        return Ok(None);
+    }
+    // SAFETY: t is a live ASN1_TYPE (public layout).
+    let ty = unsafe { &*t };
+    let out = if ty.type_ == V_ASN1_SEQUENCE {
+        // SAFETY: a SEQUENCE's value is an ASN1_STRING of its encoding.
+        let s = unsafe { ty.value.sequence };
+        // SAFETY: s is a live ASN1_STRING.
+        let len = usize::try_from(unsafe { ffi::ASN1_STRING_length(s) }).unwrap_or(0);
+        // SAFETY: as above.
+        let d = unsafe { ffi::ASN1_STRING_get0_data(s) };
+        Some(bytes_at(d, c_long::try_from(len).unwrap_or(0)))
+    } else {
+        None
+    };
+    // SAFETY: t is ours.
+    unsafe { ffi::ASN1_TYPE_free(t) };
+    Ok(out)
+}
+
+/// `OSSL_HTTP_proxy_connect(bio, server, port, proxyuser, proxypass, timeout, bio_err,
+/// prog)`.
+#[allow(clippy::too_many_arguments)]
+pub fn http_proxy_connect(
+    bio: &Bio,
+    server: &str,
+    port: &str,
+    user: Option<&str>,
+    pass: Option<&str>,
+    timeout: c_int,
+    bio_err: Option<&Bio>,
+    prog: &str,
+) -> bool {
+    let (Some(s), Some(p), Some(u), Some(pw), Some(pr)) = (
+        cstring(server),
+        cstring(port),
+        opt_cstr(user),
+        opt_cstr(pass),
+        cstring(prog),
+    ) else {
+        return false;
+    };
+    let be = bio_err.map_or(core::ptr::null_mut(), Bio::as_ptr);
+    // SAFETY: the strings are valid or NULL; the BIOs are live.
+    unsafe {
+        ffi::OSSL_HTTP_proxy_connect(
+            bio.as_ptr(),
+            s.as_ptr(),
+            p.as_ptr(),
+            ptr_of(&u),
+            ptr_of(&pw),
+            timeout,
+            be,
+            pr.as_ptr(),
+        ) == 1
+    }
+}
+
+/// `d2i_OCSP_RESPONSE` then `OCSP_RESPONSE_print(bio, rsp, flags)`: false if it doesn't
+/// parse.
+pub fn ocsp_response_print(bio: &Bio, der: &[u8], flags: c_ulong) -> bool {
+    let Ok(len) = c_long::try_from(der.len()) else {
+        return false;
+    };
+    let mut p = der.as_ptr();
+    // SAFETY: p is valid for len bytes; the result is ours.
+    let r = unsafe { ffi::d2i_OCSP_RESPONSE(core::ptr::null_mut(), &mut p, len) };
+    if r.is_null() {
+        return false;
+    }
+    // SAFETY: both are live.
+    unsafe { ffi::OCSP_RESPONSE_print(bio.as_ptr(), r, flags) };
+    // SAFETY: r is ours.
+    unsafe { ffi::OCSP_RESPONSE_free(r) };
+    true
+}
+
+impl SslRef<'_> {
+    /// `SSL_get0_tlsext_status_ocsp_resp_ex`: each stapled response's DER (`None` for a NULL
+    /// entry); `None` without a stack.
+    pub fn tlsext_status_ocsp_resp_ex(self) -> Option<Vec<Option<Vec<u8>>>> {
+        let mut sk: *mut OPENSSL_STACK = core::ptr::null_mut();
+        self.ctrl(
+            SSL_CTRL_GET_TLSEXT_STATUS_REQ_OCSP_RESP_EX,
+            0,
+            (&raw mut sk).cast(),
+        );
+        if sk.is_null() {
+            return None;
+        }
+        // SAFETY: a live stack owned by the connection.
+        let n = unsafe { ffi::OPENSSL_sk_num(sk) };
+        let mut out = Vec::new();
+        for i in 0..n.max(0) {
+            // SAFETY: i in range; the members are OCSP responses or NULL.
+            let r = unsafe { ffi::OPENSSL_sk_value(sk, i) }.cast::<OCSP_RESPONSE>();
+            out.push(ocsp_der(r));
+        }
+        Some(out)
+    }
+}
+
+fn ocsp_der(r: *const OCSP_RESPONSE) -> Option<Vec<u8>> {
+    if r.is_null() {
+        return None;
+    }
+    // SAFETY: r is live; NULL asks for the length.
+    let n = unsafe { ffi::i2d_OCSP_RESPONSE(r, core::ptr::null_mut()) };
+    let len = usize::try_from(n).ok()?;
+    let mut v = vec![0u8; len];
+    let mut p = v.as_mut_ptr();
+    // SAFETY: v has room for the encoding.
+    (unsafe { ffi::i2d_OCSP_RESPONSE(r, &mut p) } == n).then_some(v)
+}
+
+/// `OPENSSL_hexchar2int`.
+pub fn hexchar2int(c: u8) -> c_int {
+    // SAFETY: a plain value.
+    unsafe { ffi::OPENSSL_hexchar2int(c) }
+}

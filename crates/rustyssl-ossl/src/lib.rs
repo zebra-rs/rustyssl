@@ -30,6 +30,7 @@ pub use bio::Bio;
 pub use util::cstring;
 pub mod conf;
 pub mod engine;
+pub mod ocsp_status;
 pub mod pkey;
 pub mod sock;
 pub mod srp;

@@ -21,6 +21,9 @@
 //! `{fresh:NAME}` is `fresh/NAME` in the work directory, a pristine copy of `tests/apps/NAME`
 //! made again before each run, for commands that change the files they're given.
 //!
+//! A line `SERVER ARGS | CLIENT ARGS` pairs an `s_server` with a client (`{port}` is the
+//! server's port): see [`pair`].
+//!
 //! Run whole (no list named), it also runs the CLI's library-backed unit tests (`live_*`, the
 //! shared helpers) on each library.
 //!
@@ -32,6 +35,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+
+mod pair;
 
 use crate::dist::CLI_NAME;
 use crate::test_c::{LOADER_PATH, prepare};
@@ -172,6 +177,8 @@ struct Line {
     stdin: Option<PathBuf>,
     /// The `{fresh:NAME}` files.
     fresh: Vec<String>,
+    /// A paired line's server and client (`SERVER ARGS | CLIENT ARGS`).
+    pair: Option<pair::Pair>,
 }
 
 /// Replaces each `{fresh:NAME}` of `arg` with its path, recording the names.
@@ -233,8 +240,9 @@ fn parse_list(text: &str, setup: &Setup) -> Vec<Line> {
                 a
             })
             .collect();
+        let pair = pair::split(&args);
         let mut stdin = None;
-        if args.len() >= 2 && args.get(args.len() - 2).is_some_and(|a| a == "<") {
+        if pair.is_none() && args.len() >= 2 && args.get(args.len() - 2).is_some_and(|a| a == "<") {
             stdin = args.pop().map(PathBuf::from);
             args.pop();
         }
@@ -244,6 +252,7 @@ fn parse_list(text: &str, setup: &Setup) -> Vec<Line> {
             args,
             stdin,
             fresh,
+            pair,
         });
     }
     out
@@ -391,7 +400,14 @@ pub fn run(args: &[String]) -> Result {
                 runs.push((&setup.ours, &setup.ref_lib, "our tool on the reference"));
             }
             count += 1;
-            match check(&setup, &line, &runs)? {
+            let verdict = match &line.pair {
+                Some(p) => {
+                    refresh(&setup, &line)?;
+                    pair::check(&setup, p, line.compare, name)?
+                }
+                None => check(&setup, &line, &runs)?,
+            };
+            match verdict {
                 Ok(()) => println!("PASS {name}: openssl {}", line.text),
                 Err(e) => {
                     println!("FAIL {name}: openssl {}: {e}", line.text);

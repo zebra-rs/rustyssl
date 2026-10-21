@@ -12,6 +12,8 @@ pub mod apps;
 pub mod engine;
 pub mod io;
 pub mod opt;
+pub mod s_cb;
+pub mod s_socket;
 
 #[cfg(test)]
 mod live_tests;
