@@ -1348,3 +1348,47 @@ fn run(argv: &[String]) -> i32 {
     }
     0
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dn_fields() {
+        assert_eq!(dn_field("CN"), ("CN", false));
+        assert_eq!(dn_field("1.OU"), ("OU", false));
+        assert_eq!(dn_field("x:+CN"), ("CN", true));
+        assert_eq!(dn_field("+CN"), ("CN", true));
+        // A separator at the end leaves the name as it is.
+        assert_eq!(dn_field("CN."), ("CN.", false));
+    }
+
+    #[test]
+    fn c_helpers() {
+        assert_eq!(atol(" 42x"), 42);
+        assert_eq!(atol("-7"), -7);
+        assert_eq!(atol("x"), 0);
+        assert!(ends_with("CN_default", "_default"));
+        assert!(!ends_with("_min", "x_min"));
+        assert_eq!(join(10, "abc", "_d", "Name").as_deref(), Some("abc_d"));
+        crate::lib::io::capture_err(|| assert_eq!(join(5, "abc", "_d", "Name"), None));
+    }
+
+    #[test]
+    fn addext_keys() {
+        let mut set = HashSet::new();
+        let (r, err) = crate::lib::io::capture_err(|| {
+            (
+                duplicated(&mut set, " keyUsage = x"),
+                duplicated(&mut set, "keyUsage=y"),
+                duplicated(&mut set, "novalue"),
+                duplicated(&mut set, " = x"),
+            )
+        });
+        assert_eq!(r, (Ok(false), Ok(true), Err(()), Err(())));
+        assert_eq!(
+            String::from_utf8_lossy(&err),
+            "Duplicate extension name: keyUsage\nParse error on -addext: missing '='\nParse error on -addext: missing key\n"
+        );
+    }
+}

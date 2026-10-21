@@ -2000,3 +2000,124 @@ fn run(argv: &[String]) -> i32 {
 
     0
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The reference's source tree, when the live tests are on (`cargo xtask test-apps`).
+    fn live() -> bool {
+        std::env::var_os("RUSTYSSL_CLI_LIVE").is_some()
+    }
+
+    #[test]
+    fn c_chars() {
+        assert_eq!(c_char_value(b'A'), 65);
+        let high = c_char_value(0xC3);
+        assert!(high == 0xC3 || high == -61);
+        assert_eq!(atol("12 "), 12);
+        assert_eq!(c_text(b"ab\0cd"), "ab");
+    }
+
+    #[test]
+    fn live_revinfo() {
+        if !live() {
+            return;
+        }
+        let i = unpack_revinfo("260101000000Z", true).unwrap();
+        assert!(i.revtime.is_some());
+        assert_eq!(i.reason, OCSP_REVOKED_STATUS_NOSTATUS);
+        let i = unpack_revinfo("260101000000Z,keyTime,20250601000000Z", false).unwrap();
+        assert_eq!(i.reason, OCSP_REVOKED_STATUS_KEYCOMPROMISE);
+        assert!(i.revtime.is_none() && i.invtime.is_some());
+        let i = unpack_revinfo("260101000000Z,holdInstruction,1.2.840.10040.2.2", true).unwrap();
+        assert_eq!(i.reason, OCSP_REVOKED_STATUS_CERTIFICATEHOLD);
+        assert!(i.hold.is_some());
+        assert_eq!(
+            unpack_revinfo("260101000000Z,removeFromCRL", true).map(|i| i.reason),
+            Some(OCSP_REVOKED_STATUS_REMOVEFROMCRL)
+        );
+        let (r, err) = crate::lib::io::capture_err(|| {
+            (
+                unpack_revinfo("bad", true).is_none(),
+                unpack_revinfo("260101000000Z,nope", true).is_none(),
+                unpack_revinfo("260101000000Z,holdInstruction", true).is_none(),
+                unpack_revinfo("260101000000Z,CAkeyTime,bad", true).is_none(),
+            )
+        });
+        assert_eq!(r, (true, true, true, true));
+        assert_eq!(
+            String::from_utf8_lossy(&err),
+            "invalid revocation date bad\ninvalid reason code nope\nmissing hold instruction\ninvalid compromised time bad\n"
+        );
+    }
+
+    #[test]
+    fn live_ca_database() {
+        if !live() {
+            return;
+        }
+        let dir = std::env::temp_dir().join(format!("rustyssl-cli-ca-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let index = dir.join("index.txt");
+        let rows = "R\t350101000000Z\t260101000000Z,superseded\t10\tunknown\t/CN=a\nV\t210101000000Z\t\t0B\tunknown\t/CN=b\n";
+        std::fs::write(&index, rows).unwrap();
+        let file = index.display().to_string();
+        let db = load_index(&file, true).unwrap();
+        assert!(db.unique_subject);
+        assert_eq!(db.db.len(), 2);
+        assert!(check_db(&db));
+        assert!(index_index(&db));
+        // The serial index ignores leading zeros; the name index counts valid rows only.
+        let key = |s: &'static str, n: &'static str| row(None, None, None, Some(s), None, Some(n));
+        assert_eq!(
+            db.db.get_by_index(field::SERIAL, &key("000B", "x")),
+            Some(1)
+        );
+        assert_eq!(db.db.get_by_index(field::NAME, &key("", "/CN=b")), Some(1));
+        assert_eq!(db.db.get_by_index(field::NAME, &key("", "/CN=a")), None);
+        assert_eq!(get_certificate_status_quiet("B", &db), 1);
+        assert!(db.db.insert(&row(
+            Some("V"),
+            Some("350101000000Z"),
+            None,
+            Some("0C"),
+            Some("unknown"),
+            Some("/CN=c")
+        )));
+        assert!(db.db.set_field(1, field::TYPE, Some("E")));
+        assert!(save_index(&file, "new", &db));
+        assert!(rotate_index(&file, "new", "old"));
+        assert_eq!(
+            std::fs::read_to_string(&index).unwrap(),
+            "R\t350101000000Z\t260101000000Z,superseded\t10\tunknown\t/CN=a\nE\t210101000000Z\t\t0B\tunknown\t/CN=b\nV\t350101000000Z\t\t0C\tunknown\t/CN=c\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.join("index.txt.old")).unwrap(),
+            rows
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.join("index.txt.attr")).unwrap(),
+            "unique_subject = yes\n"
+        );
+        // The attributes file now says what a reload uses.
+        std::fs::write(dir.join("index.txt.attr"), "unique_subject = no\n").unwrap();
+        assert!(!load_index(&file, true).unwrap().unique_subject);
+        // Serial files.
+        let serial = dir.join("serial").display().to_string();
+        std::fs::write(&serial, "0F\n").unwrap();
+        let (s, exists) = load_serial(&serial, false);
+        let (bn, _) = s.unwrap();
+        assert!(exists);
+        assert!(bn.add_word(1));
+        assert!(save_serial(&serial, Some("new"), &bn).is_some());
+        assert!(rotate_serial(&serial, "new", "old"));
+        assert_eq!(std::fs::read_to_string(&serial).unwrap(), "10\n");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// `get_certificate_status` without its message.
+    fn get_certificate_status_quiet(s: &str, db: &CaDb) -> i32 {
+        crate::lib::io::capture_err(|| get_certificate_status(s, db)).0
+    }
+}
