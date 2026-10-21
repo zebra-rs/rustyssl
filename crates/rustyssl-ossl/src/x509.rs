@@ -530,3 +530,141 @@ pub fn load_http_crl(url: &str) -> Option<Crl> {
         ffi::X509_CRL_load_http(u.as_ptr(), core::ptr::null_mut(), core::ptr::null_mut(), 0)
     })
 }
+
+// Printing and writing certificates and CRLs, and borrowing stack members (fork G4).
+
+impl Cert {
+    /// A new reference to a certificate the caller only borrows (`X509_up_ref`).
+    pub(crate) fn from_borrowed(p: *mut crate::abi::X509) -> Option<Self> {
+        if p.is_null() {
+            return None;
+        }
+        // SAFETY: p is a live certificate; the new reference is owned by the result.
+        unsafe { ffi::X509_up_ref(p) };
+        Self::from_ptr(p)
+    }
+
+    /// `X509_print(out, x)`.
+    pub fn print(&self, out: &Bio) -> c_int {
+        // SAFETY: both are live.
+        unsafe { ffi::X509_print(out.as_ptr(), self.as_ptr()) }
+    }
+
+    /// `X509_print_ex(out, x, nmflag, cflag)`.
+    pub fn print_ex(&self, out: &Bio, nmflag: c_ulong, cflag: c_ulong) -> c_int {
+        // SAFETY: both are live.
+        unsafe { ffi::X509_print_ex(out.as_ptr(), self.as_ptr(), nmflag, cflag) }
+    }
+
+    /// `PEM_write_bio_X509`.
+    pub fn write_pem(&self, out: &Bio) -> bool {
+        // SAFETY: both are live.
+        unsafe { ffi::PEM_write_bio_X509(out.as_ptr(), self.as_ptr()) == 1 }
+    }
+
+    /// `i2d_X509_bio`.
+    pub fn write_der(&self, out: &Bio) -> bool {
+        // SAFETY: both are live.
+        unsafe { ffi::i2d_X509_bio(out.as_ptr(), self.as_ptr()) == 1 }
+    }
+}
+
+impl Crl {
+    /// A new reference to a CRL the caller only borrows (`X509_CRL_up_ref`).
+    pub(crate) fn from_borrowed(p: *mut X509_CRL) -> Option<Self> {
+        if p.is_null() {
+            return None;
+        }
+        // SAFETY: p is a live CRL; the new reference is owned by the result.
+        unsafe { ffi::X509_CRL_up_ref(p) };
+        Self::from_ptr(p)
+    }
+
+    /// `X509_CRL_print_ex(out, crl, nmflag)`.
+    pub fn print_ex(&self, out: &Bio, nmflag: c_ulong) -> c_int {
+        // SAFETY: both are live.
+        unsafe { ffi::X509_CRL_print_ex(out.as_ptr(), self.as_ptr(), nmflag) }
+    }
+
+    /// `PEM_write_bio_X509_CRL`.
+    pub fn write_pem(&self, out: &Bio) -> bool {
+        // SAFETY: both are live.
+        unsafe { ffi::PEM_write_bio_X509_CRL(out.as_ptr(), self.as_ptr()) == 1 }
+    }
+}
+
+/// The certificates of a stack the caller borrows (NULL: none), each as a new reference.
+pub(crate) fn certs_of(sk: *const stack_st_X509) -> Vec<Cert> {
+    let mut out = Vec::new();
+    if sk.is_null() {
+        return out;
+    }
+    // SAFETY: sk is a live stack.
+    let n = unsafe { ffi::OPENSSL_sk_num(sk.cast()) };
+    for i in 0..n.max(0) {
+        // SAFETY: i is in range; the member is a live X509.
+        let p = unsafe { ffi::OPENSSL_sk_value(sk.cast(), i) }.cast::<crate::abi::X509>();
+        if let Some(c) = Cert::from_borrowed(p) {
+            out.push(c);
+        }
+    }
+    out
+}
+
+/// The CRLs of a stack the caller borrows (NULL: none), each as a new reference.
+pub(crate) fn crls_of(sk: *const stack_st_X509_CRL) -> Vec<Crl> {
+    let mut out = Vec::new();
+    if sk.is_null() {
+        return out;
+    }
+    // SAFETY: sk is a live stack.
+    let n = unsafe { ffi::OPENSSL_sk_num(sk.cast()) };
+    for i in 0..n.max(0) {
+        // SAFETY: i is in range; the member is a live X509_CRL.
+        let p = unsafe { ffi::OPENSSL_sk_value(sk.cast(), i) }.cast::<X509_CRL>();
+        if let Some(c) = Crl::from_borrowed(p) {
+            out.push(c);
+        }
+    }
+    out
+}
+
+impl CertStack {
+    /// The certificates, each as a new reference.
+    pub fn to_vec(&self) -> Vec<Cert> {
+        certs_of(self.as_ptr())
+    }
+
+    /// `sk_X509_push` of a new reference to `cert`.
+    pub fn push_ref(&self, cert: &Cert) -> bool {
+        let Some(c) = Cert::from_borrowed(cert.as_ptr()) else {
+            return false;
+        };
+        // SAFETY: both are live; on success the stack owns the new reference.
+        if unsafe { ffi::OPENSSL_sk_push(self.as_ptr().cast(), c.as_ptr().cast()) } > 0 {
+            core::mem::forget(c);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Takes ownership of a stack the caller got from the library (NULL: `None`).
+    pub fn from_raw(p: *mut stack_st_X509) -> Option<Self> {
+        core::ptr::NonNull::new(p).map(Self)
+    }
+
+    /// Gives up ownership.
+    pub fn into_ptr(self) -> *mut stack_st_X509 {
+        let p = self.as_ptr();
+        core::mem::forget(self);
+        p
+    }
+}
+
+impl CrlStack {
+    /// The CRLs, each as a new reference.
+    pub fn to_vec(&self) -> Vec<Crl> {
+        crls_of(self.as_ptr())
+    }
+}

@@ -35,7 +35,7 @@ pub mod version;
 // pub mod ocsp;
 // pub mod passwd;
 // pub mod pkcs12;
-// pub mod pkcs7;
+pub mod pkcs7;
 // pub mod pkcs8;
 // pub mod pkey;
 // pub mod pkeyparam;
@@ -49,7 +49,7 @@ pub mod version;
 // pub mod s_client;
 // pub mod s_server;
 // pub mod s_time;
-// pub mod sess_id;
+pub mod sess_id;
 // pub mod skeyutl;
 // pub mod smime;
 // pub mod speed;
@@ -94,7 +94,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "ocsp" => ocsp::main,
         // "passwd" => passwd::main,
         // "pkcs12" => pkcs12::main,
-        // "pkcs7" => pkcs7::main,
+        "pkcs7" => pkcs7::main,
         // "pkcs8" => pkcs8::main,
         // "pkey" => pkey::main,
         // "pkeyparam" => pkeyparam::main,
@@ -108,7 +108,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "s_client" => s_client::main,
         // "s_server" => s_server::main,
         // "s_time" => s_time::main,
-        // "sess_id" => sess_id::main,
+        "sess_id" => sess_id::main,
         // "skeyutl" => skeyutl::main,
         // "smime" => smime::main,
         // "speed" => speed::main,
