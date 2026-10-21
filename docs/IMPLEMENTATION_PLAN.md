@@ -6023,6 +6023,38 @@ database and serial-file helpers of `apps.c` (G3, `ca`), its HTTP and TLS-for-HT
 (G4, `ocsp`/`cmp`), `http_server.c`, `cmp_mock_srv.c`, `app_params.c`, `names.c`, `log.c`, and
 `s_cb.c`/`s_socket.c` (G5).
 
+G6 (2026-10-21, branch `cli-g6`): `speed`, `engine`, `fipsinstall`, and `configutl` are ported,
+each with its corpus (`tests/apps/<command>.txt`, files under `tests/apps/<command>/`), every
+option covered, byte-exact in all three `test-apps` runs with the same exit codes:
+- **`configutl`:** the configuration linearized, with upstream's escaping (40 lines, including
+  upstream's own `.cnf` files and include, pragma, and error cases).
+- **`engine`:** the list, `-c` (methods, NIDs, store loaders), `-t`/`-tt`, `-v` to `-vvvv` with
+  the input flags, `-pre`/`-post` (48 lines; engines outside ENGINESDIR, which differs by
+  library, are loaded by path through `dynamic`).
+- **`fipsinstall`:** as upstream's tool behaves without a FIPS module: the module and
+  install-indicator MACs (`-mac_name`, `-macopt`), the generated section loaded with its
+  modules, `-verify`, `-config`, `-pedantic` and the options it excludes, every check option,
+  `-quiet`/`-noout`; the legacy provider's module stands in for a module that loads (73 lines).
+  The self-test callback (`-corrupt_desc`/`-corrupt_type`) is unit-tested, as no module here
+  runs self tests.
+- **`speed`:** every benchmark kind, `-mr`, `-multi` (forked children over pipes), `-async_jobs`,
+  `-mb`, `-engine`, `-primes`, `-mlock`, `-elapsed`, `-testmode`, providers and `-config`;
+  timed as upstream (SIGALRM, `times`); the keys from upstream's `apps/testrsa.h` and
+  `apps/testdsa.h`, now vendored (144 lines). Its lines start with `%`, a new `test-apps`
+  prefix: compared with the numbers masked, and the lines naming the library's build (decision
+  4). `-async_jobs` lines must only succeed: rustyssl's `ASYNC_is_capable()` is 0 (a recorded
+  deviation), where `speed` says so; their output matches upstream's on the reference. One
+  CLI deviation is recorded: a paused job left by a failed async run is abandoned, not resumed.
+- **Shared code added in the command files** (to move to `src/lib/` later): `speed.rs` has a
+  private `init_gen_str` (`genpkey.c`'s) and `app_tminterval` (`State::tminterval`);
+  `fipsinstall.rs` uses `rustyssl_ossl::params::Params::from_text` for
+  `app_params_new_from_opts`. New in `rustyssl-ossl`: the `params` (OSSL_PARAM lists), `os`
+  (alarm, `times`, fork to a pipe, `wait`, `select`, `mlock`), and `async_job` modules, and
+  wrappers in `bio`, `conf`, `engine`, `err`, `evp`, `pkey`, `provider`, and `rand`.
+- **Library fixes the corpora found:** configuration errors name upstream's functions
+  (`str_copy`, `parsebool`), and so do `OPENSSL_hexstr2buf(_ex)`'s (`hexstr2buf_sep`,
+  `ossl_hexstr2buf_sep`); `tests/c/conf.c` and `tests/c/crypto_str.c` check them.
+
 ## Phase 12: Hardening, performance, release 1.0 → M7
 
 - [ ] **12.1 Performance:** benchmark against the reference (per TEST_PLAN L10). Close the gaps
