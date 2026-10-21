@@ -6314,12 +6314,32 @@ The CLI's gaps closed (2026-10-21, local, branch `cli-gaps`, macOS arm64):
   with intrinsics in vetted backends and with profiling. Assembly is not allowed. Set the
   targets once there's a baseline (initial goal: within 1.25× of the reference on hot
   symmetric paths and within 1.5× on handshakes).
-- [ ] **12.2 Security:**
-  - a third-party audit (the crypto backends and all `unsafe` in capi)
+- [~] **12.2 Security:**
+  - a third-party audit (the crypto backends and all `unsafe` in capi). The user's decision
+    (2026-10-21): rustyssl prepares the package, the user engages a firm. **Package done:**
+    `docs/security/audit/` (scope, architecture summary, prior findings, a four-week plan; the
+    threat model; building and running every suite). M7's "audit closed" stays open until a firm
+    reports.
   - the complete CVE regression suite
-  - OSS-Fuzz onboarding (start after M2)
-  - a review of the `unsafe` budget
-  - a constant-time verification report
+  - OSS-Fuzz onboarding (start after M2). The user's decision (2026-10-21): the project files
+    live in our repository and run in our CI; the user submits them to google/oss-fuzz.
+    **Done:** `oss-fuzz/` (build.sh, Dockerfile, project.yaml, README.md) and ClusterFuzzLite
+    (`.clusterfuzzlite/`, `.github/workflows/cflite_pr.yml` fuzzing what a pull request
+    changes for 10 minutes, `cflite_batch.yml` a daily hour over every target), sharing one
+    build.sh.
+  - [x] a review of the `unsafe` budget (`docs/security/unsafe-review.md`). New
+    `cargo xtask unsafe-audit`: the unsafe sites per module against
+    `docs/security/unsafe-budget.txt` (growth fails until blessed), `forbid(unsafe_code)` in every
+    other crate, and the panic guard on every hand-written export; CI and `scripts/gates.sh` run
+    it. 38 743 blocks, 12 067 `unsafe fn`s, 168 `unsafe impl`s in 141 modules; every export
+    guarded; 505 internal callbacks unguarded (a panic there aborts, budgeted). The pattern
+    review (raw slices, casts, transmutes, locks across callbacks, `static mut`) found no defect.
+  - [x] a constant-time verification report (`docs/security/constant-time.md`). Found and fixed:
+    BN Montgomery reduction's carry and selections could compile to data-dependent code
+    (`bn-modexp-consttime` |t| 12–15 at 160 000 measurements, under 10 at the 40 000 the target
+    used); now branch-free behind optimization barriers, |t| 0.98–1.84, and the target takes
+    160 000. Every `test-timing` target under 10 after the fix. Left: tlsfuzzer's timing scripts
+    and a valgrind taint run on Linux, more dudect targets, x86_64 measurements.
 - [ ] **12.3 Packaging:** Debian/Fedora/Alpine (musl)/Homebrew layouts, pkg-config files, a
   default `openssl.cnf`, MODULESDIR, side-by-side installation and an alternatives mechanism,
   and migration docs. Decide the Fedora ABI extras found in 0.10 (MD2, SCTP, and the

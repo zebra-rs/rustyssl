@@ -1,0 +1,3 @@
+# The ClusterFuzzLite image copies the checkout (.clusterfuzzlite/Dockerfile): not the build outputs.
+target/
+fuzz/target/
