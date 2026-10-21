@@ -1,0 +1,9 @@
+#!/bin/sh
+# Select the system's OpenSSL again before rustyssl's files go away.
+set -e
+if [ "$1" = remove ] || [ "$1" = upgrade ]; then
+    for s in /usr/lib/*/rustyssl/bin/rustyssl-select; do
+        [ -x "$s" ] && [ "$("$s" status)" = rustyssl ] && "$s" system || true
+    done
+fi
+#DEBHELPER#

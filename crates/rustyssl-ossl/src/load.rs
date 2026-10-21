@@ -100,9 +100,20 @@ fn dlerror_text() -> String {
 fn open(library: Library) -> Result<Handle, String> {
     let file = library.file_name();
     let exe = std::env::current_exe().ok();
-    let list = candidates(&file, std::env::var_os(LIBRARY_PATH), exe);
-    for path in &list {
-        let by_name = path.as_os_str() == file.as_str();
+    open_first(
+        &file,
+        &candidates(&file, std::env::var_os(LIBRARY_PATH), exe),
+    )
+}
+
+/// Opens the first of `list` that loads. A path that exists but doesn't load (another
+/// architecture's library, such as a 32-bit one in `/usr/lib` on a multilib system) is
+/// skipped, as the dynamic loader skips an incompatible library on its search path; if none
+/// loads, the error names the first that failed.
+fn open_first(file: &str, list: &[PathBuf]) -> Result<Handle, String> {
+    let mut first_error = None;
+    for path in list {
+        let by_name = path.as_os_str() == file;
         if !by_name && !path.exists() {
             continue;
         }
@@ -111,15 +122,13 @@ fn open(library: Library) -> Result<Handle, String> {
         // SAFETY: c is a NUL-terminated path; the flags are valid dlopen modes.
         let h = unsafe { libc::dlopen(c.as_ptr(), libc::RTLD_NOW | libc::RTLD_LOCAL) };
         if h.is_null() {
-            return Err(format!(
-                "cannot load {}: {}",
-                path.display(),
-                dlerror_text()
-            ));
+            let error = format!("cannot load {}: {}", path.display(), dlerror_text());
+            first_error.get_or_insert(error);
+            continue;
         }
         return Ok(Handle(h));
     }
-    Err(format!("cannot find {file}"))
+    Err(first_error.unwrap_or_else(|| format!("cannot find {file}")))
 }
 
 fn loaded() -> &'static Loaded {
@@ -253,6 +262,29 @@ mod tests {
                 ("libcrypto.so.3", "libssl.so.3")
             );
         }
+    }
+
+    #[test]
+    fn a_library_that_does_not_load_is_skipped() {
+        // A file that exists but isn't a library, then the C library by name.
+        let dir = std::env::temp_dir().join(format!("rustyssl-load-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let bogus = dir.join("libbogus.so.3");
+        std::fs::write(&bogus, b"not a library").unwrap();
+        let libc_name = if cfg!(target_os = "macos") {
+            "libSystem.B.dylib"
+        } else {
+            "libc.so.6"
+        };
+        assert!(open_first(libc_name, &[bogus.clone(), PathBuf::from(libc_name)]).is_ok());
+        let Err(e) = open_first("libnothing.so.3", &[bogus.clone(), dir.join("missing")]) else {
+            panic!("a bogus library loaded");
+        };
+        assert!(
+            e.starts_with(&format!("cannot load {}", bogus.display())),
+            "{e}"
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

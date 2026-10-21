@@ -17,5 +17,9 @@ crate-type = ["staticlib"]
 [dependencies]
 rustyssl-capi.workspace = true
 
+[features]
+# The Fedora profile: see rustyssl-capi's `fedora` feature.
+fedora = ["rustyssl-capi/fedora"]
+
 [lints]
 workspace = true

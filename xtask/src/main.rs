@@ -13,6 +13,7 @@ mod coverage;
 mod dist;
 mod elf;
 mod json;
+mod package;
 mod reference;
 mod targets;
 mod test_apps;
@@ -21,6 +22,7 @@ mod test_c;
 mod test_consumers;
 mod test_cve;
 mod test_differential;
+mod test_distro;
 mod test_interop;
 mod test_openssl_suite;
 mod test_providers;
@@ -41,6 +43,7 @@ const COMMANDS: &[(&str, &str)] = &[
     ("codegen", "regenerate ABI bindings, NID/error tables, stubs, and version scripts"),
     ("dist", "build lib{crypto,ssl} with soname and symbol versions into target/dist/"),
     ("ref-openssl", "build the pinned reference OpenSSL into target/ref/"),
+    ("package", "build and stage a distribution's install tree and tarball into target/package/"),
     ("abi-check", "check symbols, versions, signatures, and struct layouts against abi/"),
     ("coverage", "report implemented exports per library and header into docs/coverage.md"),
     ("usage-scan", "rank exported functions by how many distro packages import them"),
@@ -50,6 +53,7 @@ const COMMANDS: &[(&str, &str)] = &[
     ("test-bogo", "BoringSSL's TLS test runner (BoGo) with an OpenSSL-API shim, on both libraries"),
     ("test-interop", "TLS between the reference's s_server/s_client and rustyssl, in four pairings"),
     ("test-differential", "compare results against the reference OpenSSL"),
+    ("test-distro", "distro system tests: rustyssl's packages in Debian, Ubuntu, Fedora, EL, Alpine containers, and Homebrew"),
     ("test-openssl-suite", "run the upstream OpenSSL test suite against our libraries"),
     ("test-tlsfuzzer", "tlsfuzzer's scripts against the reference's s_server on both libraries"),
     ("test-quic-interop", "quic-interop-runner's core cases between OpenSSL's QUIC API and other stacks, both libraries"),
@@ -74,6 +78,7 @@ fn main() -> ExitCode {
         Some("codegen") => report("codegen", codegen::run(&rest)),
         Some("coverage") => report("coverage", coverage::run(&rest)),
         Some("dist") => report("dist", dist::run(&rest)),
+        Some("package") => report("package", package::run(&rest)),
         Some("ref-openssl") => report("ref-openssl", reference::run(&rest)),
         Some("test-apps") => report("test-apps", test_apps::run(&rest)),
         Some("test-bogo") => report("test-bogo", test_bogo::run(&rest)),
@@ -82,6 +87,7 @@ fn main() -> ExitCode {
         Some("test-cve") => report("test-cve", test_cve::run(&rest)),
         Some("test-consumers") => report("test-consumers", test_consumers::run(&rest)),
         Some("test-differential") => report("test-differential", test_differential::run(&rest)),
+        Some("test-distro") => report("test-distro", test_distro::run(&rest)),
         Some("test-openssl-suite") => report("test-openssl-suite", test_openssl_suite::run(&rest)),
         Some("test-tlsfuzzer") => report("test-tlsfuzzer", test_tlsfuzzer::run(&rest)),
         Some("test-quic-interop") => report("test-quic-interop", test_quic_interop::run(&rest)),

@@ -9,6 +9,7 @@ use std::fs;
 use std::path::Path;
 
 use super::headers::Context;
+use super::profiles;
 use crate::targets::{OPENSSL_SERIES, TARGETS, Target};
 use crate::util::Result;
 
@@ -91,6 +92,25 @@ pub fn generate(ctx: &Context) -> Result<Vec<Exports>> {
             } else {
                 let path = dir.join(format!("{}.map", target.configure));
                 fs::write(path, render_elf(&exports)?)?;
+                if *library == "libcrypto" {
+                    for profile in profiles::PROFILES {
+                        let mut extended = Exports {
+                            target,
+                            library,
+                            nodes: exports.nodes.clone(),
+                        };
+                        for (node, names) in profiles::libcrypto_extras(&ctx.abi, profile)? {
+                            let Some((_, list)) =
+                                extended.nodes.iter_mut().find(|(n, _)| *n == node)
+                            else {
+                                return Err(format!("{}: no node {node}", profile.name).into());
+                            };
+                            list.extend(names);
+                        }
+                        let path = dir.join(format!("{}-{}.map", target.configure, profile.name));
+                        fs::write(path, render_elf(&extended)?)?;
+                    }
+                }
             }
             all.push(exports);
         }

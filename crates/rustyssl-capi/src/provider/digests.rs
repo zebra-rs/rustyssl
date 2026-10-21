@@ -831,6 +831,8 @@ digest!(md5, Kind::Md5, plain);
 digest!(md5_sha1, Kind::Md5Sha1, ssl3);
 digest!(ripemd160, Kind::Ripemd160, plain);
 digest!(nullmd, Kind::Null, plain);
+#[cfg(feature = "fedora")]
+digest!(md2, Kind::Md2, plain);
 digest!(md4, Kind::Md4, plain);
 digest!(mdc2_md, Kind::Mdc2, mdc2);
 digest!(whirlpool, Kind::Whirlpool, plain);
@@ -900,7 +902,23 @@ pub(crate) static DEFAULT_DIGESTS: Algorithms<28> = Algorithms([
     ALG_END,
 ]);
 
+/// `legacy_digests` (`providers/legacyprov.c`), in its order: MD2 (the Fedora profile's), MD4,
+/// MDC2, Whirlpool, RIPEMD-160.
+#[cfg(feature = "fedora")]
+pub(crate) static LEGACY_DIGESTS: Algorithms<6> = Algorithms([
+    legacy_alg(c"MD2:1.2.840.113549.2.2", &md2::TABLE),
+    legacy_alg(c"MD4:1.2.840.113549.2.4", &md4::TABLE),
+    legacy_alg(c"MDC2:2.5.8.3.101", &mdc2_md::TABLE),
+    legacy_alg(c"WHIRLPOOL:1.0.10118.3.0.55", &whirlpool::TABLE),
+    legacy_alg(
+        c"RIPEMD-160:RIPEMD160:RIPEMD:RMD160:1.3.36.3.2.1",
+        &ripemd160::TABLE,
+    ),
+    ALG_END,
+]);
+
 /// `legacy_digests` (`providers/legacyprov.c`), in its order: MD4, MDC2, Whirlpool, RIPEMD-160.
+#[cfg(not(feature = "fedora"))]
 pub(crate) static LEGACY_DIGESTS: Algorithms<5> = Algorithms([
     legacy_alg(c"MD4:1.2.840.113549.2.4", &md4::TABLE),
     legacy_alg(c"MDC2:2.5.8.3.101", &mdc2_md::TABLE),

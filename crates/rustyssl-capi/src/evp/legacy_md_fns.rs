@@ -100,6 +100,12 @@ macro_rules! legacy_md {
 legacy_md!(
     MD4, md4_init, md4_update, md4_final, MD4_CTX, MD4_Init, MD4_Update, MD4_Final, None
 );
+#[cfg(feature = "fedora")]
+use crate::lowlevel::hash::md2::{MD2_CTX, MD2_Final, MD2_Init, MD2_Update};
+#[cfg(feature = "fedora")]
+legacy_md!(
+    MD2, md2_init, md2_update, md2_final, MD2_CTX, MD2_Init, MD2_Update, MD2_Final, None
+);
 legacy_md!(
     MD5, md5_init, md5_update, md5_final, MD5_CTX, MD5_Init, MD5_Update, MD5_Final, None
 );
