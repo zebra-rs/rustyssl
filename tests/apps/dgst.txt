@@ -1,0 +1,116 @@
+# `openssl dgst` and digest names as commands (apps/dgst.c). cargo xtask test-apps runs each
+# line with upstream's tool on the reference, then with ours on rustyssl and on the reference.
+# Lines starting with `~` must only succeed: -d logs BIO addresses, and -engine names the
+# engines directory each library was built with.
+dgst {bin}
+dgst {txt} {bin}
+dgst -sha256 {bin}
+dgst -sha1 {txt}
+dgst -md5 {txt}
+dgst -sha3-512 {txt}
+dgst -sha512-256 {txt}
+dgst -blake2b512 {txt}
+dgst -sm3 {txt}
+dgst -ripemd160 {txt}
+dgst -SHA256 {txt}
+dgst -sha256 -sha1 {txt}
+sha256 {txt}
+sha1 {bin}
+md5 {txt}
+sha256 -sha1 {txt}
+dgst -c {txt}
+dgst -r {txt}
+dgst -c -r {txt}
+dgst -r -c {txt}
+dgst -hex {txt}
+dgst -binary -out {dir}/d.bin {txt}
+dgst -r {dir}/d.bin
+dgst -binary -hex {txt}
+dgst -hex -binary {txt}
+dgst -out {dir}/d.txt {txt}
+dgst -r {dir}/d.txt
+dgst -out /nonexistent/d.txt {txt}
+dgst -list
+dgst -list -sha1
+dgst -shake128 -xoflen 50 {txt}
+dgst -shake256 -xoflen 1 -c {bin}
+dgst -shake256 {txt}
+dgst -sha256 -xoflen 20 {txt}
+dgst -xoflen 0 {txt}
+dgst -xoflen -1 {txt}
+dgst -xoflen x {txt}
+dgst -hmac key {txt}
+dgst -sha1 -hmac key {bin}
+dgst -sha512 -hmac key -binary {txt}
+dgst -hmac key -r {txt}
+dgst -fips-fingerprint {txt}
+dgst -sha1 -fips-fingerprint {txt}
+dgst -shake128 -hmac key -xoflen 4 {txt}
+dgst -mac HMAC -macopt digest:SHA256 -macopt key:abc {txt}
+dgst -sha256 -mac HMAC -macopt hexkey:00ff {txt}
+dgst -mac CMAC -macopt cipher:AES-128-CBC -macopt hexkey:00112233445566778899aabbccddeeff {txt}
+dgst -mac CMAC -macopt bad {txt}
+dgst -mac HMAC {txt}
+dgst -mac nosuch {txt}
+dgst -mac HMAC -hmac k {txt}
+dgst -sha256 -sign {src}/test/certs/ee-key.pem {txt}
+dgst -sha256 -sign {src}/test/certs/ee-key.pem -hex {txt}
+dgst -sha256 -sign {src}/test/certs/ee-key.pem -c -hex {txt}
+dgst -sha256 -sign {src}/test/certs/ee-key.pem -r -hex {txt}
+dgst -sha256 -sign {src}/test/certs/ee-key.pem -out {dir}/sig.rsa {txt}
+dgst -sha256 -verify {src}/test/certs/ee-key.pem -signature {dir}/sig.rsa {txt}
+dgst -sha256 -prverify {src}/test/certs/ee-key.pem -signature {dir}/sig.rsa {txt}
+dgst -sha1 -verify {src}/test/certs/ee-key.pem -signature {dir}/sig.rsa {txt}
+dgst -sha256 -verify {src}/test/certs/ee-key.pem -signature {dir}/sig.rsa {bin}
+dgst -sha256 -verify {src}/test/certs/ee-key.pem {txt}
+dgst -sha256 -verify {src}/test/certs/ee-key.pem -signature /nonexistent/sig {txt}
+dgst -sha256 -sign {src}/test/certs/ee-key.pem -sigopt rsa_padding_mode:pss -sigopt rsa_pss_saltlen:0 -hex {txt}
+dgst -sha256 -sign {src}/test/certs/ee-key.pem -sigopt bad -hex {txt}
+dgst -sha256 -sign {src}/test/certs/ee-key.pem -sigopt x:y -hex {txt}
+dgst -sha256 -sign {src}/test/certs/ee-key.pem -keyform PEM -hex {txt}
+dgst -sha256 -sign {src}/test/certs/ee-key.pem -keyform DER -hex {txt}
+dgst -keyform xx {txt}
+dgst -sha256 -sign {src}/test/certs/ee-key.pem -passin pass:x -hex {txt}
+dgst -passin nosuch:x {txt}
+dgst -sign {src}/test/certs/ee-key.pem {txt} {bin}
+dgst -sign /nonexistent/key.pem {txt}
+dgst -sign {src}/test/certs/ee-key.pem -hmac k {txt}
+dgst -shake256 -sign {src}/test/certs/ee-key.pem -xoflen 3 {txt}
+dgst -sign {src}/test/certs/root-ed25519.privkey.pem -hex {txt}
+dgst -sign {src}/test/certs/root-ed25519.privkey.pem -hex {txt} {bin}
+dgst -sign {src}/test/certs/root-ed25519.privkey.pem -out {dir}/sig.ed {txt}
+dgst -verify {src}/test/certs/root-ed25519.pubkey.pem -signature {dir}/sig.ed {txt}
+dgst -verify {src}/test/certs/root-ed25519.pubkey.pem -signature {dir}/sig.ed {bin}
+dgst -verify {src}/test/certs/root-ed25519.pubkey.pem -signature {dir}/sig.rsa {txt}
+dgst -sign {src}/test/certs/root-ed25519.privkey.pem -sha256 {txt}
+dgst -sign {src}/test/certs/root-ed25519.privkey.pem -xoflen 3 {txt}
+dgst -sign {src}/test/certs/client-ed448-key.pem -c -hex {txt}
+dgst -sha256 -sign {src}/test/certs/ee-ecdsa-key.pem -out {dir}/sig.ec {txt}
+dgst -sha256 -verify {src}/test/certs/ee-ecdsa-key.pem -signature {dir}/sig.ec {txt}
+dgst -sha256 {dir}/nosuch {txt}
+dgst {dir}/nosuch
+dgst -sha256 < {txt}
+dgst -sha256 -r < {bin}
+dgst -sha256 -hmac key < {txt}
+dgst -sign {src}/test/certs/root-ed25519.privkey.pem -hex < {txt}
+dgst -sha256 -verify {src}/test/certs/ee-key.pem -signature {dir}/sig.rsa < {txt}
+~dgst -d {txt}
+~dgst -debug -sha1 {txt} {bin}
+~dgst -engine nosuch {txt}
+dgst -engine_impl {txt}
+dgst -provider default -sha256 {txt}
+dgst -provider-path {dir} -provider nosuch {txt}
+dgst -provider-path {dir} -provider default -sha1 {txt}
+dgst -provparam default:x=y -sha1 {txt}
+dgst -propquery provider=default -sha256 {txt}
+dgst -propquery provider=nosuch -sha256 {txt}
+dgst -rand {bin} -sha256 {txt}
+dgst -rand /nonexistent/rand -sha256 {txt}
+dgst -writerand {dir}/rand.out -sha256 {txt}
+dgst -nosuch {txt}
+dgst -sha256 -nosuch {txt}
+dgst -nosuch -sha256 {txt}
+dgst -sha256 -x -y {txt}
+dgst -help -sha256
+dgst -h
+dgst -signature

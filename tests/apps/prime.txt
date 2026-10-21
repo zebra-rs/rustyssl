@@ -1,0 +1,30 @@
+# `openssl prime` (apps/prime.c). Generated primes are random: those lines must only succeed.
+prime 2
+prime 17 18 1 0
+prime 170141183460469231731687303715884105727
+prime 170141183460469231731687303715884105729
+prime -hex 11 ff 7FFFFFFF
+prime -hex 0x11
+prime -hex xyz
+prime 12a
+prime -12
+prime -checks 10 97
+prime -checks 0 97
+prime -checks x 97
+prime -in {tests}/prime-numbers.dat
+prime -in -hex {tests}/prime-numbers.dat
+prime -in {tests}/prime-numbers.dat /nonexistent/file {txt}
+prime -in
+prime -provider default 7
+prime -propquery provider=default 7
+~prime -generate -bits 64
+~prime -generate -bits 64 -hex
+~prime -generate -bits 32 -safe
+prime -generate
+prime -generate -bits 0
+prime -generate -bits -1
+prime -generate -bits 1
+prime -generate -bits 64 extra
+prime
+prime -help
+prime -x

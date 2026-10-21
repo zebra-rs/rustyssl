@@ -1,0 +1,116 @@
+# `openssl list` (apps/list.c). Lines starting with `~` must only succeed: -verbose
+# -random-instances prints each generator's reseed time.
+list
+list -commands
+list -standard-commands
+list -commands -1
+list -1
+list -digest-commands
+list -digest-commands -1
+list -cipher-commands
+list -cipher-commands -1
+list -commands -digest-commands -cipher-commands
+list -digest-algorithms
+list -digest-algorithms -verbose
+list -cipher-algorithms
+list -cipher-algorithms -verbose
+list -kdf-algorithms
+list -kdf-algorithms -verbose
+list -mac-algorithms
+list -mac-algorithms -verbose
+list -random-generators
+list -random-generators -verbose
+list -random-instances
+~list -random-instances -verbose
+list -encoders
+list -encoders -verbose
+list -decoders
+list -decoders -verbose
+list -key-managers
+list -key-managers -verbose
+list -skey-managers
+list -skey-managers -verbose
+list -key-exchange-algorithms
+list -key-exchange-algorithms -verbose
+list -kem-algorithms
+list -kem-algorithms -verbose
+list -signature-algorithms
+list -signature-algorithms -verbose
+list -tls-signature-algorithms
+list -asymcipher-algorithms
+list -asymcipher-algorithms -verbose
+list -public-key-algorithms
+list -public-key-algorithms -verbose
+list -public-key-methods
+list -public-key-methods -verbose
+list -store-loaders
+list -store-loaders -verbose
+list -tls-groups
+list -all-tls-groups
+list -tls-groups -tls1_2
+list -tls-groups -tls1_3
+list -tls1_2 -all-tls-groups
+list -tls1_2
+list -providers
+list -providers -verbose
+list -engines
+list -disabled
+list -objects
+list -all-algorithms
+list -all-algorithms -verbose
+list -options x509
+list -options dgst
+list -options enc
+list -options list
+list -options sha256
+list -options aes-128-cbc
+list -options nosuch
+list -options x509 -options rand -1
+list -options
+list -select SHA256 -digest-algorithms
+list -select sha256 -digest-algorithms -verbose
+list -select AES-128-CBC -cipher-algorithms
+list -select aes-128-cbc -cipher-algorithms
+list -select des3 -cipher-algorithms
+list -select HMAC -mac-algorithms -verbose
+list -select HKDF -kdf-algorithms
+list -select ctr-drbg -random-generators -verbose
+list -select DER -encoders
+list -select PEM -decoders
+list -select RSA -key-managers
+list -select AES-128-CBC -skey-managers
+list -select ECDH -key-exchange-algorithms
+list -select ML-KEM-768 -kem-algorithms
+list -select RSA -signature-algorithms
+list -select nosuch -signature-algorithms
+list -select nosuch -kem-algorithms -asymcipher-algorithms -key-exchange-algorithms
+list -select RSA -asymcipher-algorithms
+list -select RSA -public-key-algorithms
+list -select RSA -public-key-methods
+list -select file -store-loaders
+list -select SHA256 -all-algorithms
+list -propquery provider=default -digest-algorithms
+list -propquery provider=default -cipher-algorithms
+list -propquery provider=default -public-key-algorithms
+list -propquery provider=default -public-key-methods
+list -propquery provider=default -digest-commands -cipher-commands
+list -propquery provider=nosuch -digest-commands
+list -provider legacy -provider default -digest-algorithms -cipher-algorithms
+list -provider legacy -provider default -all-algorithms -verbose
+list -provider legacy -provider default -providers -verbose
+list -provider legacy -digest-commands -cipher-commands
+list -provider base -encoders -decoders -providers
+list -provider base -all-algorithms -verbose
+list -provider null -providers -verbose
+list -provider null -signature-algorithms -kem-algorithms
+list -provider null -tls-signature-algorithms
+list -provider null -tls-groups
+list -provider null -random-instances
+list -provider-path {dir} -provider nosuch -providers
+list -provparam default:x=y -providers
+list -verbose
+list -select x
+list extra
+list -providers extra
+list -help
+list -x

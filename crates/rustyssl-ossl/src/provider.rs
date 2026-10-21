@@ -91,3 +91,41 @@ pub fn for_each(libctx: Option<&LibCtx>, mut f: impl FnMut(&ProviderRef) -> bool
     // keep it.
     unsafe { ffi::OSSL_PROVIDER_do_all(ctx, Some(visit), data.cast()) == 1 }
 }
+
+// Every provider loaded, and their parameters (`list -providers`).
+
+unsafe extern "C" fn collect_provider(provider: *mut OSSL_PROVIDER, data: *mut c_void) -> c_int {
+    // SAFETY: data is the Vec that all() passed, live for the call.
+    let out = unsafe { &mut *data.cast::<Vec<ProviderRef>>() };
+    out.push(ProviderRef(provider));
+    1
+}
+
+/// `OSSL_PROVIDER_do_all(NULL, ...)`: the providers loaded into the default context, in its
+/// order; `None` if it failed. They stay loaded while the program runs.
+pub fn all() -> Option<Vec<ProviderRef>> {
+    let mut out: Vec<ProviderRef> = Vec::new();
+    // SAFETY: NULL is the default context; the callback gets the Vec back.
+    let ok = unsafe {
+        ffi::OSSL_PROVIDER_do_all(
+            core::ptr::null_mut(),
+            Some(collect_provider),
+            (&raw mut out).cast(),
+        )
+    } == 1;
+    ok.then_some(out)
+}
+
+impl ProviderRef {
+    /// `OSSL_PROVIDER_get_params(prov, params)`.
+    pub fn get_params(&self, params: &mut crate::params::Query) -> bool {
+        // SAFETY: the provider is live; the array is terminated with its own storage.
+        unsafe { ffi::OSSL_PROVIDER_get_params(self.0, params.as_mut_ptr()) == 1 }
+    }
+
+    /// `OSSL_PROVIDER_gettable_params`.
+    pub fn gettable_params(&self) -> crate::params::ParamsRef<'_> {
+        // SAFETY: the provider is live; the table is owned by it.
+        crate::params::ParamsRef::from_raw(unsafe { ffi::OSSL_PROVIDER_gettable_params(self.0) })
+    }
+}
