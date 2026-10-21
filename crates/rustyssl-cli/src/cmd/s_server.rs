@@ -27,7 +27,7 @@ use crate::lib::{app_libctx, app_rand, apps, engine, io};
 /// `bufsize`.
 const BUFSIZE: usize = 16 * 1024;
 /// `DGRAM_RCV_TIMEOUT` and `DGRAM_SND_TIMEOUT` of `apps/timeouts.h`, in microseconds.
-const DGRAM_TIMEOUT: i64 = 250_000;
+const DGRAM_TIMEOUT: u32 = 250_000;
 /// `PORT` of `s_apps.h`.
 const PORT: &str = "4433";
 const TEST_CERT: &str = "server.pem";

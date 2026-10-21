@@ -33,7 +33,7 @@ const BUFSIZZ: usize = 1024 * 16;
 /// `S_CLIENT_IRC_READ_TIMEOUT`.
 const S_CLIENT_IRC_READ_TIMEOUT: u64 = 8;
 /// `DGRAM_RCV_TIMEOUT` and `DGRAM_SND_TIMEOUT` of `apps/timeouts.h`, in microseconds.
-const DGRAM_TIMEOUT: i64 = 250_000;
+const DGRAM_TIMEOUT: u32 = 250_000;
 /// `PORT` of `s_apps.h`.
 const PORT: &str = "4433";
 

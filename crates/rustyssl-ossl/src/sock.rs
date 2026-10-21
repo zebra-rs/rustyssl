@@ -272,6 +272,10 @@ pub fn last_socket_error() -> c_int {
 
 /// Sets `errno` (the C code saves and restores it around calls).
 pub fn set_errno(e: c_int) {
+    #[cfg(target_os = "macos")]
+    // SAFETY: no arguments; the result is this thread's errno.
+    let p = unsafe { libc::__error() };
+    #[cfg(not(target_os = "macos"))]
     // SAFETY: no arguments; the result is this thread's errno.
     let p = unsafe { libc::__errno_location() };
     // SAFETY: p points to this thread's errno.
@@ -356,9 +360,14 @@ pub fn select(
             width = width.max(fd + 1);
         }
     }
+    #[allow(
+        clippy::unnecessary_fallible_conversions,
+        reason = "suseconds_t is i64 on Linux but i32 on macOS"
+    )]
     let mut tv = timeout.map(|d| libc::timeval {
         tv_sec: libc::time_t::try_from(d.as_secs()).unwrap_or(libc::time_t::MAX),
-        tv_usec: libc::suseconds_t::from(d.subsec_micros()),
+        // Under a million, so it fits every target's.
+        tv_usec: libc::suseconds_t::try_from(d.subsec_micros()).unwrap_or(0),
     });
     let tvp = tv
         .as_mut()
@@ -465,10 +474,15 @@ impl Bio {
         }
     }
     /// `BIO_ctrl(b, BIO_CTRL_DGRAM_SET_RECV_TIMEOUT / _SEND_TIMEOUT, 0, &tv)`.
-    pub fn dgram_set_timeout(&self, cmd: c_int, usec: libc::suseconds_t) {
+    #[allow(
+        clippy::unnecessary_fallible_conversions,
+        reason = "suseconds_t is i64 on Linux but i32 on macOS"
+    )]
+    pub fn dgram_set_timeout(&self, cmd: c_int, usec: u32) {
         let mut tv = libc::timeval {
-            tv_sec: 0,
-            tv_usec: usec,
+            tv_sec: libc::time_t::from(usec / 1_000_000),
+            // Under a million, so it fits every target's.
+            tv_usec: libc::suseconds_t::try_from(usec % 1_000_000).unwrap_or(0),
         };
         // SAFETY: tv is valid for the call.
         unsafe { ffi::BIO_ctrl(self.as_ptr(), cmd, 0, (&raw mut tv).cast()) };
