@@ -39,7 +39,7 @@ pub mod genrsa;
 pub mod pkcs8;
 pub mod pkey;
 pub mod pkeyparam;
-// pub mod pkeyutl;
+pub mod pkeyutl;
 // pub mod prime;
 // pub mod rand;
 // pub mod rehash;
@@ -98,7 +98,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         "pkcs8" => pkcs8::main,
         "pkey" => pkey::main,
         "pkeyparam" => pkeyparam::main,
-        // "pkeyutl" => pkeyutl::main,
+        "pkeyutl" => pkeyutl::main,
         // "prime" => prime::main,
         // "rand" => rand::main,
         // "rehash" => rehash::main,

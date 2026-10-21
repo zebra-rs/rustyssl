@@ -1,0 +1,113 @@
+# `openssl pkeyutl`. RSA PKCS#1 v1.5 and EdDSA signatures, derivations and KDFs are
+# deterministic; randomized operations go through `| check` (verified or decrypted by
+# upstream's tool on the reference). Lines with `~` make fixture keys, random by design.
+pkeyutl -help
+pkeyutl
+pkeyutl -sign -in {txt}
+pkeyutl -kdf HKDF -kdflen 32 -pkeyopt md:SHA256 -pkeyopt key:k -out {dir}/pkeyutl.sha256
+pkeyutl -sign -inkey {src}/test/testrsa.pem -in {dir}/pkeyutl.sha256 -hexdump
+pkeyutl -sign -inkey {src}/test/testrsa.pem -in {dir}/pkeyutl.sha256 -pkeyopt digest:sha256 -hexdump
+pkeyutl -sign -inkey {src}/test/testrsa.pem -in {dir}/pkeyutl.sha256 -pkeyopt digest:sha256 -out {dir}/pkeyutl.sig
+pkeyutl -sign -inkey {src}/test/testrsa.pem -in {dir}/pkeyutl.sha256 -pkeyopt digest:sha256 -asn1parse
+pkeyutl -verify -inkey {src}/test/testrsa.pem -in {dir}/pkeyutl.sha256 -pkeyopt digest:sha256 -sigfile {dir}/pkeyutl.sig
+pkeyutl -verify -pubin -inkey {src}/test/testrsapub.pem -in {dir}/pkeyutl.sha256 -pkeyopt digest:sha256 -sigfile {dir}/pkeyutl.sig
+pkeyutl -verify -certin -inkey {src}/test/certs/ee-cert.pem -in {dir}/pkeyutl.sha256 -sigfile {dir}/pkeyutl.sig
+pkeyutl -verify -pubin -inkey {src}/test/testrsapub.pem -in {txt} -sigfile {dir}/pkeyutl.sig
+pkeyutl -verify -pubin -inkey {src}/test/testrsapub.pem -in {dir}/pkeyutl.sha256 -sigfile {txt}
+pkeyutl -verify -pubin -inkey {src}/test/testrsapub.pem -in {dir}/pkeyutl.sha256
+pkeyutl -verify -pubin -inkey {src}/test/testrsapub.pem -in {dir}/pkeyutl.sha256 -sigfile /nonexistent/sig.bin
+pkeyutl -sign -inkey {src}/test/testrsa.pem -in {dir}/pkeyutl.sha256 -sigfile {dir}/pkeyutl.sig
+pkeyutl -verifyrecover -pubin -inkey {src}/test/testrsapub.pem -in {dir}/pkeyutl.sig -asn1parse
+pkeyutl -verifyrecover -pubin -inkey {src}/test/testrsapub.pem -in {dir}/pkeyutl.sig -pkeyopt digest:sha256 -hexdump
+pkeyutl -verifyrecover -inkey {src}/test/testec-p256.pem -in {dir}/pkeyutl.sig
+pkeyutl -sign -inkey {src}/test/testrsa.pem -in {txt} -rev -hexdump
+pkeyutl -sign -inkey {src}/test/testrsa.pem -in {bin}
+pkeyutl -sign -inkey {src}/test/testrsa.pem -rawin -in {txt} | pkeyutl -verify -inkey {src}/test/testrsa.pem -rawin -in {txt} -sigfile /dev/stdin
+pkeyutl -sign -inkey {src}/test/testrsa.pem -digest sha256 -in {txt} -hexdump
+pkeyutl -sign -inkey {src}/test/testrsa.pem -digest sha256 -in {bin} -out {dir}/pkeyutl-raw.sig
+pkeyutl -verify -pubin -inkey {src}/test/testrsapub.pem -digest sha256 -in {bin} -sigfile {dir}/pkeyutl-raw.sig
+pkeyutl -verify -pubin -inkey {src}/test/testrsapub.pem -digest sha512 -in {bin} -sigfile {dir}/pkeyutl-raw.sig
+pkeyutl -sign -inkey {src}/test/testrsa.pem -digest nosuchmd -in {txt}
+pkeyutl -sign -inkey {src}/test/testrsa.pem -rawin -rev -in {txt}
+pkeyutl -encrypt -inkey {src}/test/testrsa.pem -rawin -in {txt}
+pkeyutl -sign -inkey {src}/test/testrsa.pem -in {txt} -pkeyopt rsa_padding_mode:pss -pkeyopt digest:sha256
+pkeyutl -sign -inkey {src}/test/testrsa.pem -in {dir}/pkeyutl.sha256 -pkeyopt rsa_padding_mode:pss -pkeyopt digest:sha256 -out {dir}/pkeyutl-pss.sig | pkeyutl -verify -pubin -inkey {src}/test/testrsapub.pem -in {dir}/pkeyutl.sha256 -pkeyopt rsa_padding_mode:pss -pkeyopt digest:sha256 -sigfile {dir}/pkeyutl-pss.sig
+pkeyutl -sign -inkey {src}/test/testrsa.pem -in {txt} -pkeyopt nosuchopt:1
+pkeyutl -sign -inkey {src}/test/testrsa.pem -in {txt} -pkeyopt nocolon
+pkeyutl -encrypt -pubin -inkey {src}/test/testrsapub.pem -in {txt} | pkeyutl -decrypt -inkey {src}/test/testrsa.pem
+pkeyutl -encrypt -pubin -inkey {src}/test/testrsapub.pem -in {txt} -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 | pkeyutl -decrypt -inkey {src}/test/testrsa.pem -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256
+pkeyutl -encrypt -certin -inkey {src}/test/certs/ee-cert.pem -in {txt} -out {dir}/pkeyutl.enc | pkeyutl -decrypt -inkey {src}/test/certs/ee-key.pem -in {dir}/pkeyutl.enc
+pkeyutl -encrypt -inkey {src}/test/testrsa.pem -in {bin}
+pkeyutl -decrypt -inkey {src}/test/testrsa.pem -in {txt}
+pkeyutl -decrypt -pubin -inkey {src}/test/testrsapub.pem -in {txt}
+pkeyutl -sign -pubin -inkey {src}/test/testrsapub.pem -in {txt}
+pkeyutl -sign -inkey {src}/test/tested25519.pem -in {txt}
+pkeyutl -sign -inkey {src}/test/tested25519.pem -in {txt} -hexdump
+pkeyutl -sign -inkey {src}/test/tested25519.pem -in {txt} -out {dir}/pkeyutl-ed.sig
+pkeyutl -verify -pubin -inkey {src}/test/tested25519pub.pem -in {txt} -sigfile {dir}/pkeyutl-ed.sig
+pkeyutl -verify -pubin -inkey {src}/test/tested25519pub.pem -in {bin} -sigfile {dir}/pkeyutl-ed.sig
+pkeyutl -sign -inkey {src}/test/tested25519.pem -rawin -in {txt} -hexdump
+pkeyutl -sign -inkey {src}/test/tested25519.pem -digest sha256 -in {txt}
+pkeyutl -sign -inkey {src}/test/tested25519.pem -hexdump < {txt}
+pkeyutl -sign -inkey {src}/test/tested448.pem -in {txt} -hexdump
+pkeyutl -sign -inkey {src}/test/testec-p256.pem -in {dir}/pkeyutl.sha256 -out {dir}/pkeyutl-ec.sig | pkeyutl -verify -inkey {src}/test/testec-p256.pem -in {dir}/pkeyutl.sha256 -sigfile {dir}/pkeyutl-ec.sig
+pkeyutl -sign -inkey {src}/test/testec-p256.pem -in {dir}/pkeyutl.sha256 -pkeyopt nonce-type:1 -pkeyopt digest:sha256 -hexdump
+pkeyutl -sign -inkey {src}/test/testec-p256.pem -digest sha256 -in {bin} -out {dir}/pkeyutl-ec-raw.sig | pkeyutl -verify -inkey {src}/test/testec-p256.pem -digest sha256 -in {bin} -sigfile {dir}/pkeyutl-ec-raw.sig
+pkeyutl -sign -inkey {src}/test/testmldsa44.pem -in {txt} -out {dir}/pkeyutl-mldsa.sig | pkeyutl -verify -pubin -inkey {src}/test/testmldsa44pub.pem -in {txt} -sigfile {dir}/pkeyutl-mldsa.sig
+pkeyutl -derive -inkey {src}/test/testec-p256.pem -peerkey {src}/test/certs/ee-ecdsa-key.pem -hexdump
+pkeyutl -derive -inkey {src}/test/testec-p256.pem -peerkey {src}/test/certs/ee-ecdsa-key.pem -peerform PEM
+pkeyutl -derive -inkey {src}/test/testec-p256.pem -peerkey {src}/test/certs/ee-ecdsa-key.pem -out {dir}/pkeyutl.dh | pkeyutl -derive -inkey {src}/test/certs/ee-ecdsa-key.pem -peerkey {src}/test/testec-p256.pem -hexdump
+pkeyutl -derive -inkey {src}/test/testec-p256.pem -peerkey {src}/test/testrsa.pem
+pkeyutl -derive -inkey {src}/test/testec-p256.pem -peerkey /nonexistent/peer.pem
+pkeyutl -derive -inkey {src}/test/testec-p256.pem
+pkeyutl -sign -inkey {src}/test/testec-p256.pem -peerkey {src}/test/testec-p256.pem -in {txt}
+pkeyutl -derive -pubin -inkey {src}/test/testecpub-p256.pem -peerkey {src}/test/testec-p256.pem
+~genpkey -algorithm X25519 -out {dir}/pkeyutl-x1.pem
+~genpkey -algorithm X25519 -out {dir}/pkeyutl-x2.pem
+pkeyutl -derive -inkey {dir}/pkeyutl-x1.pem -peerkey {dir}/pkeyutl-x2.pem -hexdump
+pkeyutl -derive -inkey {dir}/pkeyutl-x2.pem -peerkey {dir}/pkeyutl-x1.pem -hexdump
+pkeyutl -derive -inkey {dir}/pkeyutl-x1.pem -peerkey {dir}/pkeyutl-x2.pem -kdf HKDF -kdflen 32
+pkeyutl -derive -inkey {dir}/pkeyutl-x1.pem -peerkey {dir}/pkeyutl-x2.pem -rawin
+pkeyutl -encrypt -inkey {dir}/pkeyutl-x1.pem -in {txt}
+pkeyutl -kdf TLS1-PRF -kdflen 48 -pkeyopt md:SHA256 -pkeyopt secret:secret -pkeyopt seed:seed -hexdump
+pkeyutl -kdf HKDF -kdflen 32 -pkeyopt md:SHA256 -pkeyopt key:secret -pkeyopt salt:salt -pkeyopt info:label -hexdump
+pkeyutl -kdf hkdf -kdflen 16 -pkeyopt md:SHA256 -pkeyopt hexkey:00112233 -asn1parse
+pkeyutl -kdf scrypt -kdflen 16 -pkeyopt pass:password -pkeyopt salt:NaCl -pkeyopt N:1024 -pkeyopt r:8 -pkeyopt p:16 -hexdump
+pkeyutl -kdf scrypt -kdflen 16 -pkeyopt_passin pass:pass:password -pkeyopt salt:NaCl -pkeyopt N:16 -pkeyopt r:1 -pkeyopt p:1 -hexdump
+pkeyutl -kdf scrypt -kdflen 16 -pkeyopt_passin pass:file:{txt} -pkeyopt salt:NaCl -pkeyopt N:16 -pkeyopt r:1 -pkeyopt p:1 -hexdump
+pkeyutl -kdf scrypt -kdflen 16 -pkeyopt_passin pass:nosuch:x -pkeyopt salt:NaCl
+pkeyutl -kdf scrypt -kdflen 16 -pkeyopt_passin nosuch:pass:x
+pkeyutl -kdf TLS1-PRF -kdflen 48
+pkeyutl -kdf TLS1-PRF -pkeyopt md:SHA256
+pkeyutl -kdf NOSUCHKDF -kdflen 16
+pkeyutl -kdf TLS1-PRF -kdflen 0
+pkeyutl -kdf TLS1-PRF -kdflen 48 -pkeyopt md:SHA256 -pkeyopt secret:s -pkeyopt seed:x -rawin
+~genpkey -algorithm ML-KEM-512 -out {dir}/pkeyutl-kem.pem
+~pkey -in {dir}/pkeyutl-kem.pem -pubout -out {dir}/pkeyutl-kempub.pem
+pkeyutl -encap -inkey {dir}/pkeyutl-kempub.pem -secret {dir}/pkeyutl-kem.ss -out {dir}/pkeyutl-kem.ct | pkeyutl -decap -inkey {dir}/pkeyutl-kem.pem -in {dir}/pkeyutl-kem.ct -secret {dir}/pkeyutl-kem.ss2
+pkeyutl -encap -pubin -inkey {dir}/pkeyutl-kempub.pem -secret {dir}/pkeyutl-kem.ss | pkeyutl -decap -inkey {dir}/pkeyutl-kem.pem -out {dir}/pkeyutl-kem.ss3
+pkeyutl -encap -inkey {dir}/pkeyutl-kempub.pem
+pkeyutl -decap -inkey {dir}/pkeyutl-kem.pem -in {dir}/pkeyutl-kem.ct -out {dir}/x -secret {dir}/y
+pkeyutl -decap -inkey {dir}/pkeyutl-kem.pem -in {txt} -hexdump
+pkeyutl -encap -inkey {src}/test/testrsapub.pem -secret {dir}/pkeyutl-rsa.ss -kemop RSASVE | pkeyutl -decap -inkey {src}/test/testrsa.pem -kemop RSASVE -out {dir}/pkeyutl-rsa.ss2
+pkeyutl -encap -inkey {src}/test/testrsapub.pem -secret {dir}/pkeyutl-rsa.ss -kemop NOSUCH
+pkeyutl -sign -inkey {src}/test/certs/key-pass-12345.pem -passin pass:12345 -in {dir}/pkeyutl.sha256 -hexdump
+pkeyutl -sign -inkey {src}/test/certs/key-pass-12345.pem -passin pass:wrong -in {txt}
+pkeyutl -sign -inkey {src}/test/certs/key-pass-12345.pem -passin nosuch:x -in {txt}
+pkeyutl -sign -inkey /nonexistent/key.pem -in {txt}
+pkeyutl -sign -inkey {src}/test/testrsa.pem -keyform DER -in {txt}
+pkeyutl -sign -inkey {src}/test/testrsa.pem -keyform XYZ -in {txt}
+pkeyutl -derive -inkey {src}/test/testec-p256.pem -peerkey {src}/test/certs/ee-ecdsa-key.pem -peerform XYZ
+pkeyutl -sign -inkey {src}/test/testrsa.pem -in /nonexistent/in.bin
+pkeyutl -sign -inkey {src}/test/testrsa.pem -in {dir}/pkeyutl.sha256 -out /nonexistent/dir/out.bin
+pkeyutl -sign -inkey {src}/test/testrsa.pem -in {dir}/pkeyutl.sha256 -engine /nonexistent/eng.so -hexdump
+pkeyutl -sign -inkey {src}/test/testrsa.pem -in {dir}/pkeyutl.sha256 -engine /nonexistent/eng.so -engine_impl -hexdump
+pkeyutl -sign -inkey {src}/test/testrsa.pem -in {dir}/pkeyutl.sha256 -config /nonexistent/openssl.cnf
+pkeyutl -sign -inkey {src}/test/testrsa.pem -in {dir}/pkeyutl.sha256 -config {txt}
+pkeyutl -sign -inkey {src}/test/testrsa.pem -in {dir}/pkeyutl.sha256 -provider default -hexdump
+pkeyutl -sign -inkey {src}/test/testrsa.pem -in {dir}/pkeyutl.sha256 -provider /nonexistent/prov.so
+pkeyutl -sign -inkey {src}/test/testrsa.pem -in {dir}/pkeyutl.sha256 -propquery provider=nosuch
+pkeyutl -sign -inkey {src}/test/testrsa.pem -in {dir}/pkeyutl.sha256 -rand {bin} -writerand {dir}/pkeyutl.rnd -hexdump
+pkeyutl -sign -inkey {src}/test/testrsa.pem extra
+pkeyutl -nosuchoption
+pkeyutl -inkey
