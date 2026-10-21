@@ -211,8 +211,8 @@ static BIO_ADDR *addr(unsigned short port)
 
 static void bind_end(BIO *b, unsigned short port)
 {
-    BIO_dgram_set_caps(b, BIO_DGRAM_CAP_HANDLES_DST_ADDR | BIO_DGRAM_CAP_HANDLES_SRC_ADDR);
-    BIO_dgram_set0_local_addr(b, addr(port));
+    (void)BIO_dgram_set_caps(b, BIO_DGRAM_CAP_HANDLES_DST_ADDR | BIO_DGRAM_CAP_HANDLES_SRC_ADDR);
+    (void)BIO_dgram_set0_local_addr(b, addr(port));
 }
 
 typedef struct {
