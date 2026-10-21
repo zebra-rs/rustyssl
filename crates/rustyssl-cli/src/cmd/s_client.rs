@@ -2390,12 +2390,12 @@ fn run(argv: &[String]) -> i32 {
             if !ssl_pending
                 && ((!isquic && ssl_writable) || (isquic && (cbuf_len > 0 || first_loop)))
             {
+                // The same buffer on a retry (OpenSSL checks it hasn't moved).
                 let data = ud
                     .buf
                     .get(cbuf_off..cbuf_off + cbuf_len)
-                    .unwrap_or_default()
-                    .to_vec();
-                let k = con.write(&data);
+                    .unwrap_or_default();
+                let k = con.write(data);
                 match con.get_error(k) {
                     SSL_ERROR_NONE => {
                         let kk = usize::try_from(k).unwrap_or(0);

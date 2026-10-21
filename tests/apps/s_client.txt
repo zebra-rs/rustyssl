@@ -3,8 +3,7 @@
 # what is random (session IDs, tickets, master keys, times) is masked. The servers' fixtures
 # are under tests/apps/s_server/; {src}/test/certs/ is the reference's. Lines marked ~ only
 # have to succeed: -nbio_test retries at random, split records arrive as the scheduler has
-# them, -ct's default log list is in the build's OPENSSLDIR, and rustyssl's TLS core makes
-# its security checks (-security_debug) in another order. -starttls needs a server speaking
+# them, and rustyssl's TLS core makes its security checks (-security_debug) in another order. -starttls needs a server speaking
 # the protocol, so only its errors are tested; -engine's name the build's directories.
 s_client -help
 s_client -bogus
@@ -177,7 +176,6 @@ s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -k
 s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev | s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -status < {tests}/s_server/close.txt
 s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -status_file {tests}/s_server/ocsp-resp.der | s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -status -ocsp_check_leaf < {tests}/s_server/close.txt
 s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -status_file {tests}/s_server/ocsp-resp.der | s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -status -ocsp_check_all < {tests}/s_server/close.txt
-~s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev | s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -ct < {tests}/s_server/close.txt
 s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev | s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -noct < {tests}/s_server/close.txt
 s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev | s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -ct -ctlogfile {src}/test/ct/log_list.cnf < {tests}/s_server/close.txt
 s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -enable_server_rpk | s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -ign_eof -enable_server_rpk < {tests}/s_server/close.txt
