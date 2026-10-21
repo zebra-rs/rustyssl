@@ -36,7 +36,7 @@ pub mod genrsa;
 // pub mod passwd;
 // pub mod pkcs12;
 // pub mod pkcs7;
-// pub mod pkcs8;
+pub mod pkcs8;
 pub mod pkey;
 pub mod pkeyparam;
 // pub mod pkeyutl;
@@ -95,7 +95,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "passwd" => passwd::main,
         // "pkcs12" => pkcs12::main,
         // "pkcs7" => pkcs7::main,
-        // "pkcs8" => pkcs8::main,
+        "pkcs8" => pkcs8::main,
         "pkey" => pkey::main,
         "pkeyparam" => pkeyparam::main,
         // "pkeyutl" => pkeyutl::main,

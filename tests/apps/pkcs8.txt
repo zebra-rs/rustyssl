@@ -1,0 +1,70 @@
+# `openssl pkcs8`. Keys from the reference's test/ tree. Encryption uses a random salt and
+# IV, so encrypted output goes through `| check` (decrypted by upstream's tool on the
+# reference).
+pkcs8 -help
+pkcs8 -topk8 -nocrypt -in {src}/test/testrsa.pem
+pkcs8 -topk8 -nocrypt -in {src}/test/testdsa.pem
+pkcs8 -topk8 -nocrypt -in {src}/test/testec-p256.pem -outform DER
+pkcs8 -topk8 -nocrypt -in {src}/test/tested25519.pem
+pkcs8 -topk8 -nocrypt -outform XYZ -in {src}/test/testrsa.pem
+pkcs8 -topk8 -nocrypt -in {src}/test/testrsa.pem -out {dir}/pkcs8-plain.pem | pkey -in {dir}/pkcs8-plain.pem -noout -check
+pkcs8 -topk8 -nocrypt -in {src}/test/testrsa.pem -outform DER -out {dir}/pkcs8-plain.der | pkey -inform DER -in {dir}/pkcs8-plain.der -noout -check
+pkcs8 -topk8 -nocrypt -noiter -in {src}/test/testrsa.pem
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret | pkcs8 -passin pass:secret
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret | asn1parse -i
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret -outform DER | pkcs8 -inform DER -passin pass:secret
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret -v2 aes128 | asn1parse -i
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret -v2 des3 -v2prf hmacWithSHA512 | asn1parse -i
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret -v2prf hmacWithSHA1 | pkcs8 -passin pass:secret
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret -v2prf nosuchprf
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret -v2 nosuchcipher
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret -v2 aes-128-gcm
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret -v1 PBE-SHA1-3DES | asn1parse -i
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret -v1 PBE-SHA1-3DES -iter 100 | pkcs8 -passin pass:secret
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret -v1 PBE-MD5-DES
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret -v1 nosuchpbe
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret -iter 5000 | asn1parse -i
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret -noiter | asn1parse -i
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret -saltlen 16 | asn1parse -i
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret -saltlen 0
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret -iter 0
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret -scrypt | asn1parse -i
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret -scrypt -scrypt_N 1024 -scrypt_r 8 -scrypt_p 2 | pkcs8 -passin pass:secret
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret -scrypt_N 1024 -scrypt_r 8 -scrypt_p 1 -v2 aes128 | asn1parse -i
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret -scrypt_N 0
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret -scrypt_r abc
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret -scrypt_p -1
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout nosuch:x
+pkcs8 -topk8 -in {src}/test/testrsa.pem
+pkcs8 -topk8 -in {src}/test/certs/key-pass-12345.pem -passin pass:12345 -nocrypt
+pkcs8 -topk8 -in {src}/test/certs/key-pass-12345.pem -passin pass:wrong -nocrypt
+pkcs8 -topk8 -in /nonexistent/key.pem -nocrypt
+pkcs8 -topk8 -nocrypt < {src}/test/testec-p256.pem
+pkcs8 -in {src}/test/certs/key-pass-12345.pem -passin pass:12345
+pkcs8 -in {src}/test/certs/key-pass-12345.pem -passin pass:12345 -traditional
+pkcs8 -in {src}/test/certs/key-pass-12345.pem -passin pass:12345 -outform DER
+pkcs8 -in {src}/test/certs/key-pass-12345.pem -passin pass:12345 -outform XYZ
+pkcs8 -in {src}/test/certs/key-pass-12345.pem -passin pass:wrong
+pkcs8 -in {src}/test/certs/key-pass-12345.pem
+pkcs8 -in {src}/test/certs/key-pass-12345.pem -passin pass:12345 -passout pass:x
+pkcs8 -in {src}/test/certs/key-pass-12345.pem -passin pass:12345 -passout pass:x -traditional
+pkcs8 -in {src}/test/certs/key-pass-12345.pem -inform DER -passin pass:12345
+pkcs8 -in {src}/test/testrsa.pem -passin pass:x
+pkcs8 -passin pass:12345 < {src}/test/certs/key-pass-12345.pem
+pkcs8 -in {src}/test/testrsa.pem -nocrypt
+pkcs8 -in {src}/test/testrsa.pem -nocrypt -traditional
+pkcs8 -in {src}/test/testrsa.pem -nocrypt -outform DER -out {dir}/pkcs8-trad.der | pkey -inform DER -in {dir}/pkcs8-trad.der -noout -check
+pkcs8 -in {dir}/pkcs8-plain.der -inform DER -nocrypt
+pkcs8 -in {dir}/pkcs8-plain.der -inform PEM -nocrypt
+pkcs8 -in {src}/test/testdsa.pem -nocrypt
+pkcs8 -in /nonexistent/key.pem -nocrypt
+pkcs8 -in {src}/test/testrsa.pem -nocrypt -out /nonexistent/dir/out.pem
+pkcs8 -topk8 -nocrypt -in {src}/test/testrsa.pem -out /nonexistent/dir/out.pem
+pkcs8 -topk8 -nocrypt -in {src}/test/testrsa.pem -engine /nonexistent/eng.so
+pkcs8 -topk8 -nocrypt -in {src}/test/testrsa.pem -provider default
+pkcs8 -topk8 -nocrypt -in {src}/test/testrsa.pem -provider /nonexistent/prov.so
+pkcs8 -topk8 -nocrypt -in {src}/test/testrsa.pem -propquery provider=default
+pkcs8 -topk8 -in {src}/test/testrsa.pem -passout pass:secret -rand {bin} -writerand {dir}/pkcs8.rnd | pkcs8 -passin pass:secret
+pkcs8 -in {src}/test/testrsa.pem extra
+pkcs8 -nosuchoption
+pkcs8 -in

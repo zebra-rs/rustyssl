@@ -24,7 +24,8 @@
 //! `check` with upstream's tool on the reference libraries, reading the command's standard
 //! output (further `| check` stages chain the same way). What is compared is the command's
 //! exit status and the last check's output, with runs of hex-dump lines (`    01:ab:...`)
-//! collapsed to one; a `< file` comes before the first `|`.
+//! collapsed to one and `asn1parse`'s `[HEX DUMP]:` values masked; a `< file` comes before
+//! the first `|`.
 //!
 //! Run whole (no list named), it also runs the CLI's library-backed unit tests (`live_*`, the
 //! shared helpers) on each library.
@@ -263,7 +264,7 @@ fn run_line(setup: &Setup, line: &Line, tool: &Path, lib: &Path) -> Result<Outpu
 }
 
 /// Collapses each run of hex-dump lines (`    00:c3:...`, the random parts of a printed key)
-/// into one `HEX` line.
+/// into one `HEX` line, and masks `asn1parse`'s `[HEX DUMP]:` values.
 fn collapse_hex(text: &str) -> String {
     let is_hex = |l: &str| {
         let t = l.trim();
@@ -273,14 +274,17 @@ fn collapse_hex(text: &str) -> String {
                 .filter(|p| !p.is_empty())
                 .all(|p| p.len() == 2 && p.bytes().all(|b| b.is_ascii_hexdigit()))
     };
-    let mut out: Vec<&str> = Vec::new();
+    let mut out: Vec<String> = Vec::new();
     for l in text.lines() {
         if is_hex(l) {
-            if out.last() != Some(&"HEX") {
-                out.push("HEX");
+            if out.last().map(String::as_str) != Some("HEX") {
+                out.push("HEX".to_owned());
             }
+        } else if let Some(at) = l.find("[HEX DUMP]:") {
+            // asn1parse's dump of a primitive's (random) octets.
+            out.push(format!("{}[HEX DUMP]:HEX", &l[..at]));
         } else {
-            out.push(l);
+            out.push(l.to_owned());
         }
     }
     let mut s = out.join("\n");
@@ -585,5 +589,9 @@ mod tests {
             "modulus:\nHEX\nexponent: 3\nHEX\n"
         );
         assert_eq!(collapse_hex("a: 1:\n"), "a: 1:\n");
+        assert_eq!(
+            collapse_hex("  34:d=5  hl=2 l=  16 prim: OCTET STRING [HEX DUMP]:A1EA\n"),
+            "  34:d=5  hl=2 l=  16 prim: OCTET STRING [HEX DUMP]:HEX\n"
+        );
     }
 }
