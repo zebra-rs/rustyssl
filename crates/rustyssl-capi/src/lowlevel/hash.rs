@@ -1392,7 +1392,12 @@ pub(crate) mod md2 {
     const _: () = assert!(core::mem::size_of::<MD2_CTX>() == 4 + 16 + 64 + 64);
 
     fn load(c: &MD2_CTX) -> Md2 {
-        Md2 { num: c.num, data: c.data, cksm: c.cksm, state: c.state }
+        Md2 {
+            num: c.num,
+            data: c.data,
+            cksm: c.cksm,
+            state: c.state,
+        }
     }
 
     fn store(c: &mut MD2_CTX, m: &Md2) {

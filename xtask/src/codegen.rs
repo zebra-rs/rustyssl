@@ -8,9 +8,9 @@ mod curves;
 mod errors;
 pub mod exports;
 pub mod headers;
-pub mod profiles;
 mod objects;
 mod ossl;
+pub mod profiles;
 pub mod stubs;
 mod verify_strings;
 

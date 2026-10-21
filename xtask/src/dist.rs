@@ -318,7 +318,9 @@ fn link(
             // from, so the dependencies are OpenSSL's (abi-check, metadata).
             .args(["-Wl,-dead_strip", "-Wl,-dead_strip_dylibs", "-Wl,-S"]);
         match inputs {
-            Inputs::Archive { archive, native, .. } => {
+            Inputs::Archive {
+                archive, native, ..
+            } => {
                 cmd.arg(link_arg("-force_load,", archive));
                 // cc links libSystem itself; listing it again only draws a warning.
                 cmd.args(native.iter().filter(|l| *l != "-lSystem"));

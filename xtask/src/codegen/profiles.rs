@@ -57,7 +57,10 @@ pub fn find(name: &str) -> Result<&'static Profile> {
 /// deprecation, or another of `features`, or `DGRAM`/`SOCK`.
 pub fn extra_functions(num: &str, features: &[&str]) -> Result<BTreeMap<String, Vec<String>>> {
     let mut nodes: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    for line in num.lines().filter(|l| !l.starts_with('#') && !l.trim().is_empty()) {
+    for line in num
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.trim().is_empty())
+    {
         let fields: Vec<&str> = line.split_whitespace().collect();
         let [name, _, version, info, ..] = fields.as_slice() else {
             return Err(format!("bad .num line: {line}").into());
@@ -113,13 +116,18 @@ mod tests {
 
     #[test]
     fn fedora_has_md2_and_sctp() {
-        let abi = crate::util::workspace_root().join(format!(
-            "abi/openssl-{}",
-            crate::targets::OPENSSL_SERIES
-        ));
+        let abi = crate::util::workspace_root()
+            .join(format!("abi/openssl-{}", crate::targets::OPENSSL_SERIES));
         let nodes = libcrypto_extras(&abi, &FEDORA).unwrap();
         let names: Vec<&str> = nodes.values().flatten().map(String::as_str).collect();
-        for name in ["EVP_md2", "MD2", "MD2_Init", "MD2_options", "BIO_new_dgram_sctp", "BIO_dgram_is_sctp"] {
+        for name in [
+            "EVP_md2",
+            "MD2",
+            "MD2_Init",
+            "MD2_options",
+            "BIO_new_dgram_sctp",
+            "BIO_dgram_is_sctp",
+        ] {
             assert!(names.contains(&name), "{name}");
         }
         assert_eq!(names.len(), 12, "{names:?}");

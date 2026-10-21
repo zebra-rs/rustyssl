@@ -100,7 +100,10 @@ fn dlerror_text() -> String {
 fn open(library: Library) -> Result<Handle, String> {
     let file = library.file_name();
     let exe = std::env::current_exe().ok();
-    open_first(&file, &candidates(&file, std::env::var_os(LIBRARY_PATH), exe))
+    open_first(
+        &file,
+        &candidates(&file, std::env::var_os(LIBRARY_PATH), exe),
+    )
 }
 
 /// Opens the first of `list` that loads. A path that exists but doesn't load (another
@@ -268,12 +271,19 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let bogus = dir.join("libbogus.so.3");
         std::fs::write(&bogus, b"not a library").unwrap();
-        let libc_name = if cfg!(target_os = "macos") { "libSystem.B.dylib" } else { "libc.so.6" };
+        let libc_name = if cfg!(target_os = "macos") {
+            "libSystem.B.dylib"
+        } else {
+            "libc.so.6"
+        };
         assert!(open_first(libc_name, &[bogus.clone(), PathBuf::from(libc_name)]).is_ok());
         let Err(e) = open_first("libnothing.so.3", &[bogus.clone(), dir.join("missing")]) else {
             panic!("a bogus library loaded");
         };
-        assert!(e.starts_with(&format!("cannot load {}", bogus.display())), "{e}");
+        assert!(
+            e.starts_with(&format!("cannot load {}", bogus.display())),
+            "{e}"
+        );
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

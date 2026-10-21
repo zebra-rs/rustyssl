@@ -49,7 +49,12 @@ pub fn symbols(cx: &Context) -> Result<Outcome> {
         let wanted: BTreeSet<(String, String)> = cx
             .profile
             .filter(|_| *library == "libcrypto")
-            .map(|p| p.aliases.iter().map(|(n, v)| ((*n).to_owned(), (*v).to_owned())).collect())
+            .map(|p| {
+                p.aliases
+                    .iter()
+                    .map(|(n, v)| ((*n).to_owned(), (*v).to_owned()))
+                    .collect()
+            })
             .unwrap_or_default();
         for (name, node) in wanted.difference(&aliases) {
             problems.push(format!("rustyssl's {library} doesn't export {name}@{node}"));

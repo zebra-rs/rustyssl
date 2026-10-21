@@ -156,10 +156,8 @@ pub fn run(args: &[String]) -> Result {
     let (reference, dist) = match profile {
         None => prepare(&root)?,
         Some(profile) => {
-            let reference = crate::reference::ensure(
-                &root,
-                &crate::reference::vendored_version(&root)?,
-            )?;
+            let reference =
+                crate::reference::ensure(&root, &crate::reference::vendored_version(&root)?)?;
             crate::dist::run(&["--profile".to_owned(), profile.name.to_owned()])?;
             (reference, target_dir(&root).join("dist"))
         }

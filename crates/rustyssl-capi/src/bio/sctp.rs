@@ -39,9 +39,11 @@ ffi_callback! {
     }
 }
 
-static DATAGRAM_SCTP: Builtin = Builtin::new(BIO_TYPE_DGRAM_SCTP, c"datagram sctp socket", || {
-    Funcs { create: Some(sctp_new), ..Funcs::default() }
-});
+static DATAGRAM_SCTP: Builtin =
+    Builtin::new(BIO_TYPE_DGRAM_SCTP, c"datagram sctp socket", || Funcs {
+        create: Some(sctp_new),
+        ..Funcs::default()
+    });
 
 ffi_export! {
     /// Returns the SCTP datagram method, whose BIOs can't be created.
@@ -157,7 +159,10 @@ mod tests {
             assert_eq!(BIO_dgram_is_sctp(mem), 0);
             assert_eq!(BIO_dgram_sctp_wait_for_dry(mem), -1);
             assert_eq!(BIO_dgram_sctp_msg_waiting(mem), -1);
-            assert_eq!(BIO_dgram_sctp_notification_cb(mem, None, ptr::null_mut()), -1);
+            assert_eq!(
+                BIO_dgram_sctp_notification_cb(mem, None, ptr::null_mut()),
+                -1
+            );
             super::super::BIO_free(mem);
         }
     }

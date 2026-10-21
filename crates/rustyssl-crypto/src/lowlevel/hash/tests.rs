@@ -278,7 +278,11 @@ fn md2_hex(input: &[u8], pieces: usize) -> String {
     for chunk in input.chunks(step) {
         c.update(chunk).unwrap();
     }
-    c.finish().unwrap().iter().map(|b| format!("{b:02x}")).collect()
+    c.finish()
+        .unwrap()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 #[test]
@@ -289,7 +293,10 @@ fn md2_matches_rfc_1319() {
         ("a", "32ec01ec4a6dac72c0ab96fb34c0b5d1"),
         ("abc", "da853b0d3f88d99b30283a69e6ded6bb"),
         ("message digest", "ab4f496bfb2a530b219ff33031fe06b0"),
-        ("abcdefghijklmnopqrstuvwxyz", "4e8ddff3650292ab5a4108c3aa47940b"),
+        (
+            "abcdefghijklmnopqrstuvwxyz",
+            "4e8ddff3650292ab5a4108c3aa47940b",
+        ),
         (
             "12345678901234567890123456789012345678901234567890123456789012345678901234567890",
             "d5976f79d83d3a0dc9806c3c66f3efd8",
@@ -304,11 +311,17 @@ fn md2_matches_rfc_1319() {
 fn md2_matches_the_md2_crate_in_pieces() {
     let msg: Vec<u8> = (0..200u8).collect();
     for len in [0, 1, 15, 16, 17, 31, 32, 33, 100, 200] {
-        let want: String = md2::Md2::digest(&msg[..len]).iter().map(|b| format!("{b:02x}")).collect();
+        let want: String = md2::Md2::digest(&msg[..len])
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
         for pieces in [1, 2, 3, 7] {
             assert_eq!(md2_hex(&msg[..len], pieces), want, "{len} in {pieces}");
         }
     }
-    let mut c = Md2 { num: 16, ..Md2::default() };
+    let mut c = Md2 {
+        num: 16,
+        ..Md2::default()
+    };
     assert_eq!(c.update(b"x"), Err(Error::Corrupt));
 }
