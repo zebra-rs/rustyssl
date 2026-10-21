@@ -1,0 +1,57 @@
+# `openssl ec`. Keys from the reference's test/ tree; encrypted output goes through
+# `| check` (decrypted by upstream's tool on the reference).
+ec -help
+ec -in {src}/test/testec-p256.pem
+ec -in {src}/test/testec-p256.pem -text
+ec -in {src}/test/testec-p256.pem -text -noout
+ec -in {src}/test/testec-p256.pem -check -noout
+ec -in {src}/test/testec-p256.pem -check
+ec -in {src}/test/testec-p256.pem -pubout
+ec -in {src}/test/testec-p256.pem -pubout -text
+ec -in {src}/test/testec-p256.pem -param_out
+ec -in {src}/test/testec-p256.pem -param_out -outform DER
+ec -in {src}/test/testec-p256.pem -outform DER
+ec -in {src}/test/testec-p256.pem -outform DER -pubout
+ec -in {src}/test/testec-p256.pem -no_public
+ec -in {src}/test/testec-p256.pem -no_public -outform DER
+ec -in {src}/test/testec-p256.pem -conv_form compressed
+ec -in {src}/test/testec-p256.pem -conv_form compressed -pubout -text
+ec -in {src}/test/testec-p256.pem -conv_form hybrid -pubout
+ec -in {src}/test/testec-p256.pem -conv_form uncompressed -pubout
+ec -in {src}/test/testec-p256.pem -conv_form bad
+ec -in {src}/test/testec-p256.pem -param_enc explicit
+ec -in {src}/test/testec-p256.pem -param_enc explicit -param_out
+ec -in {src}/test/testec-p256.pem -param_enc explicit -text -noout
+ec -in {src}/test/testec-p256.pem -param_enc named_curve -pubout
+ec -in {src}/test/testec-p256.pem -param_enc bad
+ec -in {src}/test/testec-p256.pem -outform MSBLOB
+ec -in {src}/test/testec-p256.pem -inform XYZ
+ec -in {src}/test/testec-p256.pem -aes128 -passout pass:secret | ec -passin pass:secret -noout -text
+ec -in {src}/test/testec-p256.pem -des3 -passout pass:secret -outform DER | ec -inform DER -passin pass:secret -noout -check
+ec -in {src}/test/testec-p256.pem -aes-128-gcm -passout pass:secret
+ec -in {src}/test/testec-p256.pem -nosuchcipher
+ec -in {src}/test/testec-p256.pem -passout pass:secret
+ec -in {src}/test/testecpub-p256.pem -pubin
+ec -in {src}/test/testecpub-p256.pem -pubin -text
+ec -in {src}/test/testecpub-p256.pem -pubin -check
+ec -in {src}/test/testecpub-p256.pem -pubin -param_out
+ec -in {src}/test/testecpub-p256.pem -pubin -outform DER
+ec -in {src}/test/testecpub-p256.pem
+ec -in {src}/test/testec-p112r1.pem -text -noout
+ec -in {src}/test/testec-sm2.pem -text
+ec -in {src}/test/certs/ca-key-ec-explicit.pem -text -noout
+ec -in {src}/test/certs/ca-key-ec-explicit.pem -check -noout
+ec -in {src}/test/testrsa.pem
+ec -in {src}/test/testrsa.pem -text -noout
+ec -in {src}/test/tested25519.pem -text
+ec -in {src}/test/testec-p256.pem -passin nosuch:x
+ec -in /nonexistent/key.pem
+ec -noout -text < {src}/test/testec-p256.pem
+ec -in {src}/test/testec-p256.pem -out {dir}/ec-out.pem | ec -in {dir}/ec-out.pem -noout -text
+ec -in {src}/test/testec-p256.pem -out /nonexistent/dir/out.pem
+ec -in {src}/test/testec-p256.pem -engine /nonexistent/eng.so -noout
+ec -in {src}/test/testec-p256.pem -provider default -noout -check
+ec -in {src}/test/testec-p256.pem -provider /nonexistent/prov.so
+ec -in {src}/test/testec-p256.pem extra
+ec -nosuchoption
+ec -in

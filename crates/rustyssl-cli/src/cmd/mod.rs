@@ -16,9 +16,9 @@ pub mod version;
 // pub mod crl2pkcs7;
 // pub mod dgst;
 // pub mod dhparam;
-// pub mod dsa;
+pub mod dsa;
 // pub mod dsaparam;
-// pub mod ec;
+pub mod ec;
 // pub mod ecparam;
 // pub mod enc;
 // pub mod engine;
@@ -44,7 +44,7 @@ pub mod pkeyparam;
 // pub mod rand;
 // pub mod rehash;
 // pub mod req;
-// pub mod rsa;
+pub mod rsa;
 // pub mod rsautl;
 // pub mod s_client;
 // pub mod s_server;
@@ -75,9 +75,9 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "crl2pkcs7" => crl2pkcs7::main,
         // "dgst" => dgst::main,
         // "dhparam" => dhparam::main,
-        // "dsa" => dsa::main,
+        "dsa" => dsa::main,
         // "dsaparam" => dsaparam::main,
-        // "ec" => ec::main,
+        "ec" => ec::main,
         // "ecparam" => ecparam::main,
         // "enc" => enc::main,
         // "engine" => engine::main,
@@ -103,7 +103,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "rand" => rand::main,
         // "rehash" => rehash::main,
         // "req" => req::main,
-        // "rsa" => rsa::main,
+        "rsa" => rsa::main,
         // "rsautl" => rsautl::main,
         // "s_client" => s_client::main,
         // "s_server" => s_server::main,

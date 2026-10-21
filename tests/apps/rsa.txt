@@ -1,0 +1,67 @@
+# `openssl rsa`. Keys from the reference's test/ tree; encrypted output goes through
+# `| check` (decrypted by upstream's tool on the reference).
+rsa -help
+rsa -in {src}/test/testrsa.pem
+rsa -in {src}/test/testrsa.pem -traditional
+rsa -in {src}/test/testrsa.pem -text
+rsa -in {src}/test/testrsa.pem -text -noout
+rsa -in {src}/test/testrsa.pem -modulus -noout
+rsa -in {src}/test/testrsa.pem -check -noout
+rsa -in {src}/test/testrsa.pem -check -modulus -text
+rsa -in {src}/test/testrsa.pem -pubout
+rsa -in {src}/test/testrsa.pem -RSAPublicKey_out
+rsa -in {src}/test/testrsa.pem -outform DER
+rsa -in {src}/test/testrsa.pem -outform DER -traditional
+rsa -in {src}/test/testrsa.pem -outform DER -pubout
+rsa -in {src}/test/testrsa.pem -outform DER -RSAPublicKey_out
+rsa -in {src}/test/testrsa.pem -outform MSBLOB
+rsa -in {src}/test/testrsa.pem -outform MSBLOB -pubout
+rsa -in {src}/test/testrsa.pem -outform PVK -pvk-none
+rsa -in {src}/test/testrsa.pem -outform PVK -pvk-weak -passout pass:secret | rsa -inform PVK -passin pass:secret -noout -check
+rsa -in {src}/test/testrsa.pem -outform PVK -pvk-strong -passout pass:secret | rsa -inform PVK -passin pass:secret -noout -check
+rsa -in {src}/test/testrsa.pem -outform PVK -passout pass:secret | rsa -inform PVK -passin pass:secret -noout -modulus
+rsa -in {src}/test/testrsapub.pem -pubin -outform PVK
+rsa -in {src}/test/testrsa.pem -outform NSS
+rsa -in {src}/test/testrsa.pem -outform XYZ
+rsa -in {src}/test/testrsa.pem -inform XYZ
+rsa -in {src}/test/testrsa.pem -aes128 -passout pass:secret | rsa -passin pass:secret -noout -check
+rsa -in {src}/test/testrsa.pem -aes256 -passout pass:secret -traditional | rsa -passin pass:secret -noout -modulus
+rsa -in {src}/test/testrsa.pem -des3 -passout pass:secret -outform DER | rsa -inform DER -passin pass:secret -noout -check
+rsa -in {src}/test/testrsa.pem -aes128 -passout pass:secret -pubout
+rsa -in {src}/test/testrsa.pem -aes-128-gcm -passout pass:secret
+rsa -in {src}/test/testrsa.pem -nosuchcipher
+rsa -in {src}/test/testrsa.pem -passout pass:secret
+rsa -in {src}/test/testrsapub.pem -pubin
+rsa -in {src}/test/testrsapub.pem -pubin -text
+rsa -in {src}/test/testrsapub.pem -pubin -modulus -noout
+rsa -in {src}/test/testrsapub.pem -pubin -check
+rsa -in {src}/test/testrsapub.pem -pubin -RSAPublicKey_out
+rsa -in {src}/test/testrsapub.pem -pubin -outform DER
+rsa -in {src}/test/testrsapub.pem -pubin -outform MSBLOB
+rsa -in {src}/test/testrsapub.pem
+rsa -in {src}/test/testrsa.pem -RSAPublicKey_out -out {dir}/rsa-pkcs1.pem | rsa -RSAPublicKey_in -in {dir}/rsa-pkcs1.pem -text -noout
+rsa -in {src}/test/testrsa.pem -RSAPublicKey_out -outform DER -out {dir}/rsa-pkcs1.der | rsa -RSAPublicKey_in -inform DER -in {dir}/rsa-pkcs1.der -text -noout
+rsa -RSAPublicKey_in -in {dir}/rsa-pkcs1.pem -inform PEM -modulus -noout
+rsa -RSAPublicKey_in -in {dir}/rsa-pkcs1.der -inform DER -pubout
+rsa -RSAPublicKey_in -in {dir}/rsa-pkcs1.pem -pubout
+rsa -in {src}/test/testrsapss.pem -text -noout
+rsa -in {src}/test/testrsapss.pem -pubout
+rsa -in {src}/test/testrsapss.pem -traditional
+rsa -in {src}/test/testrsapssmandatory.pem -check -noout
+rsa -in {src}/test/testdsa.pem
+rsa -in {src}/test/testec-p256.pem -noout
+rsa -in {src}/test/certs/key-pass-12345.pem -passin pass:12345 -noout -modulus
+rsa -in {src}/test/certs/key-pass-12345.pem -passin pass:wrong
+rsa -in {src}/test/certs/key-pass-12345.pem -passin nosuch:x
+rsa -in /nonexistent/key.pem
+rsa -in {txt}
+rsa -noout -modulus < {src}/test/testrsa.pem
+rsa -in {src}/test/testrsa.pem -out {dir}/rsa-out.pem | rsa -in {dir}/rsa-out.pem -noout -check
+rsa -in {src}/test/testrsa.pem -out /nonexistent/dir/out.pem
+rsa -in {src}/test/testrsa.pem -engine /nonexistent/eng.so -noout
+rsa -in {src}/test/testrsa.pem -provider default -noout -check
+rsa -in {src}/test/testrsa.pem -provider /nonexistent/prov.so
+rsa -in {src}/test/testrsa.pem -propquery provider=nosuch -check -noout
+rsa -in {src}/test/testrsa.pem extra
+rsa -nosuchoption
+rsa -in

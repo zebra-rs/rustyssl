@@ -321,6 +321,12 @@ impl Pkey {
         unsafe { ffi::i2b_PublicKey_bio(out.as_ptr(), self.as_ptr()) }
     }
 
+    /// Whether `EVP_PKEY_get0_RSA` finds an `RSA`.
+    pub fn has_legacy_rsa(&self) -> bool {
+        // SAFETY: the key is live; the result is only tested.
+        !unsafe { ffi::EVP_PKEY_get0_RSA(self.as_ptr()) }.is_null()
+    }
+
     /// The legacy RSA public key writers of `rsa`'s `try_legacy_encoding`: `None` when the
     /// key has no `RSA` (`EVP_PKEY_get0_RSA`), else whether writing succeeded. `der` picks
     /// `i2d_*_bio` over `PEM_write_bio_*`, `pkcs1` `RSAPublicKey` over `RSA_PUBKEY`.

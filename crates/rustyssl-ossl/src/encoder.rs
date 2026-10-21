@@ -26,8 +26,9 @@ fn ptr_of(s: &Option<std::ffi::CString>) -> *const core::ffi::c_char {
     s.as_ref().map_or(core::ptr::null(), |c| c.as_ptr())
 }
 
-/// An `OSSL_ENCODER_CTX` (possibly NULL), freed when dropped.
-pub struct Encoder(*mut OSSL_ENCODER_CTX);
+/// An `OSSL_ENCODER_CTX` (possibly NULL), freed when dropped, with the strings it was made
+/// with: the library keeps the output type and structure pointers, not copies.
+pub struct Encoder(*mut OSSL_ENCODER_CTX, [Option<std::ffi::CString>; 2]);
 
 impl Encoder {
     /// `OSSL_ENCODER_CTX_new_for_pkey(pkey, selection, output_type, output_structure, NULL)`.
@@ -38,10 +39,11 @@ impl Encoder {
         output_structure: Option<&str>,
     ) -> Self {
         let (Ok(t), Ok(s)) = (opt_c(output_type), opt_c(output_structure)) else {
-            return Self(core::ptr::null_mut());
+            return Self(core::ptr::null_mut(), [None, None]);
         };
-        // SAFETY: the key is live; the strings are valid or NULL for the call.
-        Self(unsafe {
+        // SAFETY: the key is live; the strings are valid or NULL, and kept in self for the
+        // context's life.
+        let ctx = unsafe {
             ffi::OSSL_ENCODER_CTX_new_for_pkey(
                 pkey.as_ptr(),
                 selection,
@@ -49,7 +51,8 @@ impl Encoder {
                 ptr_of(&s),
                 core::ptr::null(),
             )
-        })
+        };
+        Self(ctx, [t, s])
     }
 
     /// Whether the constructor returned NULL.
@@ -110,10 +113,12 @@ impl Drop for Encoder {
     }
 }
 
-/// An `OSSL_DECODER_CTX` (possibly NULL) for one key, with the slot it decodes into.
+/// An `OSSL_DECODER_CTX` (possibly NULL) for one key, with the slot it decodes into and the
+/// strings it was made with (kept, as the library may keep the pointers).
 pub struct Decoder {
     ctx: *mut OSSL_DECODER_CTX,
     slot: Box<*mut EVP_PKEY>,
+    _strings: [Option<std::ffi::CString>; 4],
 }
 
 impl Decoder {
@@ -138,6 +143,7 @@ impl Decoder {
             return Self {
                 ctx: core::ptr::null_mut(),
                 slot,
+                _strings: [None, None, None, None],
             };
         };
         let lc = libctx.map_or(core::ptr::null_mut(), LibCtx::as_ptr);
@@ -154,7 +160,11 @@ impl Decoder {
                 ptr_of(&q),
             )
         };
-        Self { ctx, slot }
+        Self {
+            ctx,
+            slot,
+            _strings: [t, s, k, q],
+        }
     }
 
     /// Whether the constructor returned NULL.
