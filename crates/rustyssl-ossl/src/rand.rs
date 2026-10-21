@@ -20,3 +20,12 @@ pub fn write_file(name: &str) -> i32 {
     // SAFETY: n is a valid C string.
     unsafe { ffi::RAND_write_file(n.as_ptr()) }
 }
+
+/// `RAND_bytes(buf, len)`.
+pub fn bytes(buf: &mut [u8]) -> i32 {
+    let Ok(n) = core::ffi::c_int::try_from(buf.len()) else {
+        return 0;
+    };
+    // SAFETY: buf is writable for n bytes.
+    unsafe { crate::ffi::RAND_bytes(buf.as_mut_ptr(), n) }
+}

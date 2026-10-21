@@ -120,3 +120,18 @@ pub fn errors_text() -> Vec<u8> {
         None => Vec::new(),
     }
 }
+
+/// `ERR_GET_LIB(e)`.
+pub fn lib(e: c_ulong) -> c_int {
+    if is_system_error(e) {
+        return crate::abi::ERR_LIB_SYS;
+    }
+    let shifted = e >> crate::abi::ERR_LIB_OFFSET;
+    c_int::try_from(shifted & c_ulong::try_from(crate::abi::ERR_LIB_MASK).unwrap_or(0)).unwrap_or(0)
+}
+
+/// `ERR_get_error()`.
+pub fn get_error() -> c_ulong {
+    // SAFETY: no arguments; it only touches this thread's queue.
+    unsafe { ffi::ERR_get_error() }
+}

@@ -13,7 +13,8 @@
 //! Every run must print the same and exit the same as (1), after masking what differs by
 //! design: the library's version metadata (`+rustyssl...`), the directories it was built with,
 //! and errors' thread id and file and line. A line starting with `~` (timings) must only
-//! succeed on every run.
+//! succeed on every run; one starting with `%` (`speed`'s) is compared with its numbers masked,
+//! and the lines naming the library's build (`built on:`, `compiler:`, `CPUINFO:`).
 //!
 //! In a line, `{bin}` is 100,000 octets of fixed data, `{txt}` a line of text, `{dir}` the work
 //! directory, `{src}` the reference's source tree (its `test/certs/`, ...), and `{tests}`
@@ -131,9 +132,73 @@ fn mask_location(line: &str) -> String {
     }
 }
 
-/// The first difference between two outputs, after masking.
-fn compare(expected: &Output, got: &Output, label: &str) -> std::result::Result<(), String> {
-    let (t, o) = (masked(&expected.text), masked(&got.text));
+/// The output with what varies from run to run masked too: each number (`12`, `0.25s`,
+/// `1234.50k`, `inf`, `-nan`) as `N`, runs of spaces as one, and the lines that name how the
+/// library was built.
+fn masked_timings(text: &str) -> String {
+    let mut out = Vec::new();
+    for line in masked(text).lines() {
+        if let Some(p) = ["built on:", "compiler:", "CPUINFO:"]
+            .iter()
+            .find(|p| line.starts_with(**p))
+        {
+            out.push((*p).to_owned());
+            continue;
+        }
+        let c: Vec<char> = line.chars().collect();
+        let mut l = String::new();
+        let mut i = 0;
+        while i < c.len() {
+            let word_start = i == 0 || !c[i - 1].is_ascii_alphabetic();
+            let sign = usize::from(c[i] == '-');
+            let rest = &c[(i + sign).min(c.len())..];
+            let num = rest
+                .iter()
+                .take_while(|c| c.is_ascii_digit() || **c == '.')
+                .count();
+            // `inf` or `nan` as a word (or with `k`), not the start of one.
+            let alpha = |j: usize| rest.get(j).is_some_and(char::is_ascii_alphabetic);
+            let ends = !alpha(3) || (rest.get(3) == Some(&'k') && !alpha(4));
+            let starts = |w: &str| ends && rest.iter().take(3).copied().eq(w.chars());
+            let len = if num > 0 && rest[..num].iter().any(char::is_ascii_digit) {
+                num
+            } else if word_start && (starts("inf") || starts("nan")) {
+                3
+            } else {
+                0
+            };
+            if len == 0 {
+                l.push(c[i]);
+                i += 1;
+                continue;
+            }
+            l.push('N');
+            i += sign + len;
+            if c.get(i) == Some(&'k') {
+                i += 1;
+            }
+        }
+        let mut collapsed = String::new();
+        for c in l.chars() {
+            if !(c == ' ' && collapsed.ends_with(' ')) {
+                collapsed.push(c);
+            }
+        }
+        out.push(collapsed);
+    }
+    out.join("\n")
+}
+
+/// The first difference between two outputs, after masking (and with `timings`, after
+/// [`masked_timings`]).
+fn compare(
+    expected: &Output,
+    got: &Output,
+    label: &str,
+    timings: bool,
+) -> std::result::Result<(), String> {
+    let mask = if timings { masked_timings } else { masked };
+    let (t, o) = (mask(&expected.text), mask(&got.text));
     if t == o {
         return Ok(());
     }
@@ -160,10 +225,12 @@ struct Setup {
     subst: Vec<(&'static str, String)>,
 }
 
-/// One line of a list: its arguments, its standard input, and whether it is compared.
+/// One line of a list: its arguments, its standard input, and whether it is compared (with
+/// its timings masked or not).
 struct Line {
     text: String,
     compare: bool,
+    timings: bool,
     args: Vec<String>,
     stdin: Option<PathBuf>,
 }
@@ -174,9 +241,10 @@ fn parse_list(text: &str, setup: &Setup) -> Vec<Line> {
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
-        let (compare, rest) = match line.strip_prefix('~') {
-            Some(rest) => (false, rest),
-            None => (true, line),
+        let (compare, timings, rest) = match (line.strip_prefix('~'), line.strip_prefix('%')) {
+            (Some(rest), _) => (false, false, rest),
+            (None, Some(rest)) => (true, true, rest),
+            (None, None) => (true, false, line),
         };
         let mut args: Vec<String> = rest
             .split_whitespace()
@@ -196,6 +264,7 @@ fn parse_list(text: &str, setup: &Setup) -> Vec<Line> {
         out.push(Line {
             text: rest.to_owned(),
             compare,
+            timings,
             args,
             stdin,
         });
@@ -233,7 +302,7 @@ fn check(
     for (tool, lib, label) in runs {
         let got = run_tool(tool, lib, &line.args, line.stdin.as_deref(), w)?;
         let verdict = if line.compare {
-            compare(&expected, &got, label)
+            compare(&expected, &got, label, line.timings)
         } else if expected.ok && got.ok {
             Ok(())
         } else {
@@ -482,6 +551,24 @@ mod tests {
             "THREAD:error:0308010C:x:f:unsupported:FILE:LINE:Global, Algorithm (a : 0)"
         );
         assert_eq!(masked("OPENSSLDIR: \"/usr/local/ssl\""), "OPENSSLDIR: DIR");
+    }
+
+    #[test]
+    fn timings_masking() {
+        assert_eq!(
+            masked_timings("Doing sha256 ops for 1s on 16 size blocks: 12 sha256 ops in 0.99s"),
+            "Doing shaN ops for Ns on N size blocks: N shaN ops in Ns"
+        );
+        assert_eq!(
+            masked_timings("sha256           1234.50k        infk     -nan       12.00 "),
+            "shaN N N N N "
+        );
+        assert_eq!(masked_timings("+F:6:sha256:inf:0.50"), "+F:N:shaN:N:N");
+        assert_eq!(
+            masked_timings("built on: Tue Oct 20 2026\ncompiler: gcc"),
+            "built on:\ncompiler:"
+        );
+        assert_eq!(masked_timings("information: é 3"), "information: é N");
     }
 
     #[test]

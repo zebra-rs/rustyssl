@@ -21,7 +21,7 @@ Each `openssl-<major>.<minor>/` directory contains:
 | `crypto/ec/ec_curve.c`, `crypto/evp/ec_support.c` | The named curves' parameters, methods, and comments, and their names and NIST names (codegen's curve table) |
 | `crypto/**/*_err.c`, `crypto/err/err.c`, ... | The C error-string tables: the text OpenSSL actually prints (a few strings differ from `openssl.txt`), the library names, and the common reasons |
 | `doc/man3/`, `doc/man7/` | The API man pages (POD), our behavioral spec |
-| `apps/` (`*.c`, `include/*.h`, `lib/*.c`, the generated `progs.c`/`progs.h`) | The `openssl` command's sources, a specification only (never compiled): codegen reads each command's `OPTIONS` array and the command table (ADR 0007) |
+| `apps/` (`*.c`, `include/*.h`, `lib/*.c`, the generated `progs.c`/`progs.h`, `testrsa.h`/`testdsa.h`) | The `openssl` command's sources, a specification only (never compiled): codegen reads each command's `OPTIONS` array and the command table (ADR 0007), and `speed` reads its benchmark keys from the two headers |
 | `doc/man1/` | The commands' man pages (POD, generated from upstream's `.pod.in`), the CLI's behavioral spec |
 | `LICENSE.txt` | OpenSSL's license (Apache-2.0) |
 

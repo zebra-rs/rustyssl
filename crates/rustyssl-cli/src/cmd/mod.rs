@@ -52,7 +52,7 @@ pub mod fipsinstall;
 // pub mod sess_id;
 // pub mod skeyutl;
 // pub mod smime;
-// pub mod speed;
+pub mod speed;
 // pub mod spkac;
 // pub mod srp;
 // pub mod storeutl;
@@ -111,7 +111,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "sess_id" => sess_id::main,
         // "skeyutl" => skeyutl::main,
         // "smime" => smime::main,
-        // "speed" => speed::main,
+        "speed" => speed::main,
         // "spkac" => spkac::main,
         // "srp" => srp::main,
         // "storeutl" => storeutl::main,

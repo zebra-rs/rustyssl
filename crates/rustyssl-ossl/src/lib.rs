@@ -28,8 +28,10 @@ mod util;
 
 pub use bio::Bio;
 pub use util::cstring;
+pub mod async_job;
 pub mod conf;
 pub mod engine;
+pub mod os;
 pub mod params;
 pub mod pkey;
 pub mod store;
