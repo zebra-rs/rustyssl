@@ -160,7 +160,7 @@ CVE-2016-2183 test cve_tls no 3DES suite is enabled by default (SWEET32)
 CVE-2016-6302 test cve_tls a ticket shorter than its SHA-512 HMAC leads to a full handshake
 CVE-2016-6303 test cve_cipher MDC2 # skip MDC2 isn't offered here
 CVE-2016-6304 test cve_tls a status_request with 2000 responder ids is handled in bounds
-CVE-2016-6305 gap tls SSL_peek on an empty encrypted record: needs an encrypted empty record
+CVE-2016-6305 test cve_tls SSL_peek on a TLS 1.0 CBC stream whose write starts with an empty record returns the data
 CVE-2016-6306 test cve_tls a Certificate message with inconsistent lengths is refused
 CVE-2016-6307 test cve_tls a handshake message claiming 16 MiB is refused before buffering it
 CVE-2016-6308 test cve_tls the declared message length is checked first
@@ -172,7 +172,7 @@ CVE-2016-7055 test cve_pkey Montgomery multiplication equals the simple method (
 CVE-2017-3730 test cve_pkey a DH peer value of 1 is rejected
 CVE-2017-3731 test cve_tls a truncated AES-GCM record fails cleanly
 CVE-2017-3732 test cve_pkey modular exponentiation equals the simple method (x86_64 carry)
-CVE-2017-3733 gap tls Encrypt-then-MAC changing at renegotiation: needs a crafted renegotiation
+CVE-2017-3733 test cve_tls Encrypt-then-MAC added, and dropped, by a renegotiation of a CBC suite; data flows both ways after
 CVE-2017-3735 test cve_asn1 a 1-octet IPAddressFamily
 CVE-2017-3736 test cve_pkey modular exponentiation equals the simple method (bn_sqrx8x)
 CVE-2017-3737 test cve_tls after a fatal error, SSL_write and SSL_read keep failing
@@ -239,7 +239,7 @@ CVE-2023-5678 test cve_pkey generating an X9.42 DH key with an oversized q ends 
 CVE-2023-6129 n/a asm PowerPC POLY1305 assembly
 CVE-2023-6237 test cve_pkey EVP_PKEY_public_check of a 20000-bit RSA modulus ends quickly
 CVE-2024-0727 test cve_pkcs PKCS#12 files with NULL ContentInfo fields are handled
-CVE-2024-2511 gap tls TLS 1.3 session cache growth with SSL_OP_NO_TICKET: memory use isn't observable here
+CVE-2024-2511 test cve_tls 120 TLS 1.3 handshakes, 80 resumed, with SSL_OP_NO_TICKET: the cache stays within its size of 8
 CVE-2024-4603 test cve_pkey checking an 11000-bit DSA key ends quickly
 CVE-2024-4741 test cve_tls SSL_free_buffers refuses while a record is partly read
 CVE-2024-5535 test cve_tls SSL_select_next_proto with an empty client list stays within the server's
