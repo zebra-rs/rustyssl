@@ -1,0 +1,68 @@
+# `openssl asn1parse` (apps/asn1parse.c).
+asn1parse -in {src}/test/certs/ee-cert.pem
+asn1parse -in {src}/test/certs/ee-cert.pem -i
+asn1parse -in {src}/test/certs/ee-cert.pem -dump
+asn1parse -in {src}/test/certs/ee-cert.pem -dlimit 10
+asn1parse -in {src}/test/certs/ee-cert.pem -i -dump -inform PEM
+asn1parse -in {src}/test/certs/ee-cert.pem -strictpem
+asn1parse -in {src}/test/certs/ee-cert.pem -offset 4
+asn1parse -in {src}/test/certs/ee-cert.pem -offset 4 -length 10
+asn1parse -in {src}/test/certs/ee-cert.pem -offset 1000
+asn1parse -in {src}/test/certs/ee-cert.pem -offset 804
+asn1parse -in {src}/test/certs/ee-cert.pem -length 100000
+asn1parse -in {src}/test/certs/ee-cert.pem -strparse 126
+asn1parse -in {src}/test/certs/ee-cert.pem -strparse 126 -i
+asn1parse -in {src}/test/certs/ee-cert.pem -strparse 412
+asn1parse -in {src}/test/certs/ee-cert.pem -strparse 443 -strparse 2
+asn1parse -in {src}/test/certs/ee-cert.pem -strparse 4
+asn1parse -in {src}/test/certs/ee-cert.pem -strparse 18
+asn1parse -in {src}/test/certs/ee-cert.pem -strparse 29
+asn1parse -in {src}/test/certs/ee-cert.pem -strparse 100000
+asn1parse -in {src}/test/certs/ee-cert.pem -strparse 10 -strparse 7
+asn1parse -in {src}/test/certs/ee-cert.pem -strparse 5
+asn1parse -in {src}/test/certs/ee-cert.pem -out {dir}/cert.der -noout
+asn1parse -in {dir}/cert.der -inform DER -i
+asn1parse -in {dir}/cert.der -inform der -offset 4 -length 20 -out {dir}/part.der
+asn1parse -in {dir}/part.der -inform D
+asn1parse -in {dir}/cert.der -inform DER -item X509
+asn1parse -in {src}/test/certs/ee-cert.pem -item X509
+asn1parse -in {src}/test/certs/ee-cert.pem -item X509_NAME
+asn1parse -in {src}/test/certs/ee-cert.pem -offset 31 -item X509_NAME
+asn1parse -in {src}/test/certs/ee-cert.pem -item NOSUCHITEM
+asn1parse -in {src}/test/certs/ee-key.pem
+asn1parse -in {src}/test/certs/ee-key.pem -inform B64
+asn1parse -in {src}/test/certs/ee-key.pem -inform DER
+asn1parse -in {dir}/cert.der
+asn1parse -in {txt}
+asn1parse -in {txt} -inform DER
+asn1parse -in {bin} -inform DER -length 64
+asn1parse -in /nonexistent/in
+asn1parse -in {src}/test/certs/ee-cert.pem -out /nonexistent/out
+asn1parse -inform xx -in {txt}
+asn1parse -inform SMIME -in {txt}
+asn1parse < {src}/test/certs/ee-cert.pem
+asn1parse -inform DER -i < {dir}/cert.der
+asn1parse -genstr INTEGER:42
+asn1parse -genstr UTF8String:hello -i
+asn1parse -genstr OID:1.2.3.4 -dump
+asn1parse -genstr OID:rustyssl.test.oid -oid {tests}/asn1parse-oids.dat
+asn1parse -genstr OID:1.2.3.5 -oid {tests}/asn1parse-oids.dat
+asn1parse -genstr OID:1.2.3.5
+asn1parse -genstr NOSUCH:1
+asn1parse -genstr INTEGER:x
+asn1parse -genconf {tests}/asn1parse-gen.cnf
+asn1parse -genconf {tests}/asn1parse-gen.cnf -i -dump
+asn1parse -genconf {tests}/asn1parse-gen.cnf -strparse 2
+asn1parse -genconf {tests}/asn1parse-gen.cnf -genstr SEQUENCE:inner
+asn1parse -genconf {tests}/asn1parse-gen.cnf -out {dir}/gen.der -noout
+asn1parse -inform DER -in {dir}/gen.der
+asn1parse -genconf {tests}/asn1parse-noasn1.cnf
+asn1parse -genconf /nonexistent/gen.cnf
+asn1parse -genstr INTEGER:1 -oid /nonexistent/oids
+asn1parse -noout -in {src}/test/certs/ee-cert.pem
+asn1parse -offset 0 -in {src}/test/certs/ee-cert.pem
+asn1parse -offset x -in {src}/test/certs/ee-cert.pem
+asn1parse -length -1 -in {src}/test/certs/ee-cert.pem
+asn1parse -in {src}/test/certs/ee-cert.pem extra
+asn1parse -help
+asn1parse -x

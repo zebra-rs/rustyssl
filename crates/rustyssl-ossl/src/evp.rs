@@ -544,3 +544,160 @@ impl Skey {
         })
     }
 }
+
+// MACs and KDFs (`mac`, `kdf`).
+
+crate::handle!(
+    /// A fetched `EVP_MAC`.
+    Mac, EVP_MAC, EVP_MAC_free
+);
+crate::handle!(
+    /// An owned `EVP_MAC_CTX`.
+    MacCtx, EVP_MAC_CTX, EVP_MAC_CTX_free
+);
+crate::handle!(
+    /// A fetched `EVP_KDF`.
+    Kdf, EVP_KDF, EVP_KDF_free
+);
+crate::handle!(
+    /// An owned `EVP_KDF_CTX`.
+    KdfCtx, EVP_KDF_CTX, EVP_KDF_CTX_free
+);
+
+impl Mac {
+    /// `EVP_MAC_fetch(libctx, name, propq)`.
+    pub fn fetch(libctx: Option<&LibCtx>, name: &str, propq: Option<&str>) -> Option<Self> {
+        let n = cstring(name)?;
+        let pq = propq_c(propq)?;
+        let ctx = libctx.map_or(core::ptr::null_mut(), LibCtx::as_ptr);
+        // SAFETY: ctx is NULL or live; the strings are valid or NULL.
+        Self::from_ptr(unsafe { ffi::EVP_MAC_fetch(ctx, n.as_ptr(), ptr_of(&pq)) })
+    }
+
+    /// `EVP_MAC_settable_ctx_params`.
+    pub fn settable_ctx_params(&self) -> ParamsRef<'_> {
+        // SAFETY: the MAC is live; the table is owned by it.
+        ParamsRef::from_raw(unsafe { ffi::EVP_MAC_settable_ctx_params(self.as_ptr()) })
+    }
+}
+
+impl MacCtx {
+    /// `EVP_MAC_CTX_new(mac)`.
+    pub fn new(mac: &Mac) -> Option<Self> {
+        // SAFETY: the MAC is live; the context takes its own reference.
+        Self::from_ptr(unsafe { ffi::EVP_MAC_CTX_new(mac.as_ptr()) })
+    }
+
+    /// `EVP_MAC_CTX_set_params`.
+    pub fn set_params(&self, params: &Params) -> bool {
+        // SAFETY: the context is live; params is terminated.
+        unsafe { ffi::EVP_MAC_CTX_set_params(self.as_ptr(), params.as_ptr()) == 1 }
+    }
+
+    /// `EVP_MAC_init(ctx, NULL, 0, NULL)`.
+    pub fn init(&self) -> bool {
+        // SAFETY: the context is live; no key and no parameters.
+        unsafe { ffi::EVP_MAC_init(self.as_ptr(), core::ptr::null(), 0, core::ptr::null()) == 1 }
+    }
+
+    /// `EVP_MAC_update`.
+    pub fn update(&self, data: &[u8]) -> bool {
+        // SAFETY: the context is live; data is valid for its length.
+        unsafe { ffi::EVP_MAC_update(self.as_ptr(), data.as_ptr(), data.len()) == 1 }
+    }
+
+    /// `EVP_MAC_final(ctx, NULL, &len, 0)`: the output's length.
+    pub fn final_len(&self) -> Option<usize> {
+        let mut len = 0usize;
+        // SAFETY: the context is live; NULL asks for the length only.
+        (unsafe { ffi::EVP_MAC_final(self.as_ptr(), core::ptr::null_mut(), &mut len, 0) } == 1)
+            .then_some(len)
+    }
+
+    /// `EVP_MAC_final(ctx, out, &len, out.len())`: the output's length.
+    pub fn finish(&self, out: &mut [u8]) -> Option<usize> {
+        let mut len = 0usize;
+        // SAFETY: the context is live; out is writable for its length.
+        (unsafe { ffi::EVP_MAC_final(self.as_ptr(), out.as_mut_ptr(), &mut len, out.len()) } == 1)
+            .then_some(len)
+    }
+}
+
+impl Kdf {
+    /// `EVP_KDF_fetch(libctx, name, propq)`.
+    pub fn fetch(libctx: Option<&LibCtx>, name: &str, propq: Option<&str>) -> Option<Self> {
+        let n = cstring(name)?;
+        let pq = propq_c(propq)?;
+        let ctx = libctx.map_or(core::ptr::null_mut(), LibCtx::as_ptr);
+        // SAFETY: ctx is NULL or live; the strings are valid or NULL.
+        Self::from_ptr(unsafe { ffi::EVP_KDF_fetch(ctx, n.as_ptr(), ptr_of(&pq)) })
+    }
+
+    /// `EVP_KDF_settable_ctx_params`.
+    pub fn settable_ctx_params(&self) -> ParamsRef<'_> {
+        // SAFETY: the KDF is live; the table is owned by it.
+        ParamsRef::from_raw(unsafe { ffi::EVP_KDF_settable_ctx_params(self.as_ptr()) })
+    }
+}
+
+impl KdfCtx {
+    /// `EVP_KDF_CTX_new(kdf)`.
+    pub fn new(kdf: &Kdf) -> Option<Self> {
+        // SAFETY: the KDF is live; the context takes its own reference.
+        Self::from_ptr(unsafe { ffi::EVP_KDF_CTX_new(kdf.as_ptr()) })
+    }
+
+    /// `EVP_KDF_CTX_set_params`.
+    pub fn set_params(&self, params: &Params) -> bool {
+        // SAFETY: the context is live; params is terminated.
+        unsafe { ffi::EVP_KDF_CTX_set_params(self.as_ptr(), params.as_ptr()) == 1 }
+    }
+
+    /// `EVP_KDF_derive(ctx, out, len, NULL)`.
+    pub fn derive(&self, out: &mut [u8]) -> bool {
+        // SAFETY: the context is live; out is writable for its length.
+        unsafe {
+            ffi::EVP_KDF_derive(
+                self.as_ptr(),
+                out.as_mut_ptr(),
+                out.len(),
+                core::ptr::null(),
+            ) == 1
+        }
+    }
+}
+
+// Plain digests (`passwd`).
+
+impl Md {
+    /// `EVP_md5()` (static).
+    pub fn md5() -> Option<Self> {
+        // SAFETY: no arguments; EVP_MD_free ignores the static result.
+        Self::from_ptr(unsafe { ffi::EVP_md5() }.cast_mut())
+    }
+
+    /// `EVP_sha512()` (static).
+    pub fn sha512() -> Option<Self> {
+        // SAFETY: as in md5.
+        Self::from_ptr(unsafe { ffi::EVP_sha512() }.cast_mut())
+    }
+}
+
+impl MdCtxRef<'_> {
+    /// `EVP_DigestUpdate`.
+    pub fn update(self, data: &[u8]) -> bool {
+        // SAFETY: the context is live; data is valid for its length.
+        unsafe { ffi::EVP_DigestUpdate(self.0, data.as_ptr().cast(), data.len()) == 1 }
+    }
+
+    /// `EVP_DigestFinal_ex(ctx, buf, NULL)` into a buffer of `EVP_MAX_MD_SIZE`: the digest.
+    pub fn finish(self) -> Option<Vec<u8>> {
+        let mut buf = [0u8; 64];
+        let mut len: core::ffi::c_uint = 0;
+        // SAFETY: the context is live; buf holds EVP_MAX_MD_SIZE bytes.
+        if unsafe { ffi::EVP_DigestFinal_ex(self.0, buf.as_mut_ptr(), &mut len) } != 1 {
+            return None;
+        }
+        buf.get(..usize::try_from(len).ok()?).map(<[u8]>::to_vec)
+    }
+}

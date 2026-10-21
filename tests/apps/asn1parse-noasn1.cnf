@@ -1,0 +1,2 @@
+# A configuration with no `asn1` (asn1parse -genconf's error path).
+other = INTEGER:1

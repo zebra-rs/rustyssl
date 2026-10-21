@@ -5,8 +5,8 @@
 //! corpus, `tests/apps/<command>.txt`, with this binary. Every other command fails closed
 //! ([`crate::unported`]). Each command fork uncomments only its own lines.
 
+pub mod asn1parse;
 pub mod version;
-// pub mod asn1parse;
 // pub mod ca;
 // pub mod ciphers;
 // pub mod cmp;
@@ -28,12 +28,12 @@ pub mod errstr;
 // pub mod genpkey;
 // pub mod genrsa;
 pub mod info;
-// pub mod kdf;
+pub mod kdf;
 // pub mod list;
-// pub mod mac;
+pub mod mac;
 pub mod nseq;
 // pub mod ocsp;
-// pub mod passwd;
+pub mod passwd;
 // pub mod pkcs12;
 // pub mod pkcs7;
 // pub mod pkcs8;
@@ -65,7 +65,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
     Some(match name {
         "help" => crate::help_main,
         "version" => version::main,
-        // "asn1parse" => asn1parse::main,
+        "asn1parse" => asn1parse::main,
         // "ca" => ca::main,
         // "ciphers" => ciphers::main,
         // "cmp" => cmp::main,
@@ -87,12 +87,12 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "genpkey" => genpkey::main,
         // "genrsa" => genrsa::main,
         "info" => info::main,
-        // "kdf" => kdf::main,
+        "kdf" => kdf::main,
         // "list" => list::main,
-        // "mac" => mac::main,
+        "mac" => mac::main,
         "nseq" => nseq::main,
         // "ocsp" => ocsp::main,
-        // "passwd" => passwd::main,
+        "passwd" => passwd::main,
         // "pkcs12" => pkcs12::main,
         // "pkcs7" => pkcs7::main,
         // "pkcs8" => pkcs8::main,

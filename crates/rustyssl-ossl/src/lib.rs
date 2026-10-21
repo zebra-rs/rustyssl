@@ -18,6 +18,7 @@ pub use generated::ffi;
 /// The C API's types and constants (generated from the vendored headers).
 pub use rustyssl_abi as abi;
 
+pub mod asn1;
 pub mod bio;
 pub mod bn;
 pub mod crypto;
