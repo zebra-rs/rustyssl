@@ -1771,10 +1771,14 @@ fn ctr(
     // Whole blocks, many at a time: their counters encrypted in one call, which lets the
     // cipher work on several blocks at once.
     if bs > 0 && bs <= MAX_BLOCK {
-        let mut stream = Zeroizing::new([0u8; CTR_BATCH * MAX_BLOCK]);
+        // Wiped as far as it was used: a whole wipe of the buffer would cost a short call more
+        // than its encryption.
+        let mut stream = [0u8; CTR_BATCH * MAX_BLOCK];
+        let mut used = 0usize;
         while rest.len() >= bs {
             let blocks = rest.len().checked_div(bs).unwrap_or(0).min(CTR_BATCH);
             let len = blocks.checked_mul(bs).ok_or(Error::Internal)?;
+            used = used.max(len);
             let buf = stream.get_mut(..len).ok_or(Error::Internal)?;
             for slot in buf.chunks_exact_mut(bs) {
                 slot.copy_from_slice(counter);
@@ -1787,6 +1791,7 @@ fn ctr(
             }
             rest = tail;
         }
+        stream.get_mut(..used).unwrap_or_default().zeroize();
     }
     // A last partial block, keeping its key stream for the next call.
     for b in rest.iter_mut() {

@@ -335,9 +335,12 @@ impl Drbg for CtrDrbg {
         // The blocks E(V), E(V + 1), ... many at a time: their counters encrypted in one call,
         // which lets the cipher work on several at once.
         const BATCH: usize = 32;
-        let mut stream = Zeroizing::new([0u8; BATCH * 16]);
+        // Wiped as far as it was used (a whole wipe would cost a short call more than its work).
+        let mut stream = [0u8; BATCH * 16];
+        let mut used = 0usize;
         for run in out.chunks_mut(BATCH * 16) {
             let blocks = run.len().div_ceil(16);
+            used = used.max(blocks.saturating_mul(16));
             let buf = stream
                 .get_mut(..blocks.saturating_mul(16))
                 .unwrap_or(&mut []);
@@ -348,6 +351,7 @@ impl Drbg for CtrDrbg {
             Self::encrypt(&*self.cipher, buf);
             run.copy_from_slice(buf.get(..run.len()).unwrap_or(&[]));
         }
+        stream.get_mut(..used).unwrap_or_default().zeroize();
         self.update(last);
         Ok(())
     }

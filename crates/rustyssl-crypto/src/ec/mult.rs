@@ -955,7 +955,8 @@ mod tests {
             let minus = |a: &BigNum, b: u64| bn::sub(a, &word(b)).unwrap_or_default();
             let mut big = BigNum::zero();
             let _ = big.set_bit(n.num_bits().saturating_sub(1));
-            let pattern = BigNum::from_hex_digits(b"0123456789ABCDEF5A5A5A5AF0F0F0F0").unwrap_or_default();
+            let pattern =
+                BigNum::from_hex_digits(b"0123456789ABCDEF5A5A5A5AF0F0F0F0").unwrap_or_default();
             let scalars = [
                 word(0),
                 word(1),
@@ -977,10 +978,26 @@ mod tests {
                 ladder_ct(&g, &mut by_comb, k, None, &mut none).unwrap_or_else(|_| panic!("comb"));
                 ladder_ct(&g, &mut by_ladder, k, Some(&gen_pt), &mut none)
                     .unwrap_or_else(|_| panic!("ladder"));
-                assert_eq!(by_comb.is_at_infinity(), by_ladder.is_at_infinity(), "curve {} k {}", c.nid, k.to_hex());
+                assert_eq!(
+                    by_comb.is_at_infinity(),
+                    by_ladder.is_at_infinity(),
+                    "curve {} k {}",
+                    c.nid,
+                    k.to_hex()
+                );
                 if !by_comb.is_at_infinity() {
-                    assert!(bn::cmp(&by_comb.x, &by_ladder.x).is_eq(), "x: curve {} k {}", c.nid, k.to_hex());
-                    assert!(bn::cmp(&by_comb.y, &by_ladder.y).is_eq(), "y: curve {} k {}", c.nid, k.to_hex());
+                    assert!(
+                        bn::cmp(&by_comb.x, &by_ladder.x).is_eq(),
+                        "x: curve {} k {}",
+                        c.nid,
+                        k.to_hex()
+                    );
+                    assert!(
+                        bn::cmp(&by_comb.y, &by_ladder.y).is_eq(),
+                        "y: curve {} k {}",
+                        c.nid,
+                        k.to_hex()
+                    );
                 }
                 checked += 1;
             }

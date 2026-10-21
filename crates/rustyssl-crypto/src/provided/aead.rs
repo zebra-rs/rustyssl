@@ -165,7 +165,9 @@ impl crate::lowlevel::modes::Ctr128 for KeyCtr<'_> {
 
     fn ctr_in_place(&self, data: &mut [u8], blocks: usize, iv: &[u8; 16]) {
         const BATCH: usize = 32;
-        let mut stream = Zeroizing::new([0u8; BATCH * 16]);
+        // Wiped as far as it was used (a whole wipe would cost a short call more than its work).
+        let mut stream = [0u8; BATCH * 16];
+        let mut used = 0usize;
         let (head, tail) = iv.split_at(12);
         let mut counter = u32::from_be_bytes(tail.try_into().unwrap_or([0; 4]));
         let len = blocks.saturating_mul(16).min(data.len());
@@ -174,6 +176,7 @@ impl crate::lowlevel::modes::Ctr128 for KeyCtr<'_> {
             .unwrap_or_default()
             .chunks_mut(BATCH * 16)
         {
+            used = used.max(chunk.len());
             let Some(buf) = stream.get_mut(..chunk.len()) else {
                 return;
             };
@@ -189,6 +192,7 @@ impl crate::lowlevel::modes::Ctr128 for KeyCtr<'_> {
                 *d ^= k;
             }
         }
+        stream.get_mut(..used).unwrap_or_default().zeroize();
     }
 }
 
