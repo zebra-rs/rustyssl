@@ -44,10 +44,12 @@ run cargo xtask coverage
 git diff --stat -- 'crates/*/src/generated' libs docs/coverage.md | tail -3
 run cargo xtask test-c
 grep -E "FAIL|passed|failed" "$LAST" | tail -5
+run cargo xtask test-cve
+grep -E "FAIL|CVEs indexed|passed" "$LAST" | tail -5
 
 # The C tests' sources under GCC -Werror, against the current series' headers.
 SERIES=$(grep -o 'OPENSSL_SERIES: &str = "[0-9.]*"' xtask/src/targets.rs | grep -o '[0-9]\.[0-9]*')
-C_SOURCES="tests/c/*.c tests/c/modules/*.c libs/*/*.c tests/bogo/shim.c tests/timing/dudect.c"
+C_SOURCES="tests/c/*.c tests/c/modules/*.c tests/cve/*.c libs/*/*.c tests/bogo/shim.c tests/timing/dudect.c"
 gcc_check() { # $1: gcc; $2: the config directory for the target
   local bad=0 f
   for f in $C_SOURCES; do

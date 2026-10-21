@@ -193,7 +193,7 @@ generator. Don't paste the number.
 ## Commands
 
 Working now: `cargo build`, `test`, `clippy`, `fmt`, `deny`, `vet`, and `fuzz`, and the
-xtask commands `vendor`, `codegen`, `dist` (`--profile fedora`), `package`, `ref-openssl`, `abi-check`, `test-c`,
+xtask commands `vendor`, `codegen`, `dist` (`--profile fedora`), `package`, `ref-openssl`, `abi-check`, `test-c`, `test-cve`,
 `test-apps`, `test-interop`, `test-differential`, `test-openssl-suite` (`evp_test`, `bntest`, `ectest`, `rsa_test`; libssl's programs with `--ssl`; the whole tree with `--all`, our CLI with `--cli ours`),
 `test-wycheproof`, `test-bogo`, `test-tlsfuzzer`, `test-timing`, `test-providers`, `test-consumers` (`rust`, `ruby`, `pyca`, `node`, `ngtcp2`, `curl-h3`), `test-quic-interop`, `test-distro`, `coverage`, and `usage-scan`.
 The other `cargo xtask` commands arrive later and fail with a message until then. Update this
@@ -207,7 +207,7 @@ Tools each command needs:
 - **`coverage`:** `clang`, a C compiler (`$CC`), and `nm`.
 - **`usage-scan`:** `curl`, `xz`, and `zstd`, plus about 5 GB of downloads for a full scan
   (only the per-package results are kept, under `target/`).
-- **`dist`, `test-c`, `test-apps`, `test-interop`, `test-differential`, and `test-timing`:** a C compiler (`$CC`), `ar`, and `nm`; on
+- **`dist`, `test-c`, `test-cve`, `test-apps`, `test-interop`, `test-differential`, and `test-timing`:** a C compiler (`$CC`), `ar`, and `nm`; on
   Alpine also `llvm-libunwind-dev`. `test-interop --peer gnutls` also needs GnuTLS's
   `gnutls-cli` and `gnutls-serv` (it skips with a message without them).
 - **`test-openssl-suite`:** what `dist` and `ref-openssl` need (it builds upstream's test
@@ -292,6 +292,7 @@ cargo xtask abi-check [--profile P] [check...]  # L3: exports+versions, metadata
 cargo xtask coverage [--list PREFIX...]      # implemented exports per library and header -> docs/coverage.md
 cargo xtask usage-scan [--jobs N] [--limit N]  # rank exports by how many distro packages import them -> docs/symbol-usage.md
 cargo xtask test-c                           # tests/c/*.c, each run on the reference and on target/dist; output must match
+cargo xtask test-cve [program...]            # the CVE regression suite: tests/cve/*.c on both libraries, tests/cve/cves.txt checked against the reference's CHANGES.md -> target/cve-report.md
 cargo xtask test-apps [--bless] [list...]    # openssl tools: upstream's on both libraries (tests/apps/commands.txt); ours (target/dist/bin/openssl) on both, against upstream's on the reference (tests/apps/<command>.txt); the CLI's live_* helper tests on both
 cargo xtask test-interop [case...]           # the reference's s_server/s_client in four library pairings (tests/interop/cases.txt)
 cargo xtask test-interop --cli ours [case...]  # the same, with our s_server/s_client (target/dist/bin/openssl) on the rustyssl side

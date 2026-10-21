@@ -6314,9 +6314,22 @@ The CLI's gaps closed (2026-10-21, local, branch `cli-gaps`, macOS arm64):
   with intrinsics in vetted backends and with profiling. Assembly is not allowed. Set the
   targets once there's a baseline (initial goal: within 1.25× of the reference on hot
   symmetric paths and within 1.5× on handshakes).
-- [ ] **12.2 Security:**
+- [~] **12.2 Security:**
   - a third-party audit (the crypto backends and all `unsafe` in capi)
-  - the complete CVE regression suite
+  - [x] the complete CVE regression suite (2026-10-21): `tests/cve/` and `cargo xtask test-cve`
+    (TEST_PLAN L9), in the gates and CI. All 304 OpenSSL CVEs are indexed in
+    `tests/cve/cves.txt`: 203 with a check in seven TAP programs (213 checks, identical on the
+    reference and rustyssl), 1 in `test-apps`, 12 covered by `test-timing` or upstream's own
+    regression tests, 47 not applicable (with the reason), and 41 gaps (with the reason: ten
+    QUIC and seven post-handshake DTLS cases need crafted traffic, five thread races, eight
+    timing cases not yet measured by `test-timing`, four triggers needing > 2 GiB of input,
+    three CMP exchanges, three TLS cases, `dgst`'s 16 MiB one-shot). Differences it found and
+    fixed: DTLS reassembly (an empty fragment of a longer message is processed as it arrived;
+    a fragment past its message's end or of an oversized message ends the handshake quietly,
+    as OpenSSL does), and a `status_request` ResponderID of another tag now queues
+    `d2i_OCSP_RESPID`'s ASN.1 error. It also found the reference crashing on aarch64 macOS
+    when RC4-HMAC-MD5 is used (it's offered there but only implemented for x86_64), which
+    rustyssl doesn't; the check runs on x86_64 only.
   - OSS-Fuzz onboarding (start after M2)
   - a review of the `unsafe` budget
   - a constant-time verification report
