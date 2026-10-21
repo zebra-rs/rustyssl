@@ -1,0 +1,29 @@
+# `openssl sess_id` (apps/sess_id.c): run with upstream's tool on the reference, then ours on
+# rustyssl and on the reference (cargo xtask test-apps); output and exit codes must match.
+sess_id -in {src}/test/testsid.pem
+sess_id -in {src}/test/testsid.pem -text
+sess_id -in {src}/test/testsid.pem -text -noout
+sess_id -in {src}/test/testsid.pem -text -cert
+sess_id -in {src}/test/testsid.pem -cert
+sess_id -in {src}/test/testsid.pem -cert -outform DER
+sess_id -in {src}/test/testsid.pem -noout
+sess_id -in {src}/test/testsid.pem -outform NSS
+sess_id -in {src}/test/testsid.pem -outform DER -out {dir}/sid.der
+sess_id -in {dir}/sid.der -inform DER -text
+sess_id -in {dir}/sid.der -inform DER
+sess_id -in {src}/test/testsid.pem -context abc -text -noout
+sess_id -in {src}/test/testsid.pem -context abc
+sess_id -in {src}/test/testsid.pem -context 0123456789012345678901234567890123456789
+sess_id -in {src}/test/testsid.pem -out {dir}/sid.pem
+sess_id -in {dir}/sid.pem -text -noout
+sess_id -text -noout < {src}/test/testsid.pem
+sess_id -in {dir}/sid.der
+sess_id -in {src}/test/testx509.pem
+sess_id -in {dir}/nonexistent.pem
+sess_id -in {src}/test/testsid.pem -outform SMIME
+sess_id -in {src}/test/testsid.pem -outform NSS -cert
+sess_id -in {src}/test/testsid.pem -inform NSS
+sess_id -in {src}/test/testsid.pem -out {dir}/nonexistent/x
+sess_id extra
+sess_id -nosuchoption
+sess_id -help

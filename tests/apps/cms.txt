@@ -1,0 +1,235 @@
+# `openssl cms` (apps/cms.c): run with upstream's tool on the reference, then ours on
+# rustyssl and on the reference (cargo xtask test-apps); output and exit codes must match.
+# Signatures without attributes by RSA keys, data, digests, and printouts of fixed messages
+# are byte-compared; signing times, receipt IDs, DSA and ECDSA signatures, S/MIME boundaries
+# and encryption are random, so those outputs go to files that later lines verify or decrypt
+# (data/cms/ holds fixtures made once by the reference).
+#
+# Deterministic output.
+cms -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem
+cms -sign -in {src}/test/smcont.txt -outform PEM -noattr -signer {src}/test/smime-certs/smrsa1.pem
+cms -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -certfile {src}/test/smime-certs/smroot.pem -md sha384
+cms -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -certfile {src}/test/smime-certs/smroot.pem -nocerts
+cms -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -keyid
+cms -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -text
+cms -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -binary
+cms -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -crlfeol
+cms -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -asciicrlf
+cms -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -indef
+cms -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -indef -noindef
+cms -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -stream
+cms -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -signer {src}/test/smime-certs/smrsa2.pem
+cms -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa3-cert.pem -inkey {src}/test/smime-certs/smrsa3-key.pem -keyform PEM
+cms -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -econtent_type 1.2.3.4
+cms -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -keyopt rsa_padding_mode:pkcs1
+cms -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -keyopt nosuchopt:x
+cms -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr -keyopt rsa_padding_mode:pkcs1
+cms -sign -in {src}/test/smcont.txt -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -to someone@example.com -from me@example.com -subject Signed
+cms -sign -in {src}/test/smcont.txt -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem -crlfeol -to someone@example.com -from me@example.com -subject Signed
+cms -sign -digest ff236ef61b396355f75a4cc6e1c306d4c309084ae271a9e2ad6888f10a101b32 -outform PEM -noattr -signer {src}/test/smime-certs/smrsa1.pem
+cms -sign -digest ff236ef61b396355f75a4cc6e1c306d4c309084ae271a9e2ad6888f10a101b32 -outform DER -noattr -certfile {src}/test/smime-certs/smroot.pem -signer {src}/test/smime-certs/smrsa1.pem -out {dir}/dg.der
+cms -verify -in {dir}/dg.der -inform DER -CAfile {src}/test/smime-certs/smroot.pem -content {src}/test/smcont.txt
+cms -sign -digest ff23 -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem
+cms -sign -digest xyz -signer {src}/test/smime-certs/smrsa1.pem
+cms -verify -digest ff23 -in {dir}/dg.der -inform DER
+cms -data_create -in {src}/test/smcont.txt -outform PEM
+cms -data_create -in {src}/test/smcont.txt -outform PEM -nodetach -stream -out {dir}/data.pem
+cms -data_out -in {dir}/data.pem -inform PEM
+cms -data_create -in {src}/test/smcont.txt -outform DER -out {dir}/data.der
+cms -data_out -in {dir}/data.der -inform DER
+cms -data_create -in {src}/test/smcont.txt
+cms -data_create -in {src}/test/smcont.txt -text -binary -outform PEM
+cms -digest_create -in {src}/test/smcont.txt -outform PEM
+cms -digest_create -in {src}/test/smcont.txt -md sha256 -outform DER -out {dir}/digest.der
+cms -digest_verify -in {dir}/digest.der -inform DER
+cms -digest_create -in {src}/test/smcont.txt -outform PEM -out {dir}/digest.pem
+cms -digest_verify -in {dir}/digest.pem -inform PEM -out {dir}/digest.txt
+cms -digest_verify -in {dir}/data.pem -inform PEM
+cms -compress -in {src}/test/smcont.txt -outform PEM
+cms -uncompress -in {dir}/data.pem -inform PEM
+cms -cmsout -in {dir}/dg.der -inform DER -print
+cms -cmsout -in {dir}/dg.der -inform DER -noout
+cms -cmsout -in {dir}/dg.der -inform DER -outform PEM
+cms -cmsout -in {dir}/dg.der -inform DER -print -nameopt oneline
+cms -cmsout -in {dir}/dg.der -inform DER -print -nameopt RFC2253,dn_rev
+cms -cmsout -in {dir}/dg.der -inform DER -print -nameopt nosuchflag
+cms -cmsout -in {dir}/dg.der -inform DER -certsout {dir}/certs.pem
+cms -cmsout -in {dir}/dg.der -inform DER -certsout {dir}/nonexistent/certs.pem
+cms -cmsout -in {tests}/data/cms/rr.msg -print
+cms -cmsout -in {tests}/data/cms/receipt.msg -print
+cms -cmsout -in {src}/test/recipes/80-test_cms_data/ciphertext_from_1_1_1.cms -inform PEM -print
+cms -cmsout -in {src}/test/recipes/80-test_cms_data/authenveloped_attrs.pem -inform PEM -print
+cms -cmsout -in {src}/test/recipes/80-test_cms_data/rsa-malformed.der -inform DER -print
+cms -cmsout -in {src}/test/recipes/80-test_cms_data/no_ct_attr.cms -inform PEM -print -noout
+cms -decrypt -in {src}/test/recipes/80-test_cms_data/ciphertext_from_1_1_1.cms -inform PEM -recip {src}/test/smime-certs/smrsa1.pem
+cms -decrypt -in {src}/test/recipes/80-test_cms_data/rsa-malformed.der -inform DER -recip {src}/test/smime-certs/smrsa1.pem
+cms -decrypt -in {src}/test/recipes/80-test_cms_data/ecdh-malformed.der -inform DER -recip {src}/test/recipes/80-test_cms_data/ecdh-cert.pem -inkey {src}/test/recipes/80-test_cms_data/ecdh-key.pem
+cms -decrypt -in {src}/test/recipes/80-test_cms_data/dh-malformed.der -inform DER -recip {src}/test/recipes/80-test_cms_data/dh-cert.pem -inkey {src}/test/recipes/80-test_cms_data/dh-key.pem
+cms -verify -in {src}/test/recipes/80-test_cms_data/bad_signtime_attr.cms -inform PEM -CAfile {src}/test/smime-certs/smroot.pem
+cms -verify -in {src}/test/recipes/80-test_cms_data/no_md_attr.cms -inform PEM -CAfile {src}/test/smime-certs/smroot.pem
+cms -verify -in {src}/test/recipes/80-test_cms_data/ct_multiple_attr.cms -inform PEM -CAfile {src}/test/smime-certs/smroot.pem
+#
+# Fixed messages: receipts.
+cms -verify -in {tests}/data/cms/rr.msg -CAfile {src}/test/smime-certs/smroot.pem -receipt_request_print
+cms -verify -in {tests}/data/cms/rr-all.msg -CAfile {src}/test/smime-certs/smroot.pem -receipt_request_print -out {dir}/rr.txt
+cms -verify -in {tests}/data/cms/rr-first.msg -CAfile {src}/test/smime-certs/smroot.pem -receipt_request_print -signer {dir}/signer.pem
+cms -verify -in {dir}/dg.der -inform DER -CAfile {src}/test/smime-certs/smroot.pem -content {src}/test/smcont.txt -receipt_request_print
+cms -verify_receipt {tests}/data/cms/receipt.msg -in {tests}/data/cms/rr-all.msg -CAfile {src}/test/smime-certs/smroot.pem
+cms -verify_receipt {tests}/data/cms/receipt.msg -in {tests}/data/cms/rr-all.msg -CAfile {src}/test/smime-certs/smroot.pem -rctform SMIME
+cms -verify_receipt {tests}/data/cms/receipt.msg -in {tests}/data/cms/rr.msg -CAfile {src}/test/smime-certs/smroot.pem
+cms -verify_receipt {tests}/data/cms/rr.msg -in {tests}/data/cms/rr-all.msg -CAfile {src}/test/smime-certs/smroot.pem
+cms -verify_receipt {dir}/nonexistent.msg -in {tests}/data/cms/rr-all.msg -CAfile {src}/test/smime-certs/smroot.pem
+cms -verify_receipt {tests}/data/cms/receipt.msg -in {tests}/data/cms/rr-all.msg -CAfile {src}/test/smime-certs/smroot.pem -rctform DER
+cms -verify_receipt {tests}/data/cms/receipt.msg -in {tests}/data/cms/rr-all.msg -CAfile {src}/test/smime-certs/smroot.pem -rctform XYZ
+cms -sign_receipt -in {tests}/data/cms/rr-all.msg -signer {src}/test/smime-certs/smrsa2.pem -out {dir}/receipt.msg
+cms -verify_receipt {dir}/receipt.msg -in {tests}/data/cms/rr-all.msg -CAfile {src}/test/smime-certs/smroot.pem
+cms -sign_receipt -in {dir}/dg.der -inform DER -signer {src}/test/smime-certs/smrsa2.pem
+cms -sign -in {src}/test/smcont.txt -nodetach -signer {src}/test/smime-certs/smrsa1.pem -receipt_request_to a@example.com -receipt_request_to b@example.com -receipt_request_from c@example.com -receipt_request_all -out {dir}/rr1.msg
+cms -verify -in {dir}/rr1.msg -CAfile {src}/test/smime-certs/smroot.pem -out {dir}/rr1.txt
+cms -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -receipt_request_all
+cms -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -receipt_request_from a@example.com
+cms -verify -in {tests}/data/cms/rr.msg -receipt_request_to a@example.com
+cms -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -receipt_request_to x -receipt_request_first -out {dir}/rr2.msg
+#
+# Random signatures and boundaries, verified.
+cms -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -out {dir}/d1.msg
+cms -verify -in {dir}/d1.msg -CAfile {src}/test/smime-certs/smroot.pem
+cms -verify -in {dir}/d1.msg -CAfile {src}/test/smime-certs/smroot.pem -signer {dir}/signers.pem -out {dir}/d1.txt
+cms -verify -in {dir}/d1.msg -CAfile {src}/test/smime-certs/smroot.pem -signer {dir}/nonexistent/signers.pem
+cms -verify -in {dir}/d1.msg
+cms -verify -in {dir}/d1.msg -verify_retcode
+cms -verify -in {dir}/d1.msg -noverify
+cms -verify -in {dir}/d1.msg -nosigs -no-CAfile -no-CApath -no-CAstore
+cms -verify -in {dir}/d1.msg -no_content_verify -CAfile {src}/test/smime-certs/smroot.pem
+cms -verify -in {dir}/d1.msg -no_attr_verify -CAfile {src}/test/smime-certs/smroot.pem
+cms -verify -in {dir}/d1.msg -CApath {dir} -CAstore file:{dir}/nonexistent.pem
+cms -verify -in {dir}/d1.msg -CAfile {src}/test/smime-certs/smroot.pem -nointern -certfile {src}/test/smime-certs/smrsa1.pem
+cms -verify -in {dir}/d1.msg -CAfile {src}/test/smime-certs/smroot.pem -nointern
+cms -verify -in {dir}/d1.msg -CAfile {src}/test/smime-certs/smroot.pem -nointern -verify_retcode
+cms -verify -in {dir}/d1.msg -CAfile {src}/test/smime-certs/smroot.pem -purpose smimesign -policy_check -policy_print
+cms -verify -in {dir}/d1.msg -CAfile {src}/test/smime-certs/smroot.pem -policy_check -explicit_policy -policy 1.2.3.4
+cms -verify -in {dir}/d1.msg -CAfile {src}/test/smime-certs/smroot.pem -policy_check -explicit_policy -policy 1.2.3.4 -verify_retcode
+cms -verify -in {dir}/d1.msg -CAfile {src}/test/smime-certs/smroot.pem -attime 0
+cms -verify -in {dir}/d1.msg -CAfile {src}/test/smime-certs/smroot.pem -attime 0 -verify_retcode
+cms -verify -in {dir}/d1.msg -CAfile {src}/test/smime-certs/smroot.pem -purpose nosuchpurpose
+cms -verify -in {dir}/d1.msg -CAfile {src}/test/smime-certs/smroot.pem -cades
+cms -verify -in {dir}/d1.msg -CAfile {src}/test/smime-certs/smroot.pem -cades -noverify
+cms -verify -in {dir}/d1.msg -CAfile {src}/test/smime-certs/smroot.pem -inform DER
+cms -verify -in {dir}/d1.msg -CAfile {src}/test/smime-certs/smroot.pem -content {src}/test/smcont.txt
+cms -verify -in {dir}/d1.msg -CAfile {src}/test/smime-certs/smroot.pem -binary
+cms -resign -in {dir}/d1.msg -signer {src}/test/smime-certs/smrsa2.pem -out {dir}/d1r.msg
+cms -verify -in {dir}/d1r.msg -CAfile {src}/test/smime-certs/smroot.pem
+cms -sign -cades -in {src}/test/smcont.txt -outform DER -nodetach -certfile {src}/test/smime-certs/smroot.pem -signer {src}/test/smime-certs/smrsa1.pem -out {dir}/c1.der
+cms -verify -cades -in {dir}/c1.der -inform DER -CAfile {src}/test/smime-certs/smroot.pem
+cms -sign -cades -binary -nodetach -nosmimecap -md sha256 -in {src}/test/smcont.txt -outform DER -certfile {src}/test/smime-certs/smroot.pem -signer {src}/test/smime-certs/smrsa1.pem -out {dir}/c2.der
+cms -resign -cades -binary -nodetach -nosmimecap -md sha256 -inform DER -in {dir}/c2.der -certfile {src}/test/smime-certs/smroot.pem -signer {src}/test/smime-certs/smrsa2.pem -outform DER -out {dir}/c2r.der
+cms -verify -cades -in {dir}/c2r.der -inform DER -CAfile {src}/test/smime-certs/smroot.pem
+cms -sign -cades -noattr -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem
+cms -verify -cades -noattr -in {dir}/c1.der
+cms -sign -in {src}/test/smcont.txt -outform DER -nodetach -no_signing_time -nosmimecap -signer {src}/test/smime-certs/smrsa1.pem -out {dir}/nst.der
+cms -cmsout -in {dir}/nst.der -inform DER -print
+cms -sign -in {src}/test/smcont.txt -outform PEM -nodetach -signer {src}/test/smime-certs/smrsa1.pem -keyopt rsa_padding_mode:pss -keyopt rsa_pss_saltlen:16 -md sha256 -out {dir}/pss.pem
+cms -verify -in {dir}/pss.pem -inform PEM -CAfile {src}/test/smime-certs/smroot.pem
+cms -sign -in {src}/test/smcont.txt -outform DER -nodetach -stream -signer {src}/test/smime-certs/smrsa1.pem -signer {src}/test/smime-certs/smrsa2.pem -signer {src}/test/smime-certs/smdsa1.pem -signer {src}/test/smime-certs/smdsa2.pem -keyid -out {dir}/d2.der
+cms -verify -in {dir}/d2.der -inform DER -CAfile {src}/test/smime-certs/smroot.pem
+cms -sign -in {src}/test/smcont.txt -outform DER -signer {src}/test/smime-certs/smec1.pem -md sha256 -out {dir}/d3.der
+cms -verify -in {dir}/d3.der -inform DER -CAfile {src}/test/smime-certs/smroot.pem -content {src}/test/smcont.txt
+cms -verify -in {dir}/d3.der -inform DER -CAfile {src}/test/smime-certs/smroot.pem -content {dir}/nonexistent.txt
+#
+# Encryption, decrypted.
+cms -encrypt -in {src}/test/smcont.txt -stream -out {dir}/e1.msg {src}/test/smime-certs/smrsa1.pem {src}/test/smime-certs/smrsa2.pem {src}/test/smime-certs/smrsa3.pem
+cms -decrypt -recip {src}/test/smime-certs/smrsa1.pem -in {dir}/e1.msg
+cms -decrypt -recip {src}/test/smime-certs/smrsa3.pem -in {dir}/e1.msg -out {dir}/e1.txt
+cms -decrypt -recip {src}/test/smime-certs/smrsa3-cert.pem -inkey {src}/test/smime-certs/smrsa3-key.pem -in {dir}/e1.msg
+cms -decrypt -inkey {src}/test/smime-certs/smrsa2.pem -in {dir}/e1.msg
+cms -decrypt -recip {src}/test/smime-certs/smrsa1024.pem -in {dir}/e1.msg
+cms -decrypt -recip {src}/test/smime-certs/smrsa1024.pem -in {dir}/e1.msg -debug_decrypt
+cms -encrypt -in {src}/test/smcont.txt -keyid -aes128 -recip {src}/test/smime-certs/smrsa1.pem -keyopt rsa_padding_mode:oaep -keyopt rsa_oaep_md:sha256 -out {dir}/e2.msg
+cms -decrypt -recip {src}/test/smime-certs/smrsa1.pem -in {dir}/e2.msg
+cms -encrypt -in {src}/test/smcont.txt -recip {src}/test/smime-certs/smrsa1.pem -keyopt nosuchopt:1
+cms -encrypt -in {src}/test/smcont.txt -stream -recip {src}/test/smime-certs/smec1.pem -aes128 -keyopt ecdh_kdf_md:sha256 -out {dir}/e3.msg
+cms -decrypt -recip {src}/test/smime-certs/smec1.pem -in {dir}/e3.msg
+cms -encrypt -in {src}/test/smcont.txt -recip {src}/test/smime-certs/smec1.pem -aes-128-gcm -aes128-wrap -outform PEM -out {dir}/e4.pem
+cms -decrypt -recip {src}/test/smime-certs/smec1.pem -in {dir}/e4.pem -inform PEM
+cms -encrypt -in {src}/test/smcont.txt -recip {src}/test/smime-certs/smec1.pem -aes256-wrap -outform DER -out {dir}/e5.der
+cms -decrypt -recip {src}/test/smime-certs/smec1.pem -in {dir}/e5.der -inform DER
+cms -encrypt -in {src}/test/smcont.txt -recip {src}/test/smime-certs/smec1.pem -wrap id-aes192-wrap -out {dir}/e6.msg
+cms -decrypt -recip {src}/test/smime-certs/smec1.pem -in {dir}/e6.msg
+cms -encrypt -in {src}/test/smcont.txt -recip {src}/test/smime-certs/smec1.pem -aes192-wrap -des3-wrap -out {dir}/e7.msg
+cms -decrypt -recip {src}/test/smime-certs/smec1.pem -in {dir}/e7.msg
+cms -encrypt -in {src}/test/smcont.txt -recip {src}/test/smime-certs/smec1.pem -wrap nosuchwrap
+cms -encrypt -in {src}/test/smcont.txt -recip {src}/test/smime-certs/smec1.pem -originator {src}/test/smime-certs/smec3.pem
+cms -encrypt -in {src}/test/smcont.txt -recip {src}/test/smime-certs/smec1.pem -originator {dir}/nonexistent.pem
+cms -encrypt -in {src}/test/smcont.txt -recip {src}/test/smime-certs/sm_mlkem512.pem -aes-256-gcm -keyid -out {dir}/k1.msg
+cms -decrypt -in {dir}/k1.msg -recip {src}/test/smime-certs/sm_mlkem512.pem
+cms -encrypt -in {src}/test/smcont.txt -recip {src}/test/smime-certs/sm_mlkem512.pem -recip_kdf HKDF-SHA512 -recip {src}/test/smime-certs/sm_mlkem768.pem -recip_ukm 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f -aes-256-gcm -keyid -out {dir}/k2.msg
+cms -decrypt -in {dir}/k2.msg -recip {src}/test/smime-certs/sm_mlkem512.pem
+cms -decrypt -in {dir}/k2.msg -recip {src}/test/smime-certs/sm_mlkem768.pem
+cms -encrypt -in {src}/test/smcont.txt -recip {src}/test/smime-certs/sm_mlkem512.pem -recip_kdf nosuchkdf
+cms -encrypt -in {src}/test/smcont.txt -recip {src}/test/smime-certs/sm_mlkem512.pem -recip_kdf HKDF-SHA256 -recip_kdf HKDF-SHA512
+cms -encrypt -in {src}/test/smcont.txt -recip {src}/test/smime-certs/sm_mlkem512.pem -recip_ukm 00 -recip_ukm 01
+cms -encrypt -in {src}/test/smcont.txt -recip {src}/test/smime-certs/sm_mlkem512.pem -recip_ukm xyz
+cms -encrypt -in {src}/test/smcont.txt -recip_kdf HKDF-SHA256
+cms -decrypt -recip_ukm 00 -in {dir}/k1.msg
+cms -encrypt -in {src}/test/smcont.txt -outform PEM -aes128 -stream -secretkey 000102030405060708090A0B0C0D0E0F -secretkeyid C0FEE0 -out {dir}/kek.pem
+cms -decrypt -in {dir}/kek.pem -inform PEM -secretkey 000102030405060708090A0B0C0D0E0F -secretkeyid C0FEE0
+cms -decrypt -in {dir}/kek.pem -inform PEM -secretkey 000102030405060708090A0B0C0D0E0F
+cms -decrypt -in {dir}/kek.pem -inform PEM -secretkey 000102030405060708090A0B0C0D0E0F -secretkeyid C0FEE1
+cms -encrypt -in {src}/test/smcont.txt -secretkey 000102030405060708090A0B0C0D0E0F
+cms -encrypt -in {src}/test/smcont.txt -secretkey 00 -secretkey 01
+cms -encrypt -in {src}/test/smcont.txt -secretkey xyz
+cms -encrypt -in {src}/test/smcont.txt -secretkeyid 00 -secretkeyid 01
+cms -encrypt -in {src}/test/smcont.txt -secretkeyid xyz
+cms -encrypt -in {src}/test/smcont.txt -outform PEM -aes-128-gcm -kekcipher aes-128-cbc -stream -pwri_password test -out {dir}/pw.pem
+cms -decrypt -in {dir}/pw.pem -inform PEM -pwri_password test
+cms -decrypt -in {dir}/pw.pem -inform PEM -pwri_password wrong
+cms -encrypt -in {src}/test/smcont.txt -pwri_password test -kekcipher nosuchcipher
+cms -EncryptedData_encrypt -in {src}/test/smcont.txt -outform PEM -aes128 -secretkey 000102030405060708090A0B0C0D0E0F -stream -out {dir}/ed.pem
+cms -EncryptedData_decrypt -in {dir}/ed.pem -inform PEM -secretkey 000102030405060708090A0B0C0D0E0F
+cms -EncryptedData_decrypt -in {dir}/ed.pem -inform PEM -secretkey 000102030405060708090A0B0C0D0E0E -out {dir}/ed.bad
+cms -EncryptedData_encrypt -in {src}/test/smcont.txt -outform PEM -des3 -secretkey 000102030405060708090A0B0C0D0E0F1011121314151617 -noout
+cms -EncryptedData_encrypt -in {src}/test/smcont.txt -outform PEM
+cms -decrypt -recip {src}/test/smime-certs/smrsa1.pem -in {dir}/d1.msg
+cms -decrypt -recip {src}/test/smime-certs/smrsa1.pem -in {src}/test/smcont.txt
+cms -decrypt -in {dir}/e1.msg
+cms -encrypt -in {src}/test/smcont.txt
+cms -encrypt -in {src}/test/smcont.txt -nodetach -contfile x {src}/test/smime-certs/smrsa1.pem -out {dir}/x.msg
+cms -encrypt -in {src}/test/smcont.txt -aes-128-gcm -content {src}/test/smcont.txt -out {dir}/x.msg {src}/test/smime-certs/smrsa1.pem
+cms -encrypt -in {src}/test/smcont.txt -nosuchcipher {src}/test/smime-certs/smrsa1.pem
+cms -encrypt -in {src}/test/smcont.txt {src}/test/smime-certs/nonexistent.pem
+cms -encrypt -in {src}/test/smcont.txt -recip {src}/test/smime-certs/nonexistent.pem
+#
+# Errors.
+cms -sign -in {src}/test/smcont.txt -outform PEM -nodetach -noattr
+cms -sign -in {src}/test/smcont.txt -inkey {src}/test/smime-certs/smrsa1.pem
+cms -sign -in {src}/test/smcont.txt -inkey {src}/test/smime-certs/smrsa1.pem -inkey {src}/test/smime-certs/smrsa2.pem
+cms -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -inkey {src}/test/smime-certs/smrsa1.pem -inkey {src}/test/smime-certs/smrsa2.pem -outform PEM -noattr -nodetach
+cms -verify -in {dir}/d1.msg -signer {src}/test/smime-certs/smrsa1.pem -signer {src}/test/smime-certs/smrsa2.pem
+cms -in {src}/test/smcont.txt
+cms -verify -in {dir}/d1.msg {src}/test/smime-certs/smrsa1.pem
+cms -keyopt rsa_padding_mode:pss
+cms -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/nonexistent.pem
+cms -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -inkey {src}/test/smime-certs/smrsa2.pem -outform PEM -noattr
+cms -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -md nosuchmd
+cms -sign -in {dir}/nonexistent.txt -signer {src}/test/smime-certs/smrsa1.pem
+cms -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -out {dir}/nonexistent/x
+cms -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -certfile {dir}/nonexistent.pem
+cms -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -passin bad:x
+cms -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -keyform XYZ
+cms -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -inform XYZ
+cms -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -econtent_type 1.2 -econtent_type 1.3
+cms -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -econtent_type nosuchoid
+cms -verify -in {dir}/d1.msg -inform DER
+cms -verify -in {dir}/dg.der -inform PEM
+cms -cmsout -in {dir}/d1.msg -outform DER -out {dir}/d1.der
+cms -cmsout -in {dir}/d1.der -inform DER -outform SMIME -out {dir}/d1b.msg
+cms -verify -in {dir}/d1b.msg -CAfile {src}/test/smime-certs/smroot.pem -content {src}/test/smcont.txt
+cms -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -outform PEM -nodetach -noattr -config {dir}/nonexistent.cnf
+cms -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -outform PEM -nodetach -noattr -rand {bin} -writerand {dir}/rand.out
+cms -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -outform PEM -nodetach -noattr -provider default -propquery provider=default
+cms -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -outform PEM -nodetach -noattr -provider-path {dir} -provparam default:x=1
+cms -sign -in {src}/test/smcont.txt -signer {src}/test/smime-certs/smrsa1.pem -outform PEM -nodetach -noattr -engine /nonexistent/engine.so
+cms -sign -outform PEM -nodetach -noattr -signer {src}/test/smime-certs/smrsa1.pem < {src}/test/smcont.txt
+cms -help
+cms -nosuchoption -alsounknown
+cms -verify -verify_depth x

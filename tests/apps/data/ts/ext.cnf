@@ -1,0 +1,16 @@
+[ tsa_cert ]
+basicConstraints=CA:FALSE
+keyUsage = nonRepudiation, digitalSignature
+extendedKeyUsage = critical,timeStamping
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid,issuer:always
+[ non_tsa_cert ]
+basicConstraints=CA:FALSE
+keyUsage = nonRepudiation, digitalSignature
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid,issuer:always
+[ v3_ca ]
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid:always,issuer:always
+basicConstraints = critical,CA:true
+keyUsage = cRLSign, keyCertSign

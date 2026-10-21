@@ -181,6 +181,13 @@ pub fn setup() -> bool {
     ok && unsafe { ffi::UI_method_set_prompt_constructor(m, Some(ui_prompt_construct)) } == 0
 }
 
+/// `set_base_ui_method(UI_null())`: prompts get no input (`-batch`).
+pub fn set_base_null() {
+    // SAFETY: no arguments; the method is static.
+    let base = unsafe { ffi::UI_null() };
+    BASE.store(base.cast_mut(), Ordering::Release);
+}
+
 /// `destroy_ui_method`.
 pub fn destroy() {
     let m = METHOD.swap(core::ptr::null_mut(), Ordering::AcqRel);

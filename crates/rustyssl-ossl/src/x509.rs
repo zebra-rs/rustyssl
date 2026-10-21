@@ -2571,3 +2571,142 @@ impl Pkey {
         unsafe { ffi::EVP_PKEY_copy_parameters(self.as_ptr(), from.as_ptr()) == 1 }
     }
 }
+
+// Printing and writing certificates and CRLs, and borrowing stack members (fork G4).
+
+impl Cert {
+    /// A new reference to a certificate the caller only borrows (`X509_up_ref`).
+    pub(crate) fn from_borrowed(p: *mut crate::abi::X509) -> Option<Self> {
+        if p.is_null() {
+            return None;
+        }
+        // SAFETY: p is a live certificate; the new reference is owned by the result.
+        unsafe { ffi::X509_up_ref(p) };
+        Self::from_ptr(p)
+    }
+}
+
+impl Crl {
+    /// A new reference to a CRL the caller only borrows (`X509_CRL_up_ref`).
+    pub(crate) fn from_borrowed(p: *mut X509_CRL) -> Option<Self> {
+        if p.is_null() {
+            return None;
+        }
+        // SAFETY: p is a live CRL; the new reference is owned by the result.
+        unsafe { ffi::X509_CRL_up_ref(p) };
+        Self::from_ptr(p)
+    }
+}
+
+/// The certificates of a stack the caller borrows (NULL: none), each as a new reference.
+pub(crate) fn certs_of(sk: *const stack_st_X509) -> Vec<Cert> {
+    let mut out = Vec::new();
+    if sk.is_null() {
+        return out;
+    }
+    // SAFETY: sk is a live stack.
+    let n = unsafe { ffi::OPENSSL_sk_num(sk.cast()) };
+    for i in 0..n.max(0) {
+        // SAFETY: i is in range; the member is a live X509.
+        let p = unsafe { ffi::OPENSSL_sk_value(sk.cast(), i) }.cast::<crate::abi::X509>();
+        if let Some(c) = Cert::from_borrowed(p) {
+            out.push(c);
+        }
+    }
+    out
+}
+
+/// The CRLs of a stack the caller borrows (NULL: none), each as a new reference.
+pub(crate) fn crls_of(sk: *const stack_st_X509_CRL) -> Vec<Crl> {
+    let mut out = Vec::new();
+    if sk.is_null() {
+        return out;
+    }
+    // SAFETY: sk is a live stack.
+    let n = unsafe { ffi::OPENSSL_sk_num(sk.cast()) };
+    for i in 0..n.max(0) {
+        // SAFETY: i is in range; the member is a live X509_CRL.
+        let p = unsafe { ffi::OPENSSL_sk_value(sk.cast(), i) }.cast::<X509_CRL>();
+        if let Some(c) = Crl::from_borrowed(p) {
+            out.push(c);
+        }
+    }
+    out
+}
+
+impl CertStack {
+    /// The certificates, each as a new reference.
+    pub fn to_vec(&self) -> Vec<Cert> {
+        certs_of(self.as_ptr())
+    }
+
+    /// `sk_X509_push` of a new reference to `cert`.
+    pub fn push_ref(&self, cert: &Cert) -> bool {
+        let Some(c) = Cert::from_borrowed(cert.as_ptr()) else {
+            return false;
+        };
+        // SAFETY: both are live; on success the stack owns the new reference.
+        if unsafe { ffi::OPENSSL_sk_push(self.as_ptr().cast(), c.as_ptr().cast()) } > 0 {
+            core::mem::forget(c);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Gives up ownership.
+    pub fn into_ptr(self) -> *mut stack_st_X509 {
+        let p = self.as_ptr();
+        core::mem::forget(self);
+        p
+    }
+}
+
+impl CrlStack {
+    /// The CRLs, each as a new reference.
+    pub fn to_vec(&self) -> Vec<Crl> {
+        crls_of(self.as_ptr())
+    }
+}
+
+impl Cert {
+    /// `X509_get_extension_flags`.
+    pub fn extension_flags(&self) -> u32 {
+        // SAFETY: the certificate is live.
+        unsafe { ffi::X509_get_extension_flags(self.as_ptr()) }
+    }
+
+    /// `X509_cmp_timeframe(vpm, X509_get0_notBefore(x), X509_get0_notAfter(x))`: 0 when
+    /// valid now (or at the parameters' time), positive when expired, negative when not yet
+    /// valid.
+    pub fn cmp_timeframe(&self, vpm: Option<&crate::verify::VerifyParam>) -> c_int {
+        // SAFETY: the certificate is live; the times are owned by it.
+        let nb = unsafe { ffi::X509_get0_notBefore(self.as_ptr()) };
+        // SAFETY: as above.
+        let na = unsafe { ffi::X509_get0_notAfter(self.as_ptr()) };
+        let v = vpm.map_or(core::ptr::null(), |v| v.as_ptr().cast_const());
+        // SAFETY: v is NULL or live; the times are live.
+        unsafe { ffi::X509_cmp_timeframe(v, nb, na) }
+    }
+}
+
+impl Cert {
+    /// A new reference to the same certificate (`X509_up_ref`).
+    pub fn clone_ref(&self) -> Cert {
+        // SAFETY: the certificate is live; the new reference is owned by the result.
+        unsafe { ffi::X509_up_ref(self.as_ptr()) };
+        Cert(self.0)
+    }
+}
+
+impl NameRef<'_> {
+    /// The name at `p`, borrowed from its owner (NULL allowed, see [`NameRef`]).
+    pub(crate) fn from_raw(p: *const X509_NAME) -> Self {
+        Self::new(p)
+    }
+
+    /// The name, for the C API.
+    pub(crate) fn as_raw(self) -> *const X509_NAME {
+        self.0
+    }
+}

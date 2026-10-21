@@ -71,3 +71,10 @@ macro_rules! handle {
         }
     };
 }
+
+/// The address of the export `name` (NUL-terminated) of `library`, as a C function pointer
+/// for the C API's function-pointer arguments (`ASN1_d2i_bio`'s `d2i`, ...). Fails closed,
+/// as every import does, if the library doesn't have it.
+pub(crate) fn c_function(library: crate::load::Library, name: &'static str) -> *mut c_void {
+    crate::load::Symbol::new(library, name).get()
+}

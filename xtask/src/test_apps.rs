@@ -11,17 +11,27 @@
 //!   is ported (`crates/rustyssl-cli/src/cmd/<command>.rs` exists) also run (2) and (3).
 //!
 //! Every run must print the same and exit the same as (1), after masking what differs by
-//! design: the library's version metadata (`+rustyssl...`), the directories it was built with,
-//! and errors' thread id and file and line. A line starting with `~` (timings) must only
-//! succeed on every run; one starting with `%` (`speed`'s) is compared with its numbers masked,
-//! and the lines naming the library's build (`built on:`, `compiler:`, `CPUINFO:`).
+//! design: the library's version metadata (`+rustyssl...`), the directories it was built with
+//! (OPENSSLDIR, ENGINESDIR, MODULESDIR, the libraries' own), errors' thread id and file and
+//! line, dlopen's message, our tool's name (`openssl-rs`), and every `PID=n`.
 //!
 //! In a line, `{bin}` is 100,000 octets of fixed data, `{txt}` a line of text, `{dir}` the work
 //! directory, `{src}` the reference's source tree (its `test/certs/`, ...), and `{tests}`
 //! `tests/apps/`; a final `< file` gives the command its standard input (otherwise empty).
-//! A line starting with `@<fixture> ` (after any `~`) is stateful: before each of its runs, the
-//! directory `tests/apps/<fixture>` is copied afresh to `{dir}/<its last component>` (a CA's
-//! database and serial files, which the command changes), so every run starts the same.
+//!
+//! A line may start with these prefixes, in any order:
+//! - `~`: only success is compared (random output, timings);
+//! - `%`: compared with its numbers masked, and the lines naming the library's build
+//!   (`built on:`, `compiler:`, `CPUINFO:`) (`speed`);
+//! - `&`: a server (`ocsp -port`, `cmp -port`): it starts in the background, the next line runs
+//!   once it has printed its `ACCEPT` line, and then both outputs are compared (the server must
+//!   exit by itself, as with `-nrequest 1`);
+//! - `^`: the times within a few days of now (a reply made now) are masked.
+//!
+//! After them, `@<fixture> ` makes the line stateful: before each of its runs, the directory
+//! `tests/apps/<fixture>` is copied afresh to `{dir}/<its last component>` (a CA's database and
+//! serial files, which the command changes), so every run starts the same. (Forks G3 and G4
+//! both used `@`; G4's time masking became `^`.)
 //!
 //! Output that is random by design (key and parameter generation, randomized signatures) is
 //! compared structurally: in `command ... | check ...`, each run of `command` is followed by
@@ -96,11 +106,12 @@ fn run_tool(
 }
 
 /// The output with the expected differences masked: the version's build metadata, the
-/// directories the libraries were built with, and errors' `file:line:`.
+/// directories the libraries were built with, errors' `file:line:`, and process ids.
 fn masked(text: &str) -> String {
     text.lines()
         .map(|line| {
-            let mut l = line.to_owned();
+            // Our tool's own name, which commands show through `opt_appname` ("openssl cmp").
+            let mut l = mask_pid(line).replace(&format!("{CLI_NAME} "), "openssl ");
             if let Some(at) = l.find("+rustyssl") {
                 let end = l[at..].find(' ').map_or(l.len(), |e| at + e);
                 l.replace_range(at..end, "");
@@ -151,6 +162,98 @@ fn mask_libdir(line: &str) -> String {
         l.replace_range(at..at + end + "/lib/".len(), "LIBDIR/");
     }
     l
+}
+
+/// `PID=<digits>` as `PID=PID` (a server's `ACCEPT` line).
+fn mask_pid(line: &str) -> String {
+    let mut out = String::new();
+    let mut rest = line;
+    while let Some((before, after)) = rest.split_once("PID=") {
+        out.push_str(before);
+        out.push_str("PID=");
+        let n = after.bytes().take_while(u8::is_ascii_digit).count();
+        if n > 0 {
+            out.push_str("PID");
+        }
+        rest = after.get(n..).unwrap_or_default();
+    }
+    out.push_str(rest);
+    out
+}
+
+const MONTHS: [&str; 12] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+/// Days since 1970-01-01 of a civil date (Howard Hinnant's `days_from_civil`).
+fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let mp = (m + 9) % 12;
+    let doy = (153 * mp + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146_097 + doe - 719_468
+}
+
+/// The length of the time `ASN1_TIME_print` writes (`Mmm dd hh:mm:ss[.fff] yyyy GMT`) at the
+/// start of `s`, if it is within three days of `today` (days since the epoch).
+fn time_near(s: &str, today: i64) -> Option<usize> {
+    let m = MONTHS.iter().position(|m| s.starts_with(m))?;
+    let rest = s.get(3..)?;
+    let rb = rest.as_bytes();
+    if rb.first() != Some(&b' ') {
+        return None;
+    }
+    let day: i64 = rest.get(1..3)?.trim().parse().ok()?;
+    let time = rest.get(4..12)?.as_bytes();
+    if time.get(2) != Some(&b':') || time.get(5) != Some(&b':') {
+        return None;
+    }
+    let mut j = 12;
+    if rb.get(j) == Some(&b'.') {
+        j += 1;
+        while rb.get(j).is_some_and(u8::is_ascii_digit) {
+            j += 1;
+        }
+    }
+    if rb.get(j) != Some(&b' ') {
+        return None;
+    }
+    let year: i64 = rest.get(j + 1..j + 5)?.parse().ok()?;
+    if rest.get(j + 5..j + 9) != Some(" GMT") {
+        return None;
+    }
+    let days = days_from_civil(year, i64::try_from(m).ok()? + 1, day);
+    ((days - today).abs() <= 3).then_some(3 + j + 9)
+}
+
+/// The times near `today` ([`time_near`]) of a line, as `TIME`.
+fn mask_times_near(line: &str, today: i64) -> String {
+    let mut out = String::new();
+    let mut rest = line;
+    while let Some(c) = rest.chars().next() {
+        if let Some(len) = time_near(rest, today) {
+            out.push_str("TIME");
+            rest = rest.get(len..).unwrap_or_default();
+        } else {
+            out.push(c);
+            rest = rest.get(c.len_utf8()..).unwrap_or_default();
+        }
+    }
+    out
+}
+
+/// [`mask_times_near`] for every line, around the current day.
+fn mask_now_times(text: &str) -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
+    let today = i64::try_from(secs / 86_400).unwrap_or(0);
+    text.lines()
+        .map(|l| mask_times_near(l, today))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// An error line's `:<file>.c:<line>:` (or `.rs`) as `:FILE:LINE:`.
@@ -237,9 +340,13 @@ fn compare(
     got: &Output,
     label: &str,
     timings: bool,
+    times: bool,
 ) -> std::result::Result<(), String> {
     let mask = if timings { masked_timings } else { masked };
-    let (t, o) = (mask(&expected.text), mask(&got.text));
+    let (mut t, mut o) = (mask(&expected.text), mask(&got.text));
+    if times {
+        (t, o) = (mask_now_times(&t), mask_now_times(&o));
+    }
     if t == o {
         return Ok(());
     }
@@ -280,6 +387,10 @@ struct Line {
     checks: Vec<Vec<String>>,
     /// The fixture directory copied afresh before each run, and where it goes.
     reset: Option<(PathBuf, PathBuf)>,
+    /// A server for the next line (`&`).
+    background: bool,
+    /// The current times masked (`^`).
+    times: bool,
 }
 
 /// Copies the directory `from` to `to`, replacing what was there.
@@ -307,11 +418,18 @@ fn parse_list(text: &str, setup: &Setup) -> Vec<Line> {
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
-        let (compare, timings, rest) = match (line.strip_prefix('~'), line.strip_prefix('%')) {
-            (Some(rest), _) => (false, false, rest),
-            (None, Some(rest)) => (true, true, rest),
-            (None, None) => (true, false, line),
-        };
+        let (mut compare, mut timings, mut background, mut times) = (true, false, false, false);
+        let mut rest = line;
+        loop {
+            match rest.as_bytes().first() {
+                Some(b'~') => compare = false,
+                Some(b'%') => timings = true,
+                Some(b'&') => background = true,
+                Some(b'^') => times = true,
+                _ => break,
+            }
+            rest = rest.get(1..).unwrap_or_default().trim_start();
+        }
         let mut reset = None;
         let rest = match rest.strip_prefix('@').and_then(|r| r.split_once(' ')) {
             Some((fixture, r)) => {
@@ -350,6 +468,8 @@ fn parse_list(text: &str, setup: &Setup) -> Vec<Line> {
             stdin,
             checks,
             reset,
+            background,
+            times,
         });
     }
     out
@@ -442,7 +562,7 @@ fn check(
     for (tool, lib, label) in runs {
         let got = run_line(setup, line, tool, lib)?;
         let verdict = if line.compare {
-            compare(&expected, &got, label, line.timings)
+            compare(&expected, &got, label, line.timings, line.times)
         } else if expected.ok && got.ok {
             Ok(())
         } else {
@@ -460,6 +580,121 @@ fn check(
         };
         if verdict.is_err() {
             return Ok(verdict);
+        }
+    }
+    Ok(Ok(()))
+}
+
+/// A server line's run: started in the background, then (once it has printed its `ACCEPT`
+/// line) the client's run, then the server's end. Both outputs, as (server, client).
+fn run_pair(
+    tool: &Path,
+    lib: &Path,
+    server: &Line,
+    client: &Line,
+    work: &Path,
+) -> Result<(Output, Output)> {
+    use std::io::{BufRead, BufReader, Read};
+    use std::time::{Duration, Instant};
+    let mut child = Command::new(tool)
+        .args(&server.args)
+        .current_dir(work)
+        .env(LOADER_PATH, lib)
+        .env("OPENSSL_MODULES", crate::test_c::modules_of(lib))
+        .env("OPENSSL_CONF", MISSING_CONFIG)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("cannot run {}: {e}", tool.display()))?;
+    let stdout = child.stdout.take().ok_or("no server stdout")?;
+    let mut stderr = child.stderr.take().ok_or("no server stderr")?;
+    let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
+    let out_thread = std::thread::spawn(move || {
+        let mut all = Vec::new();
+        let mut r = BufReader::new(stdout);
+        let mut line = Vec::new();
+        while r.read_until(b'\n', &mut line).unwrap_or(0) > 0 {
+            all.extend_from_slice(&line);
+            let _ = tx.send(line.clone());
+            line.clear();
+        }
+        all
+    });
+    let err_thread = std::thread::spawn(move || {
+        let mut all = Vec::new();
+        let _ = stderr.read_to_end(&mut all);
+        all
+    });
+    // The server is ready once it reports where it accepts (or gone, if it failed).
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while Instant::now() < deadline {
+        match rx.recv_timeout(Duration::from_millis(100)) {
+            Ok(l) if l.starts_with(b"ACCEPT") => break,
+            Ok(_) => {}
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+        }
+    }
+    let got = run_tool(tool, lib, &client.args, client.stdin.as_deref(), work)?;
+    let deadline = Instant::now() + Duration::from_secs(20);
+    let status = loop {
+        if let Some(s) = child.try_wait()? {
+            break s;
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            break child.wait()?;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    };
+    let stdout = out_thread.join().unwrap_or_default();
+    let stderr = err_thread.join().unwrap_or_default();
+    let mut text = String::from_utf8_lossy(&stdout).into_owned();
+    text.push_str(&String::from_utf8_lossy(&stderr));
+    text.push_str(&format!("[{status}]\n"));
+    let server_out = Output {
+        stdout,
+        stderr,
+        text,
+        ok: status.success(),
+    };
+    Ok((server_out, got))
+}
+
+/// [`check`] for a server line and its client line.
+fn check_pair(
+    setup: &Setup,
+    server: &Line,
+    client: &Line,
+    runs: &[(&Path, &Path, &str)],
+) -> Result<std::result::Result<(), String>> {
+    let w = &setup.work;
+    let (es, ec) = run_pair(&setup.upstream, &setup.ref_lib, server, client, w)?;
+    for (tool, lib, label) in runs {
+        let (gs, gc) = run_pair(tool, lib, server, client, w)?;
+        let both = [(&es, &gs, server, "server"), (&ec, &gc, client, "client")];
+        for (expected, got, line, which) in both {
+            let label = format!("{label} ({which})");
+            let verdict = if line.compare {
+                compare(
+                    expected,
+                    got,
+                    &label,
+                    line.timings,
+                    line.times || server.times,
+                )
+            } else if expected.ok == got.ok {
+                Ok(())
+            } else {
+                Err(format!(
+                    "{label}: exit: expected success {}, got {}",
+                    expected.ok, got.ok
+                ))
+            };
+            if verdict.is_err() {
+                return Ok(verdict);
+            }
         }
     }
     Ok(Ok(()))
@@ -555,7 +790,8 @@ pub fn run(args: &[String]) -> Result {
     let mut count = 0;
     for (name, path) in &lists {
         let text = fs::read_to_string(path)?;
-        for line in parse_list(&text, &setup) {
+        let mut lines = parse_list(&text, &setup).into_iter();
+        while let Some(line) = lines.next() {
             let command = line.args.first().map_or("", String::as_str);
             let mut runs: Vec<(&Path, &Path, &str)> = Vec::new();
             if name == "commands" {
@@ -570,6 +806,26 @@ pub fn run(args: &[String]) -> Result {
                 runs.push((&setup.ours, &setup.ref_lib, "our tool on the reference"));
             }
             count += 1;
+            if line.background {
+                let Some(client) = lines.next() else {
+                    println!(
+                        "FAIL {name}: openssl {}: no client line after it",
+                        line.text
+                    );
+                    failures += 1;
+                    continue;
+                };
+                count += 1;
+                let text = format!("{} & {}", line.text, client.text);
+                match check_pair(&setup, &line, &client, &runs)? {
+                    Ok(()) => println!("PASS {name}: openssl {text}"),
+                    Err(e) => {
+                        println!("FAIL {name}: openssl {text}: {e}");
+                        failures += 1;
+                    }
+                }
+                continue;
+            }
             match check(&setup, &line, &runs)? {
                 Ok(()) => println!("PASS {name}: openssl {}", line.text),
                 Err(e) => {
@@ -739,6 +995,31 @@ mod tests {
     }
 
     #[test]
+    fn current_times() {
+        let today = days_from_civil(2026, 10, 21);
+        assert_eq!(days_from_civil(1970, 1, 1), 0);
+        assert_eq!(
+            mask_times_near("This Update: Oct 21 01:02:03 2026 GMT", today),
+            "This Update: TIME"
+        );
+        assert_eq!(
+            mask_times_near(
+                "a Oct 23 01:02:03.123 2026 GMT b Nov  2 00:00:00 2026 GMT",
+                today
+            ),
+            "a TIME b Nov  2 00:00:00 2026 GMT"
+        );
+        assert_eq!(
+            mask_times_near("Not After : Jan  1 00:00:00 2030 GMT", today),
+            "Not After : Jan  1 00:00:00 2030 GMT"
+        );
+        assert_eq!(
+            masked("ACCEPT [::]:8888 PID=4242"),
+            "ACCEPT [::]:8888 PID=PID"
+        );
+    }
+
+    #[test]
     fn lines_parse() {
         let setup = Setup {
             upstream: PathBuf::new(),
@@ -750,10 +1031,13 @@ mod tests {
             subst: vec![("{txt}", "/w/t".to_owned())],
         };
         let lines = parse_list(
-            "# c\n\n~speed -seconds 1\nenc -base64 -in {txt}\nx509 -noout < {txt}\n~@pki/db ca -x\n",
+            "# c\n\n~speed -seconds 1\nenc -base64 -in {txt}\nx509 -noout < {txt}\n~@pki/db ca -x\n&^ ocsp -port 1\n%speed -seconds 1 sha256\n",
             &setup,
         );
-        assert_eq!(lines.len(), 4);
+        assert_eq!(lines.len(), 6);
+        assert!(lines[4].background && lines[4].times && lines[4].compare);
+        assert_eq!(lines[4].args, ["ocsp", "-port", "1"]);
+        assert!(lines[5].timings && lines[5].compare && !lines[5].background);
         assert!(!lines[3].compare);
         assert_eq!(lines[3].args, ["ca", "-x"]);
         assert_eq!(

@@ -9,8 +9,8 @@ pub mod asn1parse;
 pub mod ca;
 pub mod version;
 // pub mod ciphers;
-// pub mod cmp;
-// pub mod cms;
+pub mod cmp;
+pub mod cms;
 pub mod configutl;
 pub mod crl;
 pub mod crl2pkcs7;
@@ -32,10 +32,10 @@ pub mod kdf;
 pub mod list;
 pub mod mac;
 pub mod nseq;
-// pub mod ocsp;
+pub mod ocsp;
 pub mod passwd;
-// pub mod pkcs12;
-// pub mod pkcs7;
+pub mod pkcs12;
+pub mod pkcs7;
 pub mod pkcs8;
 pub mod pkey;
 pub mod pkeyparam;
@@ -49,14 +49,14 @@ pub mod rsautl;
 // pub mod s_client;
 // pub mod s_server;
 // pub mod s_time;
-// pub mod sess_id;
+pub mod sess_id;
 pub mod skeyutl;
-// pub mod smime;
+pub mod smime;
 pub mod speed;
 pub mod spkac;
 // pub mod srp;
 pub mod storeutl;
-// pub mod ts;
+pub mod ts;
 pub mod verify;
 pub mod x509;
 
@@ -68,8 +68,8 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         "asn1parse" => asn1parse::main,
         "ca" => ca::main,
         // "ciphers" => ciphers::main,
-        // "cmp" => cmp::main,
-        // "cms" => cms::main,
+        "cmp" => cmp::main,
+        "cms" => cms::main,
         "configutl" => configutl::main,
         "crl" => crl::main,
         "crl2pkcs7" => crl2pkcs7::main,
@@ -91,10 +91,10 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         "list" => list::main,
         "mac" => mac::main,
         "nseq" => nseq::main,
-        // "ocsp" => ocsp::main,
+        "ocsp" => ocsp::main,
         "passwd" => passwd::main,
-        // "pkcs12" => pkcs12::main,
-        // "pkcs7" => pkcs7::main,
+        "pkcs12" => pkcs12::main,
+        "pkcs7" => pkcs7::main,
         "pkcs8" => pkcs8::main,
         "pkey" => pkey::main,
         "pkeyparam" => pkeyparam::main,
@@ -108,14 +108,14 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "s_client" => s_client::main,
         // "s_server" => s_server::main,
         // "s_time" => s_time::main,
-        // "sess_id" => sess_id::main,
+        "sess_id" => sess_id::main,
         "skeyutl" => skeyutl::main,
-        // "smime" => smime::main,
+        "smime" => smime::main,
         "speed" => speed::main,
         "spkac" => spkac::main,
         // "srp" => srp::main,
         "storeutl" => storeutl::main,
-        // "ts" => ts::main,
+        "ts" => ts::main,
         "verify" => verify::main,
         "x509" => x509::main,
         _ => return None,
