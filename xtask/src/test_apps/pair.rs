@@ -5,7 +5,8 @@
 //! its arguments replaced by the server's port. Either side may end with `< file`, its
 //! standard input; without one the client's is empty and the server's an open pipe that
 //! stays silent (an interactive server's terminal). The server must then finish on its own
-//! (`-naccept 1`); a `~` line's server is stopped once the client is done.
+//! (`-naccept 1`); a `~` line's server is stopped once the client is done, and only whether
+//! its client succeeds is compared (with the reference pairing's).
 //!
 //! Each line runs in five pairings: upstream's tool on the reference for both sides (the
 //! expectation); ours on rustyssl, and ours on the reference, for both; and ours (on
@@ -526,12 +527,6 @@ pub fn check(
     let ours_rs = (setup.ours.as_path(), setup.our_lib.as_path());
     let ours_ref = (setup.ours.as_path(), setup.ref_lib.as_path());
     let expected = run(setup, pair, up, up, !compare)?;
-    if !expected.client_ok && !compare {
-        return Ok(Err(format!(
-            "{label}: the reference pairing failed:\n{}",
-            expected.client
-        )));
-    }
     let runs = [
         ("our server and client on rustyssl", ours_rs, ours_rs),
         ("our server and client on the reference", ours_ref, ours_ref),
@@ -545,8 +540,12 @@ pub fn check(
     for (name, server, client) in runs {
         let got = run(setup, pair, server, client, !compare)?;
         if !compare {
-            if !got.client_ok {
-                return Ok(Err(format!("{name}: the client failed:\n{}", got.client)));
+            if got.client_ok != expected.client_ok {
+                let how = if got.client_ok { "succeeded" } else { "failed" };
+                return Ok(Err(format!(
+                    "{name}: the client {how}, unlike the reference pairing's:\n{}",
+                    got.client
+                )));
             }
             continue;
         }
