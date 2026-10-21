@@ -447,7 +447,9 @@ static void printf_bounds(void)
     n = BIO_get_mem_data(out, &text);
     check(n == b && small[3] == '\0',
           "CVE-2016-0799: BIO_printf's %%s, width and precision stay within bounds");
-    note("snprintf %d [%s] %d, printf %d, tail [%s]", a, small, c, b, n > 12 ? text + n - 12 : "");
+    /* The memory BIO's data isn't NUL-terminated: print its last 12 octets by length. */
+    note("snprintf %d [%s] %d, printf %d, tail [%.*s]", a, small, c, b, n > 12 ? 12 : 0,
+         n > 12 ? text + n - 12 : "");
     BIO_free(out);
 }
 
