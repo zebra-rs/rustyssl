@@ -42,17 +42,23 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::codegen::exports::PRIVATE_PREFIX;
+use crate::codegen::profiles::{self, Profile};
 use crate::targets::{OPENSSL_SERIES, Target, host};
 use crate::util::{
     Result, copy_file, fresh_dir, run_output, target_dir, toml_value, workspace_root,
 };
 
 pub fn run(args: &[String]) -> Result {
-    if !args.is_empty() {
-        return Err("usage: cargo xtask dist".into());
-    }
+    let profile = match args {
+        [] => None,
+        [flag, name] if flag == "--profile" => Some(profiles::find(name)?),
+        _ => return Err("usage: cargo xtask dist [--profile <name>]".into()),
+    };
     let root = workspace_root();
     let (host, target) = host()?;
+    if profile.is_some() && is_apple(target) {
+        return Err("export profiles are for Linux distributions".into());
+    }
     let abi = root.join("abi").join(format!("openssl-{OPENSSL_SERIES}"));
     let version_file = fs::read_to_string(abi.join("VERSION.toml"))?;
     let version = toml_value(&version_file, "version").ok_or("VERSION.toml has no version")?;
@@ -73,13 +79,24 @@ pub fn run(args: &[String]) -> Result {
 
     // libcrypto: the whole implementation, Rust runtime included.
     println!("Building libcrypto...");
-    let native = build_archive(&root, "libcrypto")?;
+    let native = build_archive(&root, "libcrypto", profile.map(|p| p.feature))?;
     let archive = release.join("libcrypto.a");
-    let crypto = Shared::new(target, "libcrypto", major);
+    let mut crypto = Shared::new(target, "libcrypto", major);
+    let mut extra_objects = Vec::new();
+    if let Some(profile) = profile {
+        crypto.exports = format!(
+            "libs/libcrypto/exports/{}-{}.map",
+            target.configure, profile.name
+        );
+        if !profile.aliases.is_empty() {
+            extra_objects.push(alias_object(target, profile, &work)?);
+        }
+    }
     println!("Linking {}...", crypto.file);
     let inputs = Inputs::Archive {
         archive: archive.clone(),
         native: native.clone(),
+        extra: extra_objects,
     };
     link(&root, target, &crypto, &inputs, &lib_dir, major)?;
     symlink(&crypto.file, &lib_dir.join(&crypto.link))?;
@@ -88,7 +105,7 @@ pub fn run(args: &[String]) -> Result {
     // libssl: only the forwarders, so it carries no second copy of the Rust runtime, as a
     // shared library or as libssl.a next to libcrypto.a.
     println!("Building libssl...");
-    build_archive(&root, "libssl")?;
+    build_archive(&root, "libssl", None)?;
     let ssl = Shared::new(target, "libssl", major);
     let objects = forwarder_objects(
         &release.join("libssl.a"),
@@ -153,11 +170,15 @@ fn install_cli(root: &Path, release: &Path, dist: &Path) -> Result {
 
 /// Builds `rustyssl-<library>` as a release static archive and returns the system libraries
 /// the archive needs, as rustc reports them.
-fn build_archive(root: &Path, library: &str) -> Result<Vec<String>> {
+fn build_archive(root: &Path, library: &str, feature: Option<&str>) -> Result<Vec<String>> {
     let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
     let package = format!("rustyssl-{library}");
-    let output = Command::new(cargo)
-        .args(["rustc", "--release", "--color", "never", "-p", &package])
+    let mut cmd = Command::new(cargo);
+    cmd.args(["rustc", "--release", "--color", "never", "-p", &package]);
+    if let Some(feature) = feature {
+        cmd.args(["--features", feature]);
+    }
+    let output = cmd
         .args(["--", "--print", "native-static-libs"])
         .current_dir(root)
         .output()
@@ -263,6 +284,8 @@ enum Inputs {
     Archive {
         archive: PathBuf,
         native: Vec<String>,
+        /// Objects linked beside it: a profile's version aliases.
+        extra: Vec<PathBuf>,
     },
     /// libssl: the forwarder objects only, which need nothing but libcrypto.
     Objects(Vec<PathBuf>),
@@ -295,7 +318,7 @@ fn link(
             // from, so the dependencies are OpenSSL's (abi-check, metadata).
             .args(["-Wl,-dead_strip", "-Wl,-dead_strip_dylibs", "-Wl,-S"]);
         match inputs {
-            Inputs::Archive { archive, native } => {
+            Inputs::Archive { archive, native, .. } => {
                 cmd.arg(link_arg("-force_load,", archive));
                 // cc links libSystem itself; listing it again only draws a warning.
                 cmd.args(native.iter().filter(|l| *l != "-lSystem"));
@@ -314,8 +337,9 @@ fn link(
             // Every name in the script must be defined, and so must everything referenced.
             .args(["-Wl,--no-undefined-version", "-Wl,--no-undefined"]);
         match inputs {
-            Inputs::Archive { archive, .. } => {
-                cmd.arg("-Wl,--whole-archive")
+            Inputs::Archive { archive, extra, .. } => {
+                cmd.args(extra)
+                    .arg("-Wl,--whole-archive")
                     .arg(archive)
                     .arg("-Wl,--no-whole-archive");
             }
@@ -497,4 +521,38 @@ fn write_pkgconfig(dir: &Path, version: &str, private_libs: &[String]) -> Result
     fs::write(dir.join("libssl.pc"), libssl)?;
     fs::write(dir.join("openssl.pc"), openssl)?;
     Ok(())
+}
+
+/// Assembles a profile's version aliases: for each `(name, node)`, a local entry point that
+/// jumps to `name` (its default version), given the extra version `name@node` with `.symver`.
+/// A jump keeps every argument and return value as they are, whatever the prototype.
+fn alias_object(target: &Target, profile: &Profile, work: &Path) -> Result<PathBuf> {
+    let jump = match target.configure {
+        "linux-x86_64" => "jmp {name}@PLT",
+        "linux-aarch64" => "b {name}",
+        other => return Err(format!("no alias assembly for {other}").into()),
+    };
+    let mut asm = String::from(".text\n");
+    for (name, node) in profile.aliases {
+        let local = format!("rustyssl_{}_{name}", profile.name);
+        writeln!(
+            asm,
+            ".globl {local}\n.type {local}, @function\n{local}:\n    {}\n\
+             .size {local}, .-{local}\n.symver {local}, {name}@{node}",
+            jump.replace("{name}", name)
+        )?;
+    }
+    asm.push_str(".section .note.GNU-stack,\"\",@progbits\n");
+    let source = work.join(format!("{}-aliases.s", profile.name));
+    let object = work.join(format!("{}-aliases.o", profile.name));
+    fs::write(&source, asm)?;
+    let cc = std::env::var_os("CC").unwrap_or_else(|| "cc".into());
+    run_output(
+        Command::new(cc)
+            .args(["-c", "-fPIC"])
+            .arg(&source)
+            .arg("-o")
+            .arg(&object),
+    )?;
+    Ok(object)
 }

@@ -120,6 +120,21 @@ impl Static {
     }
 }
 
+#[cfg(feature = "fedora")]
+ffi_export! {
+    /// MD2 (the legacy provider's), in the Fedora profile: `legacy_md2.c`'s digest.
+    ///
+    /// # Safety
+    /// No preconditions.
+    pub unsafe extern "C" fn EVP_md2() -> *const EVP_MD
+    where failure = ptr::null(), library = ERR_LIB_EVP
+    {
+        use crate::lowlevel::hash::md2::MD2_DIGEST_LENGTH;
+        static DIGEST: Static = Static::new(rustyssl_abi::NID_md2, rustyssl_abi::NID_md2WithRSAEncryption, MD2_DIGEST_LENGTH, 0, MD2_DIGEST_LENGTH, fns::MD2);
+        DIGEST.get()
+    }
+}
+
 ffi_export! {
     /// MD4 (the legacy provider's).
     ///

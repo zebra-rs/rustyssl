@@ -56,6 +56,9 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
+      # The Fedora profile's extras (MD2, the SCTP functions), which the default build leaves out.
+      - run: cargo clippy -p rustyssl-libcrypto -p rustyssl-capi --features rustyssl-capi/fedora --all-targets -- -D warnings
+      - run: cargo test -p rustyssl-capi --features fedora --lib -- md2 sctp
       - name: C conformance tests (reference vs rustyssl)
         run: cargo xtask test-c
       - name: Differential tests (reference vs rustyssl)
@@ -84,6 +87,9 @@ jobs:
         run: cargo install --locked bindgen-cli --version 0.73.2
       - name: ABI conformance (symbols, metadata, signatures, layouts, constants, linking, 3.5 compatibility)
         run: cargo xtask abi-check
+      # Last: it rebuilds target/dist with the profile.
+      - name: The Fedora profile's exports (cargo xtask dist --profile fedora)
+        run: cargo xtask abi-check --profile fedora symbols metadata binary
 
   # Miri interprets one thread at a time, so the tests run in parallel jobs, each one Miri
   # process over a part of them chosen by test name; together the parts cover every test

@@ -1360,3 +1360,175 @@ mod tests {
         assert_eq!(one, two);
     }
 }
+
+/// MD2, which only the Fedora profile offers (Fedora's libcrypto exports it; upstream's default
+/// build, and so rustyssl's, doesn't). OpenSSL's headers declare it only without
+/// `OPENSSL_NO_MD2`, so its struct and constants aren't generated: they're `md2.h`'s.
+#[cfg(feature = "fedora")]
+pub(crate) mod md2 {
+    use core::ffi::{c_char, c_int, c_uchar, c_uint};
+    use core::ptr;
+
+    use rustyssl_abi::ERR_LIB_CRYPTO;
+    use rustyssl_crypto::lowlevel::hash::{MD2_BLOCK, Md2};
+
+    use super::super::StaticMd;
+    use crate::ffi::{bytes, ffi_export};
+    use crate::mem::cleanse;
+
+    /// `MD2_DIGEST_LENGTH` and `MD2_BLOCK` (`md2.h`).
+    pub(crate) const MD2_DIGEST_LENGTH: c_int = 16;
+
+    /// `MD2_CTX` (`md2.h`): `MD2_INT` is `unsigned int`.
+    #[repr(C)]
+    #[allow(non_camel_case_types)]
+    pub(crate) struct MD2_CTX {
+        num: c_uint,
+        data: [c_uchar; MD2_BLOCK],
+        cksm: [c_uint; MD2_BLOCK],
+        state: [c_uint; MD2_BLOCK],
+    }
+
+    const _: () = assert!(core::mem::size_of::<MD2_CTX>() == 4 + 16 + 64 + 64);
+
+    fn load(c: &MD2_CTX) -> Md2 {
+        Md2 { num: c.num, data: c.data, cksm: c.cksm, state: c.state }
+    }
+
+    fn store(c: &mut MD2_CTX, m: &Md2) {
+        c.num = m.num;
+        c.data = m.data;
+        c.cksm = m.cksm;
+        c.state = m.state;
+    }
+
+    ffi_export! {
+        /// `md2(int)`: the width of `MD2_INT`.
+        ///
+        /// # Safety
+        /// No preconditions.
+        pub unsafe extern "C" fn MD2_options() -> *const c_char
+        where failure = ptr::null(), library = ERR_LIB_CRYPTO
+        {
+            c"md2(int)".as_ptr()
+        }
+    }
+
+    ffi_export! {
+        /// Starts an MD2 context. Returns 1, or 0 for null.
+        ///
+        /// # Safety
+        /// `c` is null or valid for writes of an `MD2_CTX`.
+        pub unsafe extern "C" fn MD2_Init(c: *mut MD2_CTX) -> c_int
+        where failure = 0, library = ERR_LIB_CRYPTO
+        {
+            // SAFETY: the caller's struct; integers and octets, so any octets are valid values.
+            let Some(c) = (unsafe { c.as_mut() }) else { return 0 };
+            store(c, &Md2::default());
+            1
+        }
+    }
+
+    ffi_export! {
+        /// Absorbs `len` octets at `data`. Returns 1, or 0.
+        ///
+        /// # Safety
+        /// `c` is null or an `MD2_CTX`; `data` is null or holds `len` octets.
+        pub unsafe extern "C" fn MD2_Update(c: *mut MD2_CTX, data: *const c_uchar, len: usize) -> c_int
+        where failure = 0, library = ERR_LIB_CRYPTO
+        {
+            // SAFETY: the caller's guarantee.
+            let Some(c) = (unsafe { c.as_mut() }) else { return 0 };
+            // SAFETY: the caller's guarantee.
+            let Some(input) = (unsafe { bytes(data, len) }) else { return 0 };
+            let mut m = load(c);
+            if m.update(input).is_err() {
+                return 0;
+            }
+            store(c, &m);
+            1
+        }
+    }
+
+    ffi_export! {
+        /// Pads, absorbs the checksum and writes the digest to `md`; the context is cleared.
+        /// Returns 1, or 0.
+        ///
+        /// # Safety
+        /// `md` is null or has room for 16 octets; `c` is null or an `MD2_CTX`.
+        pub unsafe extern "C" fn MD2_Final(md: *mut c_uchar, c: *mut MD2_CTX) -> c_int
+        where failure = 0, library = ERR_LIB_CRYPTO
+        {
+            // SAFETY: the caller's guarantee.
+            let Some(c) = (unsafe { c.as_mut() }) else { return 0 };
+            if md.is_null() {
+                return 0;
+            }
+            let mut m = load(c);
+            let Ok(mut out) = m.finish() else { return 0 };
+            store(c, &m);
+            // SAFETY: the caller's room for 16 octets, and our digest.
+            unsafe { ptr::copy_nonoverlapping(out.as_ptr(), md, out.len()) };
+            // SAFETY: our digest.
+            unsafe { cleanse(out.as_mut_ptr().cast(), out.len()) };
+            1
+        }
+    }
+
+    static MD2_MD: StaticMd<{ MD2_BLOCK }> = StaticMd::new();
+
+    ffi_export! {
+        /// The MD2 of `n` octets at `d`, into `md` or a static buffer. Returns where it is, or
+        /// null.
+        ///
+        /// # Safety
+        /// `d` is null or holds `n` octets; `md` is null or has room for 16 octets.
+        pub unsafe extern "C" fn MD2(d: *const c_uchar, n: usize, md: *mut c_uchar) -> *mut c_uchar
+        where failure = ptr::null_mut(), library = ERR_LIB_CRYPTO
+        {
+            // SAFETY: the caller's guarantee.
+            let Some(input) = (unsafe { bytes(d, n) }) else { return ptr::null_mut() };
+            let mut m = Md2::default();
+            if m.update(input).is_err() {
+                return ptr::null_mut();
+            }
+            let Ok(mut out) = m.finish() else { return ptr::null_mut() };
+            let md = MD2_MD.or(md);
+            // SAFETY: the caller's room for 16 octets or the static buffer, and our digest.
+            unsafe { ptr::copy_nonoverlapping(out.as_ptr(), md, out.len()) };
+            // SAFETY: our digest.
+            unsafe { cleanse(out.as_mut_ptr().cast(), out.len()) };
+            md
+        }
+    }
+}
+
+#[cfg(all(test, feature = "fedora"))]
+mod md2_tests {
+    use super::md2::*;
+
+    fn hex(d: &[u8]) -> String {
+        d.iter().map(|b| format!("{b:02x}")).collect()
+    }
+
+    #[test]
+    fn md2_low_level_and_evp() {
+        let mut out = [0u8; 16];
+        // SAFETY: three octets and room for 16.
+        unsafe { MD2(b"abc".as_ptr(), 3, out.as_mut_ptr()) };
+        assert_eq!(hex(&out), "da853b0d3f88d99b30283a69e6ded6bb");
+        // SAFETY: an all-zero MD2_CTX is a valid value of its integers and octets.
+        let mut c: MD2_CTX = unsafe { core::mem::zeroed() };
+        // SAFETY: a live context, the message's octets, and room for 16.
+        unsafe {
+            assert_eq!(MD2_Init(&mut c), 1);
+            assert_eq!(MD2_Update(&mut c, b"message ".as_ptr(), 8), 1);
+            assert_eq!(MD2_Update(&mut c, b"digest".as_ptr(), 6), 1);
+            assert_eq!(MD2_Final(out.as_mut_ptr(), &mut c), 1);
+        }
+        assert_eq!(hex(&out), "ab4f496bfb2a530b219ff33031fe06b0");
+        // SAFETY: no preconditions.
+        let options = unsafe { core::ffi::CStr::from_ptr(MD2_options()) };
+        assert_eq!(options, c"md2(int)");
+    }
+}

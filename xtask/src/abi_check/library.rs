@@ -45,7 +45,18 @@ pub fn symbols(cx: &Context) -> Result<Outcome> {
     for library in LIBRARIES {
         let expected = cx.expected_exports(library);
         let public = cx.exports.get(library).cloned().unwrap_or_default();
-        let ours = exports(cx, &cx.shared(&cx.dist, library))?;
+        let (ours, aliases) = exports_and_aliases(cx, &cx.shared(&cx.dist, library))?;
+        let wanted: BTreeSet<(String, String)> = cx
+            .profile
+            .filter(|_| *library == "libcrypto")
+            .map(|p| p.aliases.iter().map(|(n, v)| ((*n).to_owned(), (*v).to_owned())).collect())
+            .unwrap_or_default();
+        for (name, node) in wanted.difference(&aliases) {
+            problems.push(format!("rustyssl's {library} doesn't export {name}@{node}"));
+        }
+        for (name, node) in aliases.difference(&wanted) {
+            problems.push(format!("rustyssl's {library} also exports {name}@{node}"));
+        }
         let theirs = exports(cx, &cx.shared(&cx.reference, library))?;
         // Whatever the reference exports beyond its list is the toolchain's doing, not ours.
         let toolchain: BTreeSet<&String> = theirs
@@ -115,14 +126,41 @@ fn differences(
     problems
 }
 
+/// The exported functions of a shared library at their default versions, and the non-default
+/// versions (`name@node`) of names it also exports by default: a profile's aliases.
+fn exports_and_aliases(cx: &Context, path: &Path) -> Result<(Exports, BTreeSet<(String, String)>)> {
+    let all = exports_listed(cx, path)?;
+    let mut exports = Exports::new();
+    let mut aliases = BTreeSet::new();
+    for (name, version, hidden) in all.iter().filter(|(_, _, hidden)| !*hidden) {
+        exports.insert(name.clone(), (version.clone(), *hidden));
+    }
+    for (name, version, hidden) in all {
+        if hidden && exports.contains_key(&name) {
+            aliases.insert((name, version));
+        } else if hidden {
+            exports.insert(name, (version, hidden));
+        }
+    }
+    Ok((exports, aliases))
+}
+
 /// The exported functions of a shared library.
 fn exports(cx: &Context, path: &Path) -> Result<Exports> {
+    Ok(exports_listed(cx, path)?
+        .into_iter()
+        .map(|(name, version, hidden)| (name, (version, hidden)))
+        .collect())
+}
+
+/// Every exported function of a shared library: (name, version, non-default).
+fn exports_listed(cx: &Context, path: &Path) -> Result<Vec<(String, String, bool)>> {
     if cx.apple() {
         let symbols = crate::dist::symbols(path, cx.target)?;
         return Ok(symbols
             .into_iter()
             .filter(|(defined, _)| *defined)
-            .map(|(_, name)| (name, (String::new(), false)))
+            .map(|(_, name)| (name, String::new(), false))
             .collect());
     }
     let library = read_elf(path)?;
@@ -131,7 +169,7 @@ fn exports(cx: &Context, path: &Path) -> Result<Exports> {
         .into_iter()
         // The linker defines an absolute symbol named after each version node.
         .filter(|e| !(e.absolute && e.version.as_deref() == Some(e.name.as_str())))
-        .map(|e| (e.name, (e.version.unwrap_or_default(), e.hidden)))
+        .map(|e| (e.name, e.version.unwrap_or_default(), e.hidden))
         .collect())
 }
 
