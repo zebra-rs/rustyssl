@@ -6270,6 +6270,44 @@ ported, and `cargo xtask dist` installs ours as `target/dist/bin/openssl` (decis
   internal ones); `speed`'s line-final number may print with a trailing space when the timer
   crosses a tick, which the timing mask now ignores.
 
+The CLI's gaps closed (2026-10-21, local, branch `cli-gaps`, macOS arm64):
+- **`ocsp -multi`, the request timeout and the index reload** (`HTTP_DAEMON`, as upstream
+  builds its apps on Unix): forked responders in a process group of their own, replaced as they
+  exit, until SIGINT or SIGTERM (`lib::http_server::spawn_loop`); a server's `-timeout` shuts a
+  slow connection down for reading (SIGALRM); the CA index is reloaded when its file changes.
+  Measured against the reference by hand (the reload, `-multi`'s log); the corpus runs an
+  `-multi` server (test-apps sends its process group SIGTERM after the client). New deviation:
+  a connection that closes, or times out, before its request line is dropped; upstream's
+  `ocsp` keeps reading the dead connection at full CPU and never accepts another (one
+  connect-and-close stops it), a live test on both libraries.
+- **`cmp` over TLS:** paired lines run `cmp -tls_used` against `s_server` with upstream's mock
+  TLS credentials in all five pairings: the host check and trust failing (compared in full), and
+  handshakes that succeed, with and without a client certificate (exit codes only: no TLS front
+  for the mock CMP server exists, and s_server's fixed non-CMP response races the request).
+- **`speed -mb` with `-async_jobs`:** ported with upstream's text, reached only where a
+  multi-block cipher exists (x86_64) and async jobs work, which rustyssl's `ASYNC_is_capable()`
+  of 0 (a recorded deviation) rules out; the corpus compares the failure.
+- **`engine` with an unknown ID**, and every `-engine`/`-provider` error and `info`'s
+  directories: compared in full, ENGINESDIR and MODULESDIR masked (also a line that is the
+  directory itself). `padlock` stays loaded by path (the reference installs its module).
+- **The key wraps', XTS's and the ETM ciphers' errors** now name upstream's provider functions
+  (`aes_wrap_cipher_internal`, `tdes_wrap_update`, `aes_xts_stream_update`, `sm4_xts_cipher`,
+  `hwaes_cbc_hmac_sha256_etm`, ...), not `update`/`cipher`: `tests/c/cipher_err_functions.c`.
+- **`-starttls`:** a scripted front plays each protocol's plaintext exchange before the
+  s_server (`{starttls:NAME}`, `xtask/src/test_apps/starttls.rs`), so every protocol runs to a
+  TLS session in all five pairings, plus servers without the capability and servers that
+  refuse. It found the POP3 greeting's printing (upstream prints the greeting cut to the STLS
+  reply's length, reading past it into uninitialized octets when the reply is the longer: a new
+  deviation, ours never reads past it).
+- **test-apps:** `~` lines (plain and paired) compare the exit status, success or failure.
+- **Left, by design:** session tickets carry rustyssl's own session encoding inside OpenSSL's
+  ticket framing (`rustyssl-tls` can't produce `i2d_SSL_SESSION`'s DER, which is capi's), so
+  their length differs when a session's contents vary (those lines keep `-no_ticket`); the TLS
+  core makes its security-callback checks in another order and number
+  (`-security_debug_verbose` only has to succeed). Both are TLS-core design, not CLI, matters.
+  x86_64 Linux runs of test-apps and the recipes with our tool are still to do (CI runs the
+  gates there).
+
 ## Phase 12: Hardening, performance, release 1.0 → M7
 
 - [ ] **12.1 Performance:** benchmark against the reference (per TEST_PLAN L10). Close the gaps

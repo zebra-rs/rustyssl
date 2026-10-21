@@ -4015,6 +4015,7 @@ impl Cmp {
                 Some(&mut keep_alive),
                 prog,
                 false,
+                0,
             );
             ret = r.ret;
             'next: {

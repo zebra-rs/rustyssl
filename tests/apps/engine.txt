@@ -1,6 +1,8 @@
 # `openssl engine` (cargo xtask test-apps runs each line with upstream's tool on the reference,
-# then with ours on rustyssl and on the reference). Engines found through ENGINESDIR (padlock,
-# an unknown id) name a directory that differs by library, so they are loaded by path instead.
+# then with ours on rustyssl and on the reference). An unknown id is looked for in ENGINESDIR,
+# which differs by library and is masked (with dlopen's message and the libraries' own
+# directory). padlock is loaded by path: the reference installs its module in ENGINESDIR (where
+# it then fails to initialize), and rustyssl's ENGINESDIR has no modules.
 engine -help
 engine -h
 engine
@@ -16,6 +18,9 @@ engine -vvvv -v
 engine -c -t -vvvv
 engine rdrand
 engine rdrand -c -tt -vvvv
+engine nosuchengine
+engine -t nosuchengine
+engine -c -vvv nosuchengine dynamic
 engine dynamic
 engine dynamic -c -t -vv
 engine dynamic rdrand -c

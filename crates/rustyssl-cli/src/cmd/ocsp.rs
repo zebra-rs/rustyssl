@@ -30,11 +30,24 @@ use crate::lib::apps::{
 use crate::lib::apps_http::app_http_post_asn1;
 use crate::lib::ca_db::{self, field};
 use crate::lib::http_server::{
-    http_server_get_asn1_req, http_server_init, http_server_send_asn1_resp, level,
-    trace_log_message,
+    http_server_get_asn1_req, http_server_init, http_server_send_asn1_resp, level, n_responders,
+    set_n_responders, spawn_loop, trace_log_message,
 };
 use crate::lib::opt::{self, Parser, eprintf, format};
 use crate::lib::{app_libctx, io};
+
+/// `index_changed`: whether the index file's `stat` differs from when it was read.
+fn index_changed(rdb: &ca_db::CaDb) -> bool {
+    // A stat that fails now leaves the index as it is.
+    let changed = matches!(
+        (ca_db::file_stat(&rdb.dbfname), rdb.dbst),
+        (Some(now), Some(then)) if now != then
+    );
+    if changed {
+        rustyssl_ossl::os::syslog_info("index file changed, reloading");
+    }
+    changed
+}
 
 /// `MAX_VALIDITY_PERIOD`: the default `-validity_period`, in seconds.
 const MAX_VALIDITY_PERIOD: i64 = 5 * 60;
@@ -332,8 +345,7 @@ fn run(argv: &[String]) -> i32 {
                 }
                 trailing_md = true;
             }
-            // Without HTTP_DAEMON (see the module's note), -multi is ignored.
-            Opt::MULTI => {}
+            Opt::MULTI => set_n_responders(usize::try_from(atoi(p.arg())).unwrap_or(0)),
             Opt::OPT_PROV(o) => {
                 if !app_libctx::opt_provider(o, p.arg()) {
                     return 1;
@@ -449,12 +461,18 @@ fn run(argv: &[String]) -> i32 {
     let mut rdb = None;
     if let Some(f) = &ridx_filename {
         match ca_db::load_index(f, true).filter(ca_db::index_index) {
-            Some(db) => rdb = Some(db.db),
+            Some(db) => rdb = Some(db),
             None => {
                 eprintf!("Problem with index file: {f} (could not load/parse file)\n");
                 return 1;
             }
         }
+    }
+    if n_responders() != 0 && acbio.is_some() {
+        spawn_loop(&prog);
+    }
+    if acbio.is_some() && req_timeout > 0 {
+        rustyssl_ossl::os::catch_alarm_socket_timeout();
     }
     if acbio.is_some() {
         trace_log_message(&prog, level::INFO, "waiting for OCSP client connections...");
@@ -474,6 +492,21 @@ fn run(argv: &[String]) -> i32 {
         resp = None;
         let mut skip_to_done = false;
         if let Some(ac) = &acbio {
+            if let Some(db) = &rdb
+                && index_changed(db)
+            {
+                match ca_db::load_index(&db.dbfname, true).filter(ca_db::index_index) {
+                    Some(newdb) => rdb = Some(newdb),
+                    None => {
+                        let f = ridx_filename.as_deref().unwrap_or_default();
+                        trace_log_message(
+                            &prog,
+                            level::ERR,
+                            &format!("error reloading updated index: {f}"),
+                        );
+                    }
+                }
+            }
             req = None;
             let r = http_server_get_asn1_req(
                 |b| OcspRequest::read_der(Some(b)),
@@ -483,6 +516,7 @@ fn run(argv: &[String]) -> i32 {
                 None,
                 &prog,
                 true,
+                i32::try_from(req_timeout).unwrap_or(i32::MAX),
             );
             if r.ret == 0 {
                 continue;
@@ -571,7 +605,9 @@ fn run(argv: &[String]) -> i32 {
                     r.write_der(&derbio);
                 }
             }
-            if let (Some(db), Some(r), Some(rc), Some(rk)) = (&rdb, &req, &rsigner, &rkey) {
+            if let (Some(db), Some(r), Some(rc), Some(rk)) =
+                (rdb.as_ref().map(|d| &d.db), &req, &rsigner, &rkey)
+            {
                 let rsp = Responder {
                     db,
                     ca: &rca_list,

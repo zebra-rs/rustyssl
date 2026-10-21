@@ -21,6 +21,12 @@ pub fn write_file(name: &str) -> i32 {
     unsafe { ffi::RAND_write_file(n.as_ptr()) }
 }
 
+/// `RAND_poll()`.
+pub fn poll() -> bool {
+    // SAFETY: no arguments.
+    unsafe { ffi::RAND_poll() > 0 }
+}
+
 /// `RAND_status()`.
 pub fn status() -> bool {
     // SAFETY: no arguments.

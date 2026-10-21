@@ -1,14 +1,16 @@
 //! `apps/lib/http_server.c`, the very basic HTTP server of `ocsp` and `cmp`, with the part of
 //! `apps/lib/log.c` it logs through (`log_set_verbosity`, `trace_log_message`).
 //!
-//! As on upstream's platforms without `HTTP_DAEMON`, there are no forked responders (`ocsp
-//! -multi` is accepted and ignored) and no alarm-based read timeout.
+//! With `HTTP_DAEMON`, as upstream builds it on Unix: forked responders (`ocsp -multi`,
+//! [`spawn_loop`]) and the alarm-based read timeout. Its log messages go to standard error even
+//! then: `log.c` doesn't include `http_server.h`, so its syslog branch is never compiled.
 
 use std::cell::Cell;
 use std::io::Write;
 
 use rustyssl_ossl::Bio;
 use rustyssl_ossl::http;
+use rustyssl_ossl::os;
 
 use super::io;
 
@@ -28,6 +30,135 @@ pub mod level {
 thread_local! {
     /// `verbosity` of `log.c`.
     static VERBOSITY: Cell<i32> = const { Cell::new(level::INFO) };
+    /// `n_responders` of `http_server.c`: the responder processes to run (set by `ocsp`).
+    static N_RESPONDERS: Cell<usize> = const { Cell::new(0) };
+}
+
+/// Sets `n_responders` (`ocsp -multi`).
+pub fn set_n_responders(n: usize) {
+    N_RESPONDERS.with(|c| c.set(n));
+}
+
+/// `n_responders`.
+pub fn n_responders() -> usize {
+    N_RESPONDERS.with(Cell::get)
+}
+
+/// `killall`: SIGTERM to each child left, a second's pause, and the process's exit.
+fn killall(ret: i32, kidpids: &[i32]) -> ! {
+    for &pid in kidpids {
+        if pid != 0 {
+            os::terminate(pid);
+        }
+    }
+    rustyssl_ossl::ssl::sleep_ms(1000);
+    crate::exit(ret)
+}
+
+/// `spawn_loop`: keeps up to `n_responders` child processes running, each returning from here
+/// to serve; the parent loops until a termination signal, then ends the children and exits.
+pub fn spawn_loop(prog: &str) {
+    let n = n_responders();
+    if let Err(e) = os::setpgid_self() {
+        let e = os::strerror(e);
+        trace_log_message(
+            prog,
+            level::CRIT,
+            &format!("error detaching from parent process group: {e}"),
+        );
+        crate::exit(1);
+    }
+    let mut kidpids = vec![0i32; n];
+    let mut procs = 0usize;
+    os::catch_termination();
+    while os::termination_signal() == 0 {
+        // Wait for a child to replace when at the limit; slow down if one exited abnormally
+        // or waitpid failed.
+        while os::termination_signal() == 0 && procs >= n {
+            match os::waitpid_any() {
+                Ok(w) => {
+                    match kidpids.iter_mut().take(procs).find(|p| **p == w.pid) {
+                        Some(slot) => {
+                            *slot = 0;
+                            procs -= 1;
+                        }
+                        None => {
+                            trace_log_message(
+                                prog,
+                                level::CRIT,
+                                &format!(
+                                    "internal error: no matching child slot for pid: {}",
+                                    w.pid
+                                ),
+                            );
+                            killall(1, &kidpids);
+                        }
+                    }
+                    if w.status != 0 {
+                        match w.how {
+                            os::ChildStatus::Exited(code) => trace_log_message(
+                                prog,
+                                level::WARNING,
+                                &format!("child process: {}, exit status: {code}", w.pid),
+                            ),
+                            os::ChildStatus::Signaled(sig) => {
+                                let dumped = if w.core_dumped { " (core dumped)" } else { "" };
+                                trace_log_message(
+                                    prog,
+                                    level::WARNING,
+                                    &format!("child process: {}, term signal {sig}{dumped}", w.pid),
+                                );
+                            }
+                            os::ChildStatus::Other => {}
+                        }
+                        rustyssl_ossl::ssl::sleep_ms(1000);
+                    }
+                    break;
+                }
+                Err(os::EINTR) => {}
+                Err(e) => {
+                    let e = os::strerror(e);
+                    trace_log_message(prog, level::CRIT, &format!("waitpid() failed: {e}"));
+                    killall(1, &kidpids);
+                }
+            }
+        }
+        if os::termination_signal() != 0 {
+            break;
+        }
+        if let Some(b) = io::bio_out() {
+            b.flush();
+        }
+        match os::fork() {
+            // System critically low on memory: pause and try again later.
+            Err(_) => rustyssl_ossl::ssl::sleep_ms(30000),
+            Ok(os::Fork::Child) => {
+                os::default_termination();
+                if os::termination_signal() != 0 {
+                    crate::exit(0);
+                }
+                if !rustyssl_ossl::rand::poll() {
+                    trace_log_message(prog, level::CRIT, "RAND_poll() failed");
+                    crate::exit(1);
+                }
+                return;
+            }
+            Ok(os::Fork::Parent(pid)) => match kidpids.iter_mut().find(|p| **p == 0) {
+                Some(slot) => {
+                    *slot = pid;
+                    procs += 1;
+                }
+                None => {
+                    trace_log_message(prog, level::CRIT, "internal error: no free child slots");
+                    killall(1, &kidpids);
+                }
+            },
+        }
+    }
+    // The loop above only ends on a termination signal.
+    let sig = os::termination_signal();
+    trace_log_message(prog, level::INFO, &format!("terminating on signal: {sig}"));
+    killall(0, &kidpids);
 }
 
 /// `log_set_verbosity`.
@@ -167,7 +298,9 @@ pub struct Request<T> {
 }
 
 /// `http_server_get_asn1_req`: the next request on `cbio` (a new connection when `None`),
-/// its DER parsed by `parse`. A request that fails gets a 400 (or 500) response here.
+/// its DER parsed by `parse`. A request that fails gets a 400 (or 500) response here. With a
+/// `timeout` (seconds; the caller has set [`os::catch_alarm_socket_timeout`]), an alarm shuts
+/// the connection down for reading if its request line and headers take longer.
 #[allow(clippy::too_many_arguments)]
 pub fn http_server_get_asn1_req<T>(
     parse: impl FnOnce(&Bio) -> Option<T>,
@@ -177,6 +310,39 @@ pub fn http_server_get_asn1_req<T>(
     found_keep_alive: Option<&mut bool>,
     prog: &str,
     accept_get: bool,
+    timeout: i32,
+) -> Request<T> {
+    let mut armed = false;
+    let r = get_asn1_req(
+        parse,
+        want_path,
+        pcbio,
+        acbio,
+        found_keep_alive,
+        prog,
+        accept_get,
+        timeout,
+        &mut armed,
+    );
+    if armed {
+        os::alarm(0);
+    }
+    os::set_alarm_socket(-1);
+    r
+}
+
+/// [`http_server_get_asn1_req`]'s work; `armed` says whether the alarm is still pending.
+#[allow(clippy::too_many_arguments)]
+fn get_asn1_req<T>(
+    parse: impl FnOnce(&Bio) -> Option<T>,
+    want_path: bool,
+    pcbio: &mut Option<Bio>,
+    acbio: &Bio,
+    found_keep_alive: Option<&mut bool>,
+    prog: &str,
+    accept_get: bool,
+    timeout: i32,
+    armed: &mut bool,
 ) -> Request<T> {
     let mut out = Request {
         ret: 0,
@@ -207,6 +373,13 @@ pub fn http_server_get_asn1_req<T>(
         out.ret = -1;
         return out;
     };
+    if let Ok(secs) = u32::try_from(timeout)
+        && secs > 0
+    {
+        os::set_alarm_socket(http::bio_fd(cbio));
+        os::alarm(secs);
+        *armed = true;
+    }
     let bad = |cbio: &Bio| {
         let _ = http_server_send_status(prog, cbio, 400, "Bad Request");
     };
@@ -214,6 +387,10 @@ pub fn http_server_get_asn1_req<T>(
     // The request line.
     let (len, reqbuf) = cbio.gets(2048);
     if len == 0 {
+        // A connection closed (or timed out) before its request line is dropped here, where
+        // upstream keeps it: its `ocsp` would then read the dead connection again and again,
+        // spinning without ever accepting another (docs/DEVIATIONS.md). `cmp` drops it itself.
+        *pcbio = None;
         return out;
     }
     out.ret = 1;
@@ -382,6 +559,11 @@ pub fn http_server_get_asn1_req<T>(
     if let Some(k) = found_keep_alive {
         *k = keep_alive;
     }
+    // The alarm is cleared before the client socket is closed.
+    if *armed {
+        os::alarm(0);
+        *armed = false;
+    }
 
     // The request's content.
     let req = parse(getbio.as_ref().unwrap_or(cbio));
@@ -474,6 +656,31 @@ mod tests {
         );
         assert_eq!(chop_eol(b"x\ny"), Some(&b"x"[..]));
         assert_eq!(chop_eol(b"x\r"), None);
+    }
+
+    /// A connection that closes before its request line is dropped, and the next one is
+    /// served (upstream's `ocsp` spins on the dead one instead).
+    #[test]
+    fn live_closed_connection_dropped() {
+        if std::env::var_os("RUSTYSSL_CLI_LIVE").is_none() {
+            return;
+        }
+        let acbio = http::accept_bio("0").ok().unwrap();
+        let (_, port) = http::sock_info_address(http::bio_fd(&acbio));
+        let port: u16 = port.unwrap().parse().unwrap();
+        drop(std::net::TcpStream::connect(("127.0.0.1", port)).unwrap());
+        let mut cbio = None;
+        let parse = |_: &Bio| Some(());
+        let r = http_server_get_asn1_req(parse, false, &mut cbio, &acbio, None, "t", true, 0);
+        assert_eq!(r.ret, 0);
+        assert!(cbio.is_none());
+        // The next connection's request is read.
+        let mut client = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
+        client.write_all(b"POST / HTTP/1.0\r\n\r\n").unwrap();
+        let r = io::muted(|| {
+            http_server_get_asn1_req(parse, false, &mut cbio, &acbio, None, "t", true, 0)
+        });
+        assert_eq!((r.ret, r.req), (1, Some(())));
     }
 
     #[test]

@@ -13,19 +13,21 @@
 //! Every run must print the same and exit the same as (1), after masking what differs by
 //! design: the library's version metadata (`+rustyssl...`), the directories it was built with
 //! (OPENSSLDIR, ENGINESDIR, MODULESDIR, the libraries' own), errors' thread id and file and
-//! line, dlopen's message, and every `PID=n`.
+//! line, dlopen's message, every `PID=n`, and `ocsp -multi`'s `child process: n`.
 //!
 //! In a line, `{bin}` is 100,000 octets of fixed data, `{txt}` a line of text, `{dir}` the work
 //! directory, `{src}` the reference's source tree (its `test/certs/`, ...), and `{tests}`
 //! `tests/apps/`; a final `< file` gives the command its standard input (otherwise empty).
 //!
 //! A line may start with these prefixes, in any order:
-//! - `~`: only success is compared (random output, timings);
+//! - `~`: only the exit status (success or failure) is compared (random output, timings, and
+//!   failures whose text differs by a recorded deviation);
 //! - `%`: compared with its numbers masked, and the lines naming the library's build
 //!   (`built on:`, `compiler:`, `CPUINFO:`) (`speed`);
 //! - `&`: a server (`ocsp -port`, `cmp -port`): it starts in the background, the next line runs
 //!   once it has printed its `ACCEPT` line, and then both outputs are compared (the server must
-//!   exit by itself, as with `-nrequest 1`);
+//!   exit by itself, as with `-nrequest 1`; an `ocsp -multi` server, which runs until a signal,
+//!   gets `SIGTERM` in its process group half a second after the client ends);
 //! - `^`: the times within a few days of now (a reply made now) are masked.
 //!
 //! `{fresh:NAME}` in an argument is `fresh/NAME` in the work directory, a pristine copy of the
@@ -62,6 +64,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 mod pair;
+mod starttls;
 
 use crate::dist::CLI_NAME;
 use crate::test_c::{LOADER_PATH, prepare};
@@ -146,6 +149,10 @@ fn masked(text: &str) -> String {
                 }
             }
             for (dir, name) in OPENSSLDIRS.get().into_iter().flatten() {
+                // A line that is the directory itself (`info -enginesdir`) has no `/` after it.
+                if l == dir.trim_end_matches('/') {
+                    l = name.trim_end_matches('/').to_owned();
+                }
                 l = l.replace(dir.as_str(), name);
             }
             l
@@ -208,13 +215,19 @@ fn mask_apps_line(line: &str) -> String {
     out
 }
 
-/// `PID=<digits>` as `PID=PID` (a server's `ACCEPT` line).
+/// `PID=<digits>` as `PID=PID` (a server's `ACCEPT` line), and the process ID of an `ocsp
+/// -multi` responder's log (`child process: <digits>,`) as `PID`.
 fn mask_pid(line: &str) -> String {
+    mask_digits_after(&mask_digits_after(line, "PID="), "child process: ")
+}
+
+/// The digits after each `marker` in `line` as `PID`.
+fn mask_digits_after(line: &str, marker: &str) -> String {
     let mut out = String::new();
     let mut rest = line;
-    while let Some((before, after)) = rest.split_once("PID=") {
+    while let Some((before, after)) = rest.split_once(marker) {
         out.push_str(before);
-        out.push_str("PID=");
+        out.push_str(marker);
         let n = after.bytes().take_while(u8::is_ascii_digit).count();
         if n > 0 {
             out.push_str("PID");
@@ -658,7 +671,7 @@ fn check(
         let got = run_line(setup, line, tool, lib)?;
         let verdict = if line.compare {
             compare(&expected, &got, label, line.timings, line.times)
-        } else if expected.ok && got.ok {
+        } else if expected.ok == got.ok {
             Ok(())
         } else {
             Err(format!(
@@ -732,6 +745,14 @@ fn run_pair(
         }
     }
     let got = run_tool(tool, lib, &client.args, client.stdin.as_deref(), work)?;
+    if server.args.iter().any(|a| a == "-multi") {
+        // Its responders run in the process group `spawn_loop` made (the server's process ID);
+        // the parent, in waitpid (restarted after a signal), ends once a child has.
+        std::thread::sleep(Duration::from_millis(500));
+        let _ = Command::new("kill")
+            .args(["-TERM", "--", &format!("-{}", child.id())])
+            .status();
+    }
     let deadline = Instant::now() + Duration::from_secs(20);
     let status = loop {
         if let Some(s) = child.try_wait()? {
@@ -1122,6 +1143,10 @@ mod tests {
         assert_eq!(
             masked("ACCEPT [::]:8888 PID=4242"),
             "ACCEPT [::]:8888 PID=PID"
+        );
+        assert_eq!(
+            masked("ocsp: child process: 4242, term signal 15"),
+            "ocsp: child process: PID, term signal 15"
         );
         assert_eq!(
             masked("opt_str:apps/cmp.c:2853:CMP warning: x"),

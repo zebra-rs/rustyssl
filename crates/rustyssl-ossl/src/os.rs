@@ -1,8 +1,9 @@
 //! What the commands need from the operating system beyond `std`, as upstream's apps use it:
-//! `SIGALRM` timers, process CPU times, `fork` with a pipe, `wait`, and `mlock` (Unix).
+//! `SIGALRM` timers, process CPU times, `fork` (with a pipe, or for `http_server.c`'s
+//! responders), `wait`, signals, and `mlock` (Unix).
 
 use core::ffi::c_int;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 
 /// `run` of `speed.c`: set when a timed run starts, cleared by `SIGALRM`.
 static RUNNING: AtomicBool = AtomicBool::new(false);
@@ -181,4 +182,152 @@ pub fn select_read(fds: &[c_int]) -> Result<Vec<bool>, i32> {
 /// `FD_SETSIZE`.
 pub fn fd_setsize() -> c_int {
     c_int::try_from(libc::FD_SETSIZE).unwrap_or(c_int::MAX)
+}
+
+/// What [`fork`] returned in this process.
+pub enum Fork {
+    /// The child.
+    Child,
+    /// The parent, with the child's process ID.
+    Parent(i32),
+}
+
+/// `fork()`: `Err(errno)` when it fails.
+pub fn fork() -> Result<Fork, i32> {
+    // SAFETY: fork(2); the program has no other threads, so the child's state is consistent.
+    match unsafe { libc::fork() } {
+        -1 => Err(errno()),
+        0 => Ok(Fork::Child),
+        pid => Ok(Fork::Parent(pid)),
+    }
+}
+
+/// `setpgid(0, 0)`: a process group of its own; `Err(errno)` when it fails.
+pub fn setpgid_self() -> Result<(), i32> {
+    // SAFETY: no pointers.
+    if unsafe { libc::setpgid(0, 0) } != 0 {
+        return Err(errno());
+    }
+    Ok(())
+}
+
+/// How [`waitpid_any`] found a child: its process ID, its raw status, and how it ended.
+pub struct Waited {
+    pub pid: i32,
+    pub status: i32,
+    pub how: ChildStatus,
+    /// `WCOREDUMP(status)`.
+    pub core_dumped: bool,
+}
+
+/// `EINTR`: a call interrupted by a signal.
+pub const EINTR: i32 = libc::EINTR;
+
+/// `waitpid(-1, &status, 0)`: `Err(errno)` when it fails (`EINTR` included).
+pub fn waitpid_any() -> Result<Waited, i32> {
+    let mut status: c_int = 0;
+    // SAFETY: status is a valid out-parameter.
+    let pid = unsafe { libc::waitpid(-1, &mut status, 0) };
+    if pid <= 0 {
+        return Err(errno());
+    }
+    let how = if libc::WIFEXITED(status) {
+        ChildStatus::Exited(libc::WEXITSTATUS(status))
+    } else if libc::WIFSIGNALED(status) {
+        ChildStatus::Signaled(libc::WTERMSIG(status))
+    } else {
+        ChildStatus::Other
+    };
+    Ok(Waited {
+        pid,
+        status,
+        how,
+        core_dumped: libc::WIFSIGNALED(status) && libc::WCOREDUMP(status),
+    })
+}
+
+/// `kill(pid, SIGTERM)`, whose result upstream ignores.
+pub fn terminate(pid: i32) {
+    // SAFETY: no pointers.
+    unsafe { libc::kill(pid, libc::SIGTERM) };
+}
+
+/// `termsig` of `http_server.c`: the termination signal [`catch_termination`]'s handler saw.
+static TERMSIG: AtomicI32 = AtomicI32::new(0);
+
+extern "C" fn noteterm(sig: c_int) {
+    // Async-signal-safe: an atomic store.
+    TERMSIG.store(sig, Ordering::SeqCst);
+}
+
+/// `signal(SIGINT, noteterm)` and `signal(SIGTERM, noteterm)`: from now on those signals are
+/// noted in [`termination_signal`].
+pub fn catch_termination() {
+    for sig in [libc::SIGINT, libc::SIGTERM] {
+        // SAFETY: the handler only does async-signal-safe work.
+        unsafe { libc::signal(sig, noteterm as *const () as libc::sighandler_t) };
+    }
+}
+
+/// `signal(SIGINT, SIG_DFL)` and `signal(SIGTERM, SIG_DFL)`.
+pub fn default_termination() {
+    for sig in [libc::SIGINT, libc::SIGTERM] {
+        // SAFETY: restoring the default disposition.
+        unsafe { libc::signal(sig, libc::SIG_DFL) };
+    }
+}
+
+/// The signal [`catch_termination`]'s handler noted, or 0.
+pub fn termination_signal() -> i32 {
+    TERMSIG.load(Ordering::SeqCst)
+}
+
+/// `acfd` of `http_server.c`: the client socket an alarm shuts down, or -1.
+static ACFD: AtomicI32 = AtomicI32::new(-1);
+
+extern "C" fn socket_timeout(_sig: c_int) {
+    let fd = ACFD.load(Ordering::SeqCst);
+    if fd != -1 {
+        // SAFETY: shutdown(2) is async-signal-safe; a stale descriptor only fails.
+        unsafe { libc::shutdown(fd, libc::SHUT_RD) };
+    }
+}
+
+/// `signal(SIGALRM, socket_timeout)`: from now on an alarm shuts down reading on the socket
+/// [`set_alarm_socket`] names.
+pub fn catch_alarm_socket_timeout() {
+    // SAFETY: the handler only does async-signal-safe work.
+    unsafe {
+        libc::signal(
+            libc::SIGALRM,
+            socket_timeout as *const () as libc::sighandler_t,
+        )
+    };
+}
+
+/// Sets `acfd` (-1 for none).
+pub fn set_alarm_socket(fd: c_int) {
+    ACFD.store(fd, Ordering::SeqCst);
+}
+
+/// `strerror(errnum)`.
+pub fn strerror(errnum: i32) -> String {
+    // SAFETY: strerror takes any number.
+    let p = unsafe { libc::strerror(errnum) };
+    if p.is_null() {
+        return String::new();
+    }
+    // SAFETY: a valid NUL-terminated string, read before any other call could replace it.
+    unsafe { core::ffi::CStr::from_ptr(p) }
+        .to_string_lossy()
+        .into_owned()
+}
+
+/// `syslog(LOG_INFO, "%s", msg)`.
+pub fn syslog_info(msg: &str) {
+    let Ok(m) = std::ffi::CString::new(msg) else {
+        return;
+    };
+    // SAFETY: a constant format taking one NUL-terminated string, which m is.
+    unsafe { libc::syslog(libc::LOG_INFO, c"%s".as_ptr(), m.as_ptr()) };
 }

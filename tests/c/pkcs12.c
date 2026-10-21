@@ -1432,7 +1432,9 @@ int main(void)
         check(q == NULL, "PKCS12_init of SignedData");
     }
     {
-        PKCS7 *p7 = PKCS12_pack_p7encdata(NID_pbe_WithSHA1And3_Key_TripleDES_CBC, "pw", -1, NULL, 0, 1000, bags);
+        /* A fixed salt: with a random one, the wrong password below gives valid CBC padding
+         * about once in 256 runs, and its errors differ (an ASN.1 error, not a bad decrypt). */
+        PKCS7 *p7 = PKCS12_pack_p7encdata(NID_pbe_WithSHA1And3_Key_TripleDES_CBC, "pw", -1, (unsigned char *)salt8, 8, 1000, bags);
         PKCS7 *p7b = PKCS12_pack_p7encdata_ex(NID_aes_256_cbc, "pw", 2, (unsigned char *)salt8, 8, 1000, bags, NULL, NULL);
         STACK_OF(PKCS12_SAFEBAG) *back = PKCS12_unpack_p7encdata(p7, "pw", -1);
         STACK_OF(PKCS12_SAFEBAG) *back2 = PKCS12_unpack_p7encdata(p7b, "pw", 2);

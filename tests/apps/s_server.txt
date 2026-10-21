@@ -9,10 +9,12 @@
 # session tickets differ in length from OpenSSL's DER when a session's contents vary, so those
 # lines run with -no_ticket. -security_debug_verbose only has to succeed: rustyssl's TLS core
 # makes its security checks in another order. -engine and -provider errors name the build's
-# directories and aren't compared.
+# directories, which are masked.
 s_server -help
 s_server -bogus
 s_server extra
+s_server -engine nosuch -accept 127.0.0.1:0 -naccept 1
+s_server -provider nosuch -accept 127.0.0.1:0 -naccept 1
 s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -verify_return_error -ign_eof < {tests}/s_server/close.txt
 s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -rev -tls1_2 || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -verify_return_error -ign_eof < {tests}/s_server/close.txt
 s_server -accept 127.0.0.1:0 -naccept 1 -cert {src}/test/certs/servercert.pem -key {src}/test/certs/serverkey.pem -www || s_client -connect 127.0.0.1:{port} -CAfile {src}/test/certs/rootcert.pem -verify_return_error -ign_eof -quiet < {tests}/s_server/get.txt

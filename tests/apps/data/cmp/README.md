@@ -9,3 +9,6 @@ Its paths are relative to test-apps' work directory (`target/xtask/test-apps`), 
 reference's source tree is `../../ref/openssl-<version>/src`; the credentials are upstream's,
 in `test/recipes/80-test_cmp_http_data/Mock/`. Update the version in `M` when the vendored
 release changes.
+
+`text-response.txt` is a fixed HTTP response (CRLF line ends) that isn't CMP: `s_server` sends it
+from its standard input to `cmp`'s TLS client in the TLS lines.

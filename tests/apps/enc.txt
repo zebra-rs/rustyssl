@@ -137,7 +137,7 @@ enc -aes-128-cbc -K 00112233445566778899aabbccddeeff -iv 00112233445566778899aab
 enc -aes-128-cbc -K 00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -in /nonexistent/x
 ~enc -aes-128-cbc -K 00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -nosalt -debug -in {txt} -a
 ~enc -debug -base64 -in {txt}
-~enc -engine nosuch -base64 -in {txt}
+enc -engine nosuch -base64 -in {txt}
 enc -z -base64 -in {txt}
 enc -rand {bin} -base64 -in {txt}
 enc -rand /nonexistent/rand -base64 -in {txt}

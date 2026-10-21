@@ -123,6 +123,10 @@ ocsp -index {tests}/data/ocsp/index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem 
 ^ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -no_nonce -host 127.0.0.1:18832 -path /ocsp -header Host=localhost -header X-Test=1 -timeout 10 -CAfile {src}/test/ocsp-tests/root-cert.pem -no-CApath -no-CAstore
 &ocsp -index {tests}/data/ocsp/index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -CA {src}/test/ocsp-tests/intermediate-cert.pem -port 18833 -nrequest 1 -ndays 1
 ^ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -url http://127.0.0.1:18833/some/path -noverify -respout {dir}/s3.der
+# Two forked responders (-multi): one answers, exits after its request and is replaced; the
+# process group's SIGTERM ends them.
+&ocsp -index {tests}/data/ocsp/index.txt -rsigner {src}/test/ocsp-tests/ocsp.pem -CA {src}/test/ocsp-tests/intermediate-cert.pem -port 18835 -nrequest 1 -multi 2
+^ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -serial 2 -url http://127.0.0.1:18835 -CAfile {src}/test/ocsp-tests/root-cert.pem -no-CApath -no-CAstore
 ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -url http://127.0.0.1:18839 -noverify
 ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -url nonsense://x
 ocsp -issuer {src}/test/ocsp-tests/intermediate-cert.pem -cert {src}/test/ocsp-tests/server-cert.pem -url https://127.0.0.1:18839 -noverify -proxy 127.0.0.1:18839 -no_proxy localhost

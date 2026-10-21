@@ -171,13 +171,34 @@ pub mod db_type {
     pub const SUSP: u8 = b'S';
 }
 
-/// `CA_DB` of `apps.h`: the index, its attributes, its file name, and when it was last
-/// changed (`dbst`, for `ocsp`'s reloading).
+/// `CA_DB` of `apps.h`: the index, its attributes, its file name, and its file's state when
+/// it was read (`dbst`, for `ocsp`'s reloading).
 pub struct CaDb {
     pub db: rustyssl_ossl::txt_db::TxtDb,
     pub unique_subject: bool,
     pub dbfname: String,
-    pub modified: Option<std::time::SystemTime>,
+    pub dbst: Option<FileStat>,
+}
+
+/// What `index_changed` of `ocsp.c` compares of a file's `stat`.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct FileStat {
+    pub mtime: i64,
+    pub ctime: i64,
+    pub ino: u64,
+    pub dev: u64,
+}
+
+/// `stat(path)`'s [`FileStat`], or `None` if it fails.
+pub fn file_stat(path: &str) -> Option<FileStat> {
+    use std::os::unix::fs::MetadataExt;
+    let m = std::fs::metadata(path).ok()?;
+    Some(FileStat {
+        mtime: m.mtime(),
+        ctime: m.ctime(),
+        ino: m.ino(),
+        dev: m.dev(),
+    })
 }
 
 /// `load_index(dbfile, db_attr)`: `unique_subject` is the caller's default (1 when it
@@ -185,9 +206,7 @@ pub struct CaDb {
 pub fn load_index(dbfile: &str, unique_subject: bool) -> Option<CaDb> {
     let ret = (|| {
         let input = Bio::new_file(dbfile, "r")?;
-        let modified = std::fs::metadata(dbfile)
-            .ok()
-            .and_then(|m| m.modified().ok());
+        let dbst = file_stat(dbfile);
         let db = rustyssl_ossl::txt_db::TxtDb::read(
             &input,
             core::ffi::c_int::try_from(field::NUMBER).unwrap_or(0),
@@ -203,7 +222,7 @@ pub fn load_index(dbfile: &str, unique_subject: bool) -> Option<CaDb> {
             db,
             unique_subject: unique,
             dbfname: dbfile.to_owned(),
-            modified,
+            dbst,
         })
     })();
     io::print_errors();

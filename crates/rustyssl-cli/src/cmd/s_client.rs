@@ -2738,13 +2738,21 @@ fn starttls(
             sbio.read(sbuf);
         }
         Proto::Pop3 => {
-            let mut tmp = vec![0u8; BUFSIZZ];
-            sbio.read(&mut tmp);
+            // The greeting goes into mbuf, but mbuf_len is the STLS reply's length: what's
+            // printed once the handshake is done is the greeting cut to the reply's length.
+            // Upstream reads past the greeting, into its buffer's uninitialized octets, when
+            // the reply is the longer; only the greeting is printed here.
+            let mut greeting = vec![0u8; BUFSIZZ];
+            let n = sbio.read(&mut greeting);
+            greeting.truncate(usize::try_from(n).unwrap_or(0));
             w(sbio, "STLS\r\n");
-            if sbio.read(sbuf) < 0 {
+            let len = sbio.read(sbuf);
+            if len < 0 {
                 eprintf!("BIO_read failed\n");
                 return Err(Exit::End);
             }
+            greeting.truncate(usize::try_from(len).unwrap_or(0));
+            *mbuf = greeting;
         }
         Proto::Imap => {
             let mut foundit = false;
