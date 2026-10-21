@@ -117,11 +117,18 @@ fn masked(text: &str) -> String {
                 l = mask_location(&l);
                 l = mask_libdir(&l);
             }
+            for dir in OPENSSLDIRS.get().into_iter().flatten() {
+                l = l.replace(dir.as_str(), "OPENSSLDIR/");
+            }
             l
         })
         .collect::<Vec<_>>()
         .join("\n")
 }
+
+/// Both libraries' OPENSSLDIRs (with a trailing `/`), set once the libraries are found: a
+/// default file's path (`cert.pem`, `openssl.cnf`, ...) is `OPENSSLDIR/<file>` in the output.
+static OPENSSLDIRS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
 
 /// The libraries' own directory as `LIBDIR/`: macOS's `dlopen` errors list the paths dyld
 /// tried, the library's directory first (`target/ref/openssl-<version>/lib/` on the reference,
@@ -431,6 +438,27 @@ pub fn run(args: &[String]) -> Result {
             .into());
         }
     }
+    // Each library's OPENSSLDIR (the reference's is under its prefix, ours the target's
+    // default), masked wherever an output names a file in it.
+    let mut dirs = Vec::new();
+    for lib in [&setup.ref_lib, &setup.our_lib] {
+        let out = run_tool(
+            &setup.upstream,
+            lib,
+            &["version".to_owned(), "-d".to_owned()],
+            None,
+            &work,
+        )?;
+        let text = String::from_utf8_lossy(&out.stdout).into_owned();
+        if let Some(dir) = text
+            .trim()
+            .strip_prefix("OPENSSLDIR: \"")
+            .and_then(|d| d.strip_suffix('"'))
+        {
+            dirs.push(format!("{dir}/"));
+        }
+    }
+    let _ = OPENSSLDIRS.set(dirs);
 
     let mut lists: Vec<(String, PathBuf)> = Vec::new();
     for entry in fs::read_dir(root.join("tests/apps"))? {
