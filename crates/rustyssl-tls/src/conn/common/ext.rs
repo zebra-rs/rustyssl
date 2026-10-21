@@ -404,6 +404,13 @@ pub fn collect(
         let Some(slot) = idx.and_then(|i| raw.get_mut(i)) else {
             continue;
         };
+        if c.cfg.callbacks.tlsext_debug {
+            c.notify(super::super::Event::TlsextDebug {
+                client: !c.cfg.server,
+                typ: e.typ,
+                data: e.body.clone(),
+            });
+        }
         *slot = Some(RawExt {
             typ: e.typ,
             body: e.body,

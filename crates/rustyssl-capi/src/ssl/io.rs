@@ -1358,6 +1358,35 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                     unsafe { cb(s, l.as_ptr()) };
                 }
             }
+            Event::TlsextDebug { client, typ, data } => {
+                let (cb, arg) = {
+                    let st = x.state();
+                    (st.debug_cb, st.debug_arg)
+                };
+                if let (Some(cb), Ok(len)) = (cb, c_int::try_from(data.len())) {
+                    // SAFETY: the debug callback's real type, as SSL_callback_ctrl stored it.
+                    let cb: unsafe extern "C" fn(
+                        *mut SSL,
+                        c_int,
+                        c_int,
+                        *const u8,
+                        c_int,
+                        *mut c_void,
+                    ) = unsafe { core::mem::transmute(cb) };
+                    // SAFETY: the application's callback with its connection and the
+                    // extension's body, valid for len octets; no lock is held.
+                    unsafe {
+                        cb(
+                            s,
+                            c_int::from(client),
+                            c_int::from(typ),
+                            data.as_ptr(),
+                            len,
+                            arg,
+                        )
+                    };
+                }
+            }
             Event::UpdateCache { server } => {
                 // SAFETY: as above.
                 unsafe { super::sess_cache::on_update_cache(s, x, server) };

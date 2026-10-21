@@ -138,12 +138,29 @@ static SSL_CTX *client_ctx(void)
 }
 
 /* Runs a client and a server from the contexts over a BIO pair: 0 when both finish. */
+/* With debug_exts, the tlsext debug callback reports each extension received. */
+static int debug_exts = 0;
+
+static void debug_cb(SSL *s, int client_server, int type, const unsigned char *data, int len,
+                     void *arg)
+{
+    printf("  %s (%s) received extension %d%s\n", client_server ? "client" : "server",
+           (const char *)arg, type, data != NULL || len == 0 ? "" : " (no data)");
+    (void)s;
+}
+
 static int handshake(SSL_CTX *cctx, SSL_CTX *sctx, int version)
 {
     SSL *c = SSL_new(cctx), *s = SSL_new(sctx);
     BIO *a = NULL, *b = NULL;
     int cdone = 0, sdone = 0, round, ret = -1;
 
+    if (debug_exts) {
+        SSL_set_tlsext_debug_callback(c, debug_cb);
+        SSL_set_tlsext_debug_arg(c, "c");
+        SSL_set_tlsext_debug_callback(s, debug_cb);
+        SSL_set_tlsext_debug_arg(s, "s");
+    }
     BIO_new_bio_pair(&a, 0, &b, 0);
     SSL_set_bio(c, a, a);
     SSL_set_bio(s, b, b);
@@ -523,6 +540,24 @@ static void test_serverinfo(void)
     }
 }
 
+/* SSL_set_tlsext_debug_callback: every recognised extension received, in order. */
+static void test_debug_callback(void)
+{
+    SSL_CTX *sctx = server_ctx(), *cctx = client_ctx();
+    int v;
+
+    debug_exts = 1;
+    for (v = 0; v < 2; v++) {
+        int version = v == 0 ? TLS1_2_VERSION : TLS1_3_VERSION;
+
+        printf("# debug callback, %s\n", v == 0 ? "TLS 1.2" : "TLS 1.3");
+        check(handshake(cctx, sctx, version) == 0, "a handshake with the debug callback");
+    }
+    debug_exts = 0;
+    SSL_CTX_free(sctx);
+    SSL_CTX_free(cctx);
+}
+
 int main(void)
 {
     test_registration();
@@ -530,6 +565,7 @@ int main(void)
     test_new_tls13();
     test_unsolicited();
     test_serverinfo();
+    test_debug_callback();
     printf("1..%d\n", number);
     return failures == 0 ? 0 : 1;
 }

@@ -14,6 +14,8 @@ pub struct Callbacks {
     pub msg: bool,
     /// `SSL_CTX_set_keylog_callback`.
     pub keylog: bool,
+    /// `SSL_set_tlsext_debug_callback`.
+    pub tlsext_debug: bool,
     /// `SSL_CTX_set_tlsext_servername_callback`.
     pub servername: bool,
     /// `SSL_CTX_set_client_hello_cb`.
@@ -432,6 +434,16 @@ pub enum Event {
     },
     /// A key log line (`SSL_CTX_set_keylog_callback`).
     Keylog(String),
+    /// A received extension, for the tlsext debug callback (`tls_collect_extensions`), in the
+    /// order received; unrecognised ones aren't reported.
+    TlsextDebug {
+        /// The callback's `client_server`: whether this side is the client.
+        client: bool,
+        /// The extension type.
+        typ: u16,
+        /// Its body.
+        data: Vec<u8>,
+    },
     /// A handshake ended: capi updates the session cache (`ssl_update_cache` with
     /// `SSL_SESS_CACHE_SERVER` or `_CLIENT`), as `tls_finish_handshake` does.
     UpdateCache {
