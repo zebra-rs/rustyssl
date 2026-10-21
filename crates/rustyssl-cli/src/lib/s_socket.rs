@@ -23,6 +23,14 @@ thread_local! {
     static OURPEER: RefCell<Option<Addr>> = const { RefCell::new(None) };
 }
 
+/// `ERR_print_errors(bio_err)` leaving `errno` as it was: upstream's `bio_err` is a stdio
+/// stream, which doesn't touch it, and callers print it after (`connect:errno=...`).
+fn print_errors_keeping_errno() {
+    let e = sock::last_socket_error();
+    io::print_errors();
+    sock::set_errno(e);
+}
+
 /// Runs `f` with the current peer's address (`ourpeer`), if there is one.
 pub fn with_ourpeer<T>(f: impl FnOnce(Option<&Addr>) -> T) -> T {
     OURPEER.with(|p| f(p.borrow().as_ref()))
@@ -56,7 +64,7 @@ pub fn init_client(
     }
     let Some(res) = AddrInfo::lookup_ex(host, port, BIO_LOOKUP_CLIENT, family, socktype, protocol)
     else {
-        io::print_errors();
+        print_errors_keeping_errno();
         return Err(sockfd);
     };
     let bindaddr = if bindhost.is_some() || bindport.is_some() {
@@ -70,7 +78,7 @@ pub fn init_client(
         ) {
             Some(b) => Some(b),
             None => {
-                io::print_errors();
+                print_errors_keeping_errno();
                 return Err(sockfd);
             }
         }
@@ -145,7 +153,7 @@ pub fn init_client(
             );
             err::clear();
         }
-        io::print_errors();
+        print_errors_keeping_errno();
         return Err(sockfd);
     }
     if let Some(hostname) = chosen.and_then(|ai| ai.hostname_string()) {

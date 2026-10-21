@@ -614,3 +614,19 @@ pub mod consts {
         SOCK_STREAM,
     };
 }
+
+/// The process's user CPU time in seconds (`getrusage(RUSAGE_SELF)`), what upstream's
+/// `app_tminterval(.., usertime = 1)` measures.
+pub fn user_seconds() -> f64 {
+    let mut u = core::mem::MaybeUninit::<libc::rusage>::zeroed();
+    // SAFETY: u is valid for a rusage.
+    let r = unsafe { libc::getrusage(libc::RUSAGE_SELF, u.as_mut_ptr()) };
+    if r != 0 {
+        return 0.0;
+    }
+    // SAFETY: getrusage succeeded, so it filled u (zeroed besides).
+    let u = unsafe { u.assume_init() };
+    #[allow(clippy::cast_precision_loss)]
+    let s = u.ru_utime.tv_sec as f64 + u.ru_utime.tv_usec as f64 / 1e6;
+    s
+}

@@ -1017,9 +1017,8 @@ fn print_stuff(bio: &Bio, s: SslRef<'_>, full: bool) {
             ssl::verify_cert_error_string(vr)
         ));
     } else if let Some(sess) = s.session() {
+        // In TLSv1.3 we do this on arrival of a NewSessionTicket.
         sess.print(bio);
-    } else {
-        p("<NULL>");
     }
     if s.session().is_some()
         && let Some(label) = &label

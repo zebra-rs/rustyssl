@@ -403,7 +403,7 @@ pub fn run(args: &[String]) -> Result {
             let verdict = match &line.pair {
                 Some(p) => {
                     refresh(&setup, &line)?;
-                    pair::check(&setup, p, line.compare, name)?
+                    pair::check(&setup, p, line.compare, &format!("{name}-{count}"))?
                 }
                 None => check(&setup, &line, &runs)?,
             };

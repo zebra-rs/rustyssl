@@ -56,8 +56,8 @@ pub fn split(args: &[String]) -> Option<Pair> {
         Side { args, stdin }
     };
     Some(Pair {
-        server: side(&args[..at]),
-        client: side(&args[at + 1..]),
+        server: side(args.get(..at).unwrap_or_default()),
+        client: side(args.get(at + 1..).unwrap_or_default()),
     })
 }
 
@@ -148,14 +148,14 @@ fn run(
                 match out.read(&mut buf) {
                     Ok(0) | Err(_) => break,
                     Ok(n) => {
-                        seen.extend_from_slice(&buf[..n]);
+                        seen.extend_from_slice(buf.get(..n).unwrap_or_default());
                         if !reported {
                             let text = String::from_utf8_lossy(&seen);
-                            if let Some(l) = text.lines().find(|l| l.starts_with("ACCEPT")) {
-                                if text.contains(&format!("{l}\n")) {
-                                    let _ = line_tx.send(Some(l.to_owned()));
-                                    reported = true;
-                                }
+                            if let Some(l) = text.lines().find(|l| l.starts_with("ACCEPT"))
+                                && text.contains(&format!("{l}\n"))
+                            {
+                                let _ = line_tx.send(Some(l.to_owned()));
+                                reported = true;
                             }
                         }
                     }
@@ -185,12 +185,18 @@ fn run(
             server_ok: false,
         });
     };
+    // `ACCEPT 127.0.0.1:PORT`; a Unix socket's is `ACCEPTunknown:error`, with no port.
     let port = accept
         .rsplit(':')
         .next()
         .unwrap_or_default()
         .trim()
         .to_owned();
+    let port = if !port.is_empty() && port.chars().all(|c| c.is_ascii_digit()) {
+        port
+    } else {
+        String::new()
+    };
     let cargs: Vec<String> = pair
         .client
         .args
@@ -243,12 +249,28 @@ fn run(
 pub fn mask(text: &str, port: &str) -> String {
     let mut out = Vec::new();
     let mut in_pem = false;
+    let mut in_ticket = false;
     for line in text.lines() {
         let mut l = if port.is_empty() {
             line.to_owned()
         } else {
             replace_number(line, port, "{port}")
         };
+        // A session's ticket (random), up to the blank line after it: a raw write of
+        // the peer's data may split one of its lines where the stdio buffer filled.
+        if in_ticket {
+            if l.is_empty() {
+                in_ticket = false;
+            } else {
+                if out.last().is_none_or(|p: &String| p != "HEX") {
+                    out.push("HEX".to_owned());
+                }
+                continue;
+            }
+        }
+        if l.trim_start() == "TLS session ticket:" {
+            in_ticket = true;
+        }
         if l.starts_with("-----BEGIN SSL SESSION PARAMETERS-----") {
             in_pem = true;
             out.push(l);
@@ -279,6 +301,7 @@ pub fn mask(text: &str, port: &str) -> String {
         if is_dump_line(&l) || is_msg_hex_line(&l) {
             l = "HEX".to_owned();
         }
+        mask_trace_hex(&mut l);
         l = mask_pointers(&l);
         l = super::masked(&l);
         // Consecutive masked hex lines count as one (their number varies with lengths).
@@ -333,6 +356,18 @@ fn is_msg_hex_line(l: &str) -> bool {
             .skip(1)
             .all(|b| b.len() == 2 && b.chars().all(|c| c.is_ascii_hexdigit()))
         && rest.starts_with(' ')
+}
+
+/// A `-trace` field's octets (`random_bytes (len=28): 1046A9...`) as `HEX`.
+fn mask_trace_hex(l: &mut String) {
+    let Some(at) = l.find("): ") else {
+        return;
+    };
+    let (head, hex) = l.split_at(at + 3);
+    if head.contains("(len=") && hex.len() >= 8 && hex.chars().all(|c| c.is_ascii_hexdigit()) {
+        l.truncate(at + 3);
+        l.push_str("HEX");
+    }
 }
 
 /// `0x...` addresses as `0xPTR`.

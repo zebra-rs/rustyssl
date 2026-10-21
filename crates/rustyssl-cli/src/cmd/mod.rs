@@ -48,7 +48,7 @@ pub mod ciphers;
 // pub mod rsautl;
 pub mod s_client;
 pub mod s_server;
-// pub mod s_time;
+pub mod s_time;
 // pub mod sess_id;
 // pub mod skeyutl;
 // pub mod smime;
@@ -107,7 +107,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "rsautl" => rsautl::main,
         "s_client" => s_client::main,
         "s_server" => s_server::main,
-        // "s_time" => s_time::main,
+        "s_time" => s_time::main,
         // "sess_id" => sess_id::main,
         // "skeyutl" => skeyutl::main,
         // "smime" => smime::main,
