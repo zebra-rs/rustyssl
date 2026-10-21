@@ -11,6 +11,8 @@
 #define CVE_H
 
 #define _POSIX_C_SOURCE 200809L
+/* Several CVEs are in deprecated functions, which applications still call. */
+#define OPENSSL_SUPPRESS_DEPRECATED
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
