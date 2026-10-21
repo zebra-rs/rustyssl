@@ -436,9 +436,9 @@ unsafe fn process(
         outsize,
     };
     if let Some(r) = ctx.core.process(io, one_shot) {
-        let function = if one_shot { "cipher" } else { "update" };
+        let (inner, outer) = mode_functions(ctx.core.kind(), one_shot);
         // SAFETY: the caller's guarantee.
-        return unsafe { finish_raised(r, out, outl, function) };
+        return unsafe { finish_raised(r, out, outl, inner, outer) };
     }
     let kind = ctx.core.kind();
     if kind.cts() && !one_shot {
@@ -527,18 +527,63 @@ pub(crate) unsafe fn finish_raised(
     result: Result<Output, Raised>,
     out: *mut u8,
     outl: *mut usize,
-    function: &str,
+    inner: &str,
+    outer: &str,
 ) -> c_int {
     match result {
-        // SAFETY: the caller's guarantee.
-        Ok(o) => unsafe { finish(Ok(o), out, outl, function) },
-        Err(r) => {
-            raise(r.first, function);
-            if let Some(e) = r.then {
-                raise(e, function);
+        Ok(mut o) => {
+            // A failure inside that the outer function reports as success (the AES key
+            // wraps') is raised where it happened.
+            if let Some(e) = o.raised.take() {
+                raise(e, inner);
             }
+            // SAFETY: the caller's guarantee.
+            unsafe { finish(Ok(o), out, outl, outer) }
+        }
+        Err(Raised { first, then: None }) => {
+            raise(first, outer);
             0
         }
+        Err(Raised {
+            first,
+            then: Some(e),
+        }) => {
+            raise(first, inner);
+            raise(e, outer);
+            0
+        }
+    }
+}
+
+/// The functions the modes [`Ctx::process`] runs raise their errors in, as upstream's
+/// providers name them: where a failure starts inside, and the update (or one-shot cipher)
+/// that reports it.
+fn mode_functions(kind: Kind, one_shot: bool) -> (&'static str, &'static str) {
+    let Kind::Block {
+        algorithm, mode, ..
+    } = kind
+    else {
+        return ("", "");
+    };
+    let generic = if one_shot {
+        "ossl_cipher_generic_cipher"
+    } else {
+        "ossl_cipher_generic_stream_update"
+    };
+    match (algorithm, mode) {
+        (BlockAlgorithm::Sm4, Mode::Xts) if one_shot => ("sm4_xts_cipher", "sm4_xts_cipher"),
+        (BlockAlgorithm::Sm4, Mode::Xts) => ("sm4_xts_cipher", "sm4_xts_stream_update"),
+        (_, Mode::Xts) if one_shot => ("aes_xts_cipher", "aes_xts_cipher"),
+        (_, Mode::Xts) => ("aes_xts_cipher", "aes_xts_stream_update"),
+        (BlockAlgorithm::TripleDes, _) if one_shot => ("tdes_wrap_cipher", "tdes_wrap_cipher"),
+        (BlockAlgorithm::TripleDes, _) => ("tdes_wrap_cipher", "tdes_wrap_update"),
+        (_, Mode::Wrap | Mode::WrapPad | Mode::WrapInv | Mode::WrapPadInv) => {
+            ("aes_wrap_cipher_internal", "aes_wrap_cipher")
+        }
+        (_, Mode::CbcHmacSha1Etm) => ("hwaes_cbc_hmac_sha1_etm", generic),
+        (_, Mode::CbcHmacSha256Etm) => ("hwaes_cbc_hmac_sha256_etm", generic),
+        (_, Mode::CbcHmacSha512Etm) => ("hwaes_cbc_hmac_sha512_etm", generic),
+        _ => (generic, generic),
     }
 }
 
