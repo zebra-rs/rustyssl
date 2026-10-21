@@ -6,7 +6,6 @@
 //!   order's length ([`super::fe`]), so neither the private key nor the nonce shows in the time
 //!   taken.
 
-use super::fe::Fp;
 use crate::bn::{BigNum, Endian};
 
 /// Why the Z value's input couldn't be made.
@@ -57,7 +56,7 @@ pub fn sign_s(order: &BigNum, d: &BigNum, k: &BigNum, r: &BigNum) -> Result<BigN
 
 /// [`sign_s`]'s work.
 fn sign_s_dit(order: &BigNum, d: &BigNum, k: &BigNum, r: &BigNum) -> Result<BigNum, SignError> {
-    let f = Fp::new(order).ok_or(SignError::Bn)?;
+    let f = super::fe::cached(order).ok_or(SignError::Bn)?;
     let de = f.from_bn_unreduced(d).ok_or(SignError::Bn)?;
     let ke = f.from_bn_unreduced(k).ok_or(SignError::Bn)?;
     let re = f.from_bn_unreduced(r).ok_or(SignError::Bn)?;

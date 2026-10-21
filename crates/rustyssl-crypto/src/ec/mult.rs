@@ -400,7 +400,8 @@ fn ladder_ct(
         let (x, y) = gfp::get_affine(g, &p, rng)?;
         gfp::set_jprojective(g, &mut p, Some(&x), Some(&y), Some(&BigNum::one()))?;
     }
-    let fp = Fp::new(&g.field).ok_or(Error::new(Reason::InternalError, F))?;
+    let fp = super::fe::cached(&g.field).ok_or(Error::new(Reason::InternalError, F))?;
+    let fp = fp.as_ref();
     let reduce = |v: &BigNum| bn::nnmod(v, &g.field).ok().and_then(|v| fp.from_bn(&v));
     let elems = (reduce(&p.x), reduce(&p.y), reduce(&g.a), reduce(&g.b));
     let (Some(px), Some(py), Some(a), Some(b)) = elems else {
@@ -416,16 +417,13 @@ fn ladder_ct(
         x: fp.sub(&t4, &t5),
         z: fp.shl(&t2, 2),
     };
-    let mut ss = CtPoint {
-        x: px.clone(),
-        z: fp.one(),
-    };
+    let mut ss = CtPoint { x: px, z: fp.one() };
     let mut pbit = true;
     for i in (0..card_bits).rev() {
         let kbit = k.is_bit_set(i) ^ pbit;
         Fp::cswap(kbit, &mut rr.x, &mut ss.x);
         Fp::cswap(kbit, &mut rr.z, &mut ss.z);
-        ct_step(&fp, &mut rr, &mut ss, &px, &a, &b4);
+        ct_step(fp, &mut rr, &mut ss, &px, &a, &b4);
         pbit ^= kbit;
     }
     Fp::cswap(pbit, &mut rr.x, &mut ss.x);
