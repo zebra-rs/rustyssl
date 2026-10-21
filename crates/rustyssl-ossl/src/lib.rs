@@ -28,6 +28,7 @@ mod util;
 
 pub use bio::Bio;
 pub use util::cstring;
+pub mod cms;
 pub mod conf;
 pub mod engine;
 pub mod object;

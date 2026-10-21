@@ -10,7 +10,7 @@ pub mod version;
 // pub mod ca;
 // pub mod ciphers;
 // pub mod cmp;
-// pub mod cms;
+pub mod cms;
 // pub mod configutl;
 // pub mod crl;
 // pub mod crl2pkcs7;
@@ -69,7 +69,7 @@ pub fn find(name: &str) -> Option<fn(&[String]) -> i32> {
         // "ca" => ca::main,
         // "ciphers" => ciphers::main,
         // "cmp" => cmp::main,
-        // "cms" => cms::main,
+        "cms" => cms::main,
         // "configutl" => configutl::main,
         // "crl" => crl::main,
         // "crl2pkcs7" => crl2pkcs7::main,

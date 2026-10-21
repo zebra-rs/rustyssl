@@ -352,11 +352,20 @@ fn nodes_print(err: &Bio, name: &str, nodes: *mut crate::abi::stack_st_X509_POLI
     }
 }
 
+/// The last error [`policy_print_cb`] saw (`verify_err` of `cms.c`).
+static LAST_VERIFY_ERROR: core::sync::atomic::AtomicI32 = core::sync::atomic::AtomicI32::new(0);
+
+/// The verification error the verify callback last saw (`cms -verify_retcode`).
+pub fn last_verify_error() -> c_int {
+    LAST_VERIFY_ERROR.load(core::sync::atomic::Ordering::Relaxed)
+}
+
 /// The verify callback of `smime` and `cms` (`smime_cb`, `cms_cb`): prints the policies
 /// (`policies_print` of `apps.c`) when the chain verified or no explicit policy was found.
 unsafe extern "C" fn policy_print_cb(ok: c_int, ctx: *mut X509_STORE_CTX) -> c_int {
     // SAFETY: ctx is the live context the library calls back with.
     let error = unsafe { ffi::X509_STORE_CTX_get_error(ctx) };
+    LAST_VERIFY_ERROR.store(error, core::sync::atomic::Ordering::Relaxed);
     if error != X509_V_ERR_NO_EXPLICIT_POLICY && (error != X509_V_OK || ok != 2) {
         return ok;
     }
