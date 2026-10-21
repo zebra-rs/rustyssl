@@ -6310,10 +6310,22 @@ The CLI's gaps closed (2026-10-21, local, branch `cli-gaps`, macOS arm64):
 
 ## Phase 12: Hardening, performance, release 1.0 → M7
 
-- [ ] **12.1 Performance:** benchmark against the reference (per TEST_PLAN L10). Close the gaps
+- [~] **12.1 Performance:** benchmark against the reference (per TEST_PLAN L10). Close the gaps
   with intrinsics in vetted backends and with profiling. Assembly is not allowed. Set the
   targets once there's a baseline (initial goal: within 1.25× of the reference on hot
   symmetric paths and within 1.5× on handshakes).
+  **Done (2026-10-21, arm64 macOS; docs/PERFORMANCE.md):** `cargo xtask bench` (upstream's
+  `openssl speed` on each library and `tests/bench/bench.c`: handshakes, bulk TLS, memory,
+  start-up, DRBG, RSA keygen, threads) with `--compare` for the 5% regression gate on a
+  dedicated machine. Profiling-driven work: batched and in-place cipher modes, a keyed-once GHASH,
+  allocation-free Montgomery arithmetic with cached contexts, a constant-time fixed-base comb for
+  EC generators, batched DRBG output, and fewer locks (EVP fetch, RAND, TLS discovery per
+  `SSL_CTX`). Cost against the reference, before → after: RSA-2048 sign 5.4× → 3.2×, verify
+  17× → 3.1×; ECDSA P-256 sign 43× → 5.6×; AES-128-GCM 16 KiB 13× → 3.2×; AES-128-CTR 25× → 4.8×;
+  full TLS 1.3 ECDSA handshakes 7.8× → 3.1×; TLS 1.2 resumption 4.1× → 2.6×; TLS bulk 12× → 4.3×.
+  Met: hashes from 1 KiB, Ed25519, ML-DSA, memory, start-up. Missed: the initial 1.25×/1.5× goals
+  for AES/ChaCha bulk and handshakes (no assembly; P-256, RSA and AES are the gaps); the
+  follow-ups are listed in docs/PERFORMANCE.md.
 - [~] **12.2 Security:**
   - a third-party audit (the crypto backends and all `unsafe` in capi). The user's decision
     (2026-10-21): rustyssl prepares the package, the user engages a firm. **Package done:**
