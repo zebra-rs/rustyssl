@@ -24,3 +24,6 @@ crl2pkcs7 -in {src}/test/testcrl.pem -propquery provider=default -provider-path 
 crl2pkcs7 -in {src}/test/testcrl.pem extra
 crl2pkcs7 -nosuchoption
 crl2pkcs7 -in {src}/test/testcrl.pem -provparam default:x=1
+# The man page's examples.
+crl2pkcs7 -in {tests}/pki/crl1.pem -certfile {src}/test/certs/ca-cert.pem -out {dir}/man-p7.pem
+crl2pkcs7 -nocrl -certfile {src}/test/certs/ee-cert.pem

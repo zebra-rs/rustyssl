@@ -143,3 +143,11 @@ ca -crldays
 @pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -keyform ENGINE -engine dynamic
 # A random serial: the certificate differs from run to run.
 @pki/cadb ~ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -rand_serial -verbose
+# The man page's examples.
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -out {dir}/man-newcert.pem
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {src}/test/certs/sm2-csr.pem -md sm3 -sigopt distid:1234567812345678 -vfyopt distid:1234567812345678 -policy policy_anything
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {src}/test/certs/sm2-csr.pem -md sm3 -vfyopt distid:1234567812345678 -policy policy_anything -notext
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -in {tests}/pki/ee.csr -extensions v3_ca -out {dir}/man-newcert.pem
+@pki/cadb ca -config {dir}/cadb/ca.cnf -gencrl -crl_lastupdate 20260101000000Z -crl_nextupdate 20260201000000Z -out {dir}/man-crl.pem
+@pki/cadb ca -config {dir}/cadb/ca.cnf -batch -startdate 20250101000000Z -enddate 20350101000000Z -infiles {tests}/pki/ee.csr {dir}/cadb/email.csr {dir}/cadb/noorg.csr
+@pki/cadb ca -config {dir}/cadb/ca.cnf -startdate 20250101000000Z -enddate 20350101000000Z -spkac {dir}/cadb/spkac.txt

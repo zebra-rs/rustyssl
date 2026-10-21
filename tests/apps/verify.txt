@@ -83,3 +83,6 @@ verify -CAfile
 verify -attime
 verify -engine dynamic -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem {src}/test/certs/ee-cert.pem
 verify -provparam default:x=1 -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem {src}/test/certs/ee-cert.pem
+# The man page's examples.
+verify -CAfile {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem {src}/test/certs/ee-cert.pem
+verify -trusted {src}/test/certs/root-cert.pem -untrusted {src}/test/certs/ca-cert.pem -show_chain {src}/test/certs/ee-cert.pem

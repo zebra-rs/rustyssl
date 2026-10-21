@@ -62,3 +62,6 @@ storeutl a b
 storeutl -nosuchoption
 storeutl -engine dynamic -noout {src}/test/certs/ca-cert.pem
 storeutl -provparam default:x=1 -noout {src}/test/certs/ca-cert.pem
+# The man page's examples.
+storeutl -certs {src}/test/certs/leaf-chain.pem
+storeutl -noout -text -certs -subject /CN=CA {src}/test/certs/ca-cert.pem

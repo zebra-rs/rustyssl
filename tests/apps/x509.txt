@@ -174,3 +174,12 @@ x509 -engine dynamic -in {src}/test/certs/ee-cert.pem -noout -subject
 x509 -engine dynamic -in {src}/test/certs/ee-cert.pem -key {src}/test/certs/ee-key.pem -keyform ENGINE
 x509 -provparam default:x=1 -in {src}/test/certs/ee-cert.pem -noout -subject
 x509 -provparam bad -in {src}/test/certs/ee-cert.pem -noout -subject
+# The man page's examples.
+x509 -in {src}/test/certs/ee-cert.pem -noout -ext subjectAltName,nsCertType
+x509 -sha1 -in {src}/test/certs/ee-cert.pem -noout -fingerprint
+x509 -in {src}/test/certs/ee-cert.pem -inform PEM -out {dir}/man-cert.der -outform DER
+x509 -x509toreq -in {src}/test/certs/ee-cert.pem -out {dir}/man-req.pem -key {src}/test/certs/ee-key.pem
+x509 -req -in {tests}/pki/ee.csr -extfile {tests}/pki/x509.cnf -extensions v3_ca -CA {src}/test/certs/ca-cert.pem -CAkey {src}/test/certs/ca-key.pem -set_serial 3 -not_before 20250101000000Z -not_after 20350101000000Z
+x509 -in {src}/test/certs/ee-cert.pem -addtrust clientAuth -setalias Steve's_Class_1_CA -out {dir}/man-trust.pem
+x509 -in {dir}/man-trust.pem -noout -alias -text -certopt no_pubkey,no_sigdump
+x509 -in {src}/test/certs/leaf-chain.pem -multi -checkend 2592000

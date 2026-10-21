@@ -70,3 +70,6 @@ crl -in {tests}/pki/crl1.pem extra
 crl -in {tests}/pki/crl1.pem -nosuchoption -sha256
 crl -nosuchoption
 crl -in {tests}/pki/crl1.pem -provparam default:x=1 -noout -crlnumber
+# The man page's examples.
+crl -in {tests}/pki/crl2.pem -outform DER -out {dir}/man-crl.der
+crl -in {dir}/man-crl.der -text -noout

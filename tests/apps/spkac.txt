@@ -35,3 +35,8 @@ spkac -in
 spkac -engine dynamic -in {tests}/pki/spkac.cnf -noout -verify
 spkac -engine dynamic -key {src}/test/testrsa.pem -keyform ENGINE
 spkac -provparam default:x=1 -in {tests}/pki/spkac.cnf -noout -verify
+# The man page's examples.
+spkac -in {tests}/pki/spkac.cnf
+spkac -in {tests}/pki/spkac.cnf -noout -verify
+spkac -key {src}/test/testrsa.pem -challenge hello -out {dir}/man-spkac.cnf
+spkac -in {dir}/man-spkac.cnf -verify -noout

@@ -28,7 +28,7 @@ req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -subj /CN=
 req -config {tests}/pki/req.cnf -section utf8 -new -key {src}/test/certs/ee-key.pem -noout -subject
 req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -extensions v3_ca -noout -text -reqopt no_pubkey,no_sigdump
 req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -reqexts v3_req -addext subjectAltName=DNS:extra.example -noout -text
-req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -addext keyUsage=critical,digitalSignature -addext " extendedKeyUsage = serverAuth" -noout -text -reqopt no_pubkey,no_sigdump
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -addext keyUsage=critical,digitalSignature -addext extendedKeyUsage=serverAuth -noout -text -reqopt no_pubkey,no_sigdump
 req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -addext keyUsage=digitalSignature -addext "keyUsage =nonRepudiation"
 req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -addext keyUsage
 req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -addext =x
@@ -135,3 +135,10 @@ req -config {tests}/pki/req.cnf -engine dynamic -new -key {src}/test/certs/ee-ke
 req -config {tests}/pki/req.cnf -keygen_engine dynamic -newkey rsa:1024 -quiet -noenc -noout
 req -config {tests}/pki/req.cnf -keygen_engine dynamic -newkey param:{tests}/pki/p256.param -quiet -noenc -keyout {dir}/ec.key -noout -subject
 req -config {tests}/pki/req.cnf -provparam default:x=1 -new -key {src}/test/certs/ee-key.pem -noout -subject
+# The man page's examples (new keys written to files, with -quiet).
+req -config {tests}/pki/req.cnf -in {tests}/pki/ee.csr -text -verify -noout
+~req -config {tests}/pki/req.cnf -newkey rsa:2048 -keyout {dir}/man-key.pem -out {dir}/man-req.csr -cipher aes-256-cbc -passout pass:pw
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/ee-key.pem -out {dir}/man-req2.pem
+req -config {tests}/pki/req.cnf -new -key {src}/test/certs/sm2.key -sm3 -sigopt distid:1234567812345678 -noout -subject
+req -config {tests}/pki/req.cnf -verify -in {src}/test/certs/sm2-csr.pem -sm3 -vfyopt distid:1234567812345678 -noout
+req -config {tests}/pki/req.cnf -new -subj /C=GB/CN=foo -addext subjectAltName=DNS:foo.co.uk -addext certificatePolicies=1.2.3.4 -newkey rsa:1024 -quiet -noenc -keyout {dir}/man-key2.pem -noout -subject
