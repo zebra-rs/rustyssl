@@ -93,6 +93,11 @@ pub fn supported(
     c: &mut Connection,
     p: &dyn crate::crypto::Provider,
 ) -> Option<Vec<&'static Cipher>> {
+    // A flexible method's version isn't TLS 1.3 before the hellos choose it
+    // (`SSL_CONNECTION_IS_TLS13` reads the method's), so DSA's signatures count here.
+    if c.cfg.method_version == 0 && c.neg.cipher.is_none() {
+        c.version_pending = true;
+    }
     if c.hs.sh.groups.is_empty() {
         c.hs.sh.groups = p.groups();
     }

@@ -1272,6 +1272,8 @@ ffi_export! {
         let prov = unsafe { super::io::provider(x, &snap) };
         // SAFETY: the live connection and its context's snapshot.
         let mut cfg = unsafe { super::io::config::build(s, x, &snap, &prov) };
+        // `ssl_set_client_disabled` wants the client's PSK callback on either end.
+        cfg.callbacks.psk = x.state().psk_client_callback.is_some();
         // SAFETY: the live connection.
         let hook = unsafe { super::io::security_hook(s, x) };
         cfg.custom_security_callback = hook.is_some();
