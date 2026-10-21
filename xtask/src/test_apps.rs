@@ -20,7 +20,8 @@
 //! `tests/apps/`; a final `< file` gives the command its standard input (otherwise empty).
 //!
 //! A line may start with these prefixes, in any order:
-//! - `~`: only success is compared (random output, timings);
+//! - `~`: only the exit status (success or failure) is compared (random output, timings, and
+//!   failures whose text differs by a recorded deviation);
 //! - `%`: compared with its numbers masked, and the lines naming the library's build
 //!   (`built on:`, `compiler:`, `CPUINFO:`) (`speed`);
 //! - `&`: a server (`ocsp -port`, `cmp -port`): it starts in the background, the next line runs
@@ -663,7 +664,7 @@ fn check(
         let got = run_line(setup, line, tool, lib)?;
         let verdict = if line.compare {
             compare(&expected, &got, label, line.timings, line.times)
-        } else if expected.ok && got.ok {
+        } else if expected.ok == got.ok {
             Ok(())
         } else {
             Err(format!(
