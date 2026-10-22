@@ -29,7 +29,7 @@ which library a program loaded:
 
 ```console
 $ LD_LIBRARY_PATH=$HOME/rustyssl/target/dist/lib openssl version
-OpenSSL 3.0.2 15 Mar 2022 (Library: OpenSSL 3.6.5+rustyssl.0.1.0 29 Sep 2026)
+OpenSSL 3.0.2 15 Mar 2022 (Library: OpenSSL 3.6.5+rustyssl.1.0.0 29 Sep 2026)
 ```
 
 (That is Ubuntu's own `openssl` binary, 3.0.2, running on rustyssl's library.)
@@ -169,7 +169,7 @@ rustyssl's: upstream OpenSSL 3.6 is refused the same way. OpenSSH 9.4 and later 
 
 ```sh
 LD_LIBRARY_PATH=$R ssh -V
-#   OpenSSH_9.6p1 Ubuntu-3ubuntu13.x, OpenSSL 3.6.5+rustyssl.0.1.0 29 Sep 2026
+#   OpenSSH_9.6p1 Ubuntu-3ubuntu13.x, OpenSSL 3.6.5+rustyssl.1.0.0 29 Sep 2026
 
 LD_LIBRARY_PATH=$R ssh -c aes256-gcm@openssh.com -o KexAlgorithms=ecdh-sha2-nistp256 \
     -o HostKeyAlgorithms=ecdsa-sha2-nistp256 -i ~/.ssh/id_ecdsa user@host
@@ -252,7 +252,7 @@ More on the install layout, other distributions, and what differs from OpenSSL:
 |---|---|
 | `OpenSSL version mismatch. Built against 30000020, you have 30600050` | OpenSSH 8.9 on 22.04; see [SSH](#ssh). |
 | `certificate verify failed` in Python or `openssl s_client` | rustyssl isn't using Ubuntu's CA certificates: build with `RUSTYSSL_OPENSSLDIR=/usr/lib/ssl`, or set `SSL_CERT_DIR=/etc/ssl/certs`. |
-| `DSO_load:could not load the shared library ... name=legacy` | the legacy provider isn't in MODULESDIR: set `OPENSSL_MODULES=<dist>/lib/ossl-modules`, or use the side-by-side install. |
+| `DSO_load:could not load the shared library ... name=legacy`, then `provider_init:reason(37)` | the legacy provider isn't in MODULESDIR: set `OPENSSL_MODULES=<dist>/lib/ossl-modules`, or use the side-by-side install. (`reason(37)` has no text in OpenSSL either: it prints the same line.) |
 | `version 'GLIBC_2.xx' not found` | the build needs a newer glibc than the machine has; build on the oldest release you run it on. |
 | A program still shows the system's OpenSSL | it's setuid, has an `RPATH`, is a snap, or was started before; see [the caveats](#when-ld_library_path-doesnt-apply). |
 
