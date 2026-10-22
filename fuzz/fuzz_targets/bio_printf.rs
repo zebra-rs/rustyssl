@@ -40,6 +40,10 @@ fn has_float_conversion(format: &[u8]) -> bool {
         }
         match format.get(i) {
             Some(b'e' | b'E' | b'f' | b'F' | b'g' | b'G' | b'a' | b'A') => return true,
+            // A `%` here starts the next conversion (BIO_printf prints an invalid one as it
+            // stands, `%LLj%G` among them), so it isn't stepped over; `%%G` counts as a
+            // conversion too, which only skips a comparison.
+            Some(b'%') => {}
             Some(_) => i += 1,
             None => break,
         }
