@@ -34,7 +34,7 @@ The draft has, for `<version>`:
 | `rustyssl-<version>-{debian,fedora,el}-x86_64.tar.gz` | Ubuntu 22.04 (glibc 2.35; the libraries need at most 2.34) |
 | `rustyssl-<version>-{debian,fedora,el}-aarch64.tar.gz` | Ubuntu 22.04 arm64 |
 | `rustyssl-<version>-alpine-{x86_64,aarch64}.tar.gz` | Alpine (musl) |
-| `rustyssl-<version>-homebrew-aarch64.tar.gz` | macOS 15, prefix `/opt/homebrew/Cellar/rustyssl/<version>` |
+| `rustyssl-<version>-homebrew-arm64.tar.gz` | macOS 15, prefix `/opt/homebrew/Cellar/rustyssl/<version>` |
 | `rustyssl-<version>-source.tar.gz` | `git archive` of the tag |
 | `SHA256SUMS` | |
 
