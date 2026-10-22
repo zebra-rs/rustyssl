@@ -16,6 +16,10 @@ Priority order when goals conflict:
 2. **ABI and behavioral compatibility** with OpenSSL
 3. Performance
 
+To try it: [docs/TRY-ON-UBUNTU.md](docs/TRY-ON-UBUNTU.md) (build it, run programs on it with
+`LD_LIBRARY_PATH`, or install it side by side on Ubuntu 22.04 and 24.04);
+[docs/MIGRATION.md](docs/MIGRATION.md) for other distributions.
+
 Plans: [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) (phased steps) and
 [docs/TEST_PLAN.md](docs/TEST_PLAN.md) (verification strategy). Keep both current: mark
 steps done and record decisions as they're made.
