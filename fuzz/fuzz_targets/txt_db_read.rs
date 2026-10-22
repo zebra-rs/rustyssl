@@ -13,7 +13,8 @@ use std::io::Write as _;
 
 use libfuzzer_sys::fuzz_target;
 use rustyssl_abi::{
-    BIO, BIO_CTRL_INFO, BIO_METHOD, OPENSSL_STACK, OPENSSL_STRING, SRP_VBASE, SRP_user_pwd, TXT_DB,
+    BIGNUM, BIO, BIO_CTRL_INFO, BIO_METHOD, OPENSSL_STACK, OPENSSL_STRING, SRP_VBASE, SRP_gN_cache,
+    SRP_user_pwd, TXT_DB,
 };
 // Linked for its exports, which the declarations below resolve to.
 use rustyssl_capi as _;
@@ -45,6 +46,8 @@ unsafe extern "C" {
     ) -> *mut c_char;
     fn OPENSSL_sk_num(st: *const OPENSSL_STACK) -> c_int;
     fn OPENSSL_sk_value(st: *const OPENSSL_STACK, i: c_int) -> *mut c_void;
+    fn OPENSSL_sk_pop(st: *mut OPENSSL_STACK) -> *mut c_void;
+    fn BN_free(a: *mut BIGNUM);
     fn OPENSSL_LH_strhash(c: *const c_char) -> c_ulong;
     fn BIO_new(m: *const BIO_METHOD) -> *mut BIO;
     fn BIO_new_mem_buf(buf: *const c_void, len: c_int) -> *mut BIO;
@@ -181,6 +184,25 @@ fuzz_target!(|data: &[u8]| {
             let u = unsafe { SRP_VBASE_get1_by_user(vb, name.as_ptr().cast_mut()) };
             // SAFETY: made here, or NULL.
             unsafe { SRP_user_pwd_free(u) };
+        }
+        // SRP_VBASE_free frees the group cache's list but not its entries, as OpenSSL does: the
+        // users SRP_VBASE_get1_by_user returns borrow their g and N, so they must outlive the
+        // base. Ours are freed, so the entries go here (or LeakSanitizer reports them).
+        // SAFETY: the base made above, or NULL.
+        if let Some(v) = unsafe { vb.as_ref() } {
+            let cache: *mut OPENSSL_STACK = v.gN_cache.cast();
+            loop {
+                // SAFETY: the base's cache, which holds only entries.
+                let e: *mut SRP_gN_cache = unsafe { OPENSSL_sk_pop(cache) }.cast();
+                // SAFETY: an entry the cache held, or NULL when it's empty.
+                let Some(entry) = (unsafe { e.as_ref() }) else { break };
+                // SAFETY: the entry's string and number, then the entry, each freed once.
+                unsafe {
+                    CRYPTO_free(entry.b64_bn.cast(), ptr::null(), 0);
+                    BN_free(entry.bn);
+                    CRYPTO_free(e.cast(), ptr::null(), 0);
+                }
+            }
         }
         // SAFETY: made here.
         unsafe { SRP_VBASE_free(vb) };

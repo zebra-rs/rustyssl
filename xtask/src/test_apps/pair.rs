@@ -451,7 +451,9 @@ pub fn mask(text: &str, port: &str) -> String {
     out.join("\n")
 }
 
-/// `s` with each occurrence of the number `n` that isn't part of a longer number replaced.
+/// `s` with each occurrence of the number `n` that stands alone replaced: not where a digit or a
+/// letter touches it, so a run of hex (a key share in a `-trace` dump) that happens to contain
+/// the port keeps it, and is masked as hex later.
 fn replace_number(s: &str, n: &str, with: &str) -> String {
     let mut out = String::new();
     let mut rest = s;
@@ -459,7 +461,9 @@ fn replace_number(s: &str, n: &str, with: &str) -> String {
         let before = rest[..at].chars().next_back();
         let after = rest[at + n.len()..].chars().next();
         out.push_str(&rest[..at]);
-        if before.is_some_and(|c| c.is_ascii_digit()) || after.is_some_and(|c| c.is_ascii_digit()) {
+        if before.is_some_and(|c| c.is_ascii_alphanumeric())
+            || after.is_some_and(|c| c.is_ascii_alphanumeric())
+        {
             out.push_str(n);
         } else {
             out.push_str(with);
@@ -560,8 +564,11 @@ pub fn check(
         ("our server on rustyssl, upstream's client", ours_rs, up),
     ];
     let (es, ec) = (
-        mask(&expected.server, &expected.port),
-        tickets_last(&mask(&expected.client, &expected.port)),
+        without_nbio_blocks(&mask(&expected.server, &expected.port), &pair.server),
+        without_nbio_blocks(
+            &tickets_last(&mask(&expected.client, &expected.port)),
+            &pair.client,
+        ),
     );
     for (name, server, client) in runs {
         let got = run(setup, pair, server, client, !compare)?;
@@ -576,8 +583,8 @@ pub fn check(
             continue;
         }
         let (gs, gc) = (
-            mask(&got.server, &got.port),
-            tickets_last(&mask(&got.client, &got.port)),
+            without_nbio_blocks(&mask(&got.server, &got.port), &pair.server),
+            without_nbio_blocks(&tickets_last(&mask(&got.client, &got.port)), &pair.client),
         );
         if gc != ec {
             save(setup, label, name, "client", &ec, &gc);
@@ -594,6 +601,27 @@ pub fn check(
         }
     }
     Ok(Ok(()))
+}
+
+/// A side's text without `-nbio`'s retry lines (`read R BLOCK`, `write W BLOCK`, ...): how many
+/// a handshake prints depends on whether each non-blocking call came before the peer's flight,
+/// which is timing (a slow runner skips one). `-nbio_test`'s lines are only run (`~`).
+fn without_nbio_blocks(text: &str, side: &Side) -> String {
+    if !side.args.iter().any(|a| a == "-nbio") {
+        return text.to_owned();
+    }
+    let block = |l: &str| {
+        let mut w = l.split(' ');
+        matches!(
+            (w.next(), w.next(), w.next(), w.next()),
+            (Some("read" | "write"), Some("R" | "W"), Some("BLOCK"), None)
+        )
+    };
+    let mut out: Vec<&str> = text.lines().filter(|l| !block(l)).collect();
+    if text.ends_with('\n') {
+        out.push("");
+    }
+    out.join("\n")
 }
 
 /// Keeps both texts of a failure, for a diff.
@@ -627,12 +655,48 @@ mod tests {
     }
 
     #[test]
+    fn nbio_block_lines() {
+        let side = |a: &str| Side {
+            args: a.split(' ').map(str::to_owned).collect(),
+            stdin: None,
+        };
+        let text = "CONNECTED(00000003)\nwrite R BLOCK\nread R BLOCK\n---\nread R BLOCKED\n";
+        assert_eq!(
+            without_nbio_blocks(text, &side("s_client -nbio")),
+            "CONNECTED(00000003)\n---\nread R BLOCKED\n"
+        );
+        // Only with -nbio itself: -nbio_test lines are run, not compared, and others keep theirs.
+        assert_eq!(
+            without_nbio_blocks(text, &side("s_client -nbio_test")),
+            text
+        );
+        assert_eq!(without_nbio_blocks(text, &side("s_client")), text);
+        assert_eq!(
+            without_nbio_blocks("read W BLOCK", &side("s_server -nbio")),
+            ""
+        );
+    }
+
+    #[test]
     fn masking() {
         assert_eq!(
             mask("ACCEPT 127.0.0.1:4321", "4321"),
             "ACCEPT 127.0.0.1:{port}"
         );
         assert_eq!(mask("x 43210", "4321"), "x 43210");
+        // The port inside a random hex run (run 39734936987, arm64): left for the hex mask.
+        assert_eq!(
+            replace_number("(len=8): EA2045678FB0", "45678", "{port}"),
+            "(len=8): EA2045678FB0"
+        );
+        assert_eq!(
+            replace_number("at 127.0.0.1:45678, done", "45678", "{port}"),
+            "at 127.0.0.1:{port}, done"
+        );
+        assert_eq!(
+            mask("        key_exchange:  (len=8): EA2045678FB0", "45678"),
+            "        key_exchange:  (len=8): HEX"
+        );
         assert_eq!(mask("    Session-ID: ABCD", ""), "    Session-ID: MASKED");
         let full = "    0050 - dc e2 c2 3d 04 d9 0f dd-d6 77 45 46 96 a0 01 49   ...=....wEF....I";
         assert_eq!(stray_text(full, Some("    0060 - 00")), None);

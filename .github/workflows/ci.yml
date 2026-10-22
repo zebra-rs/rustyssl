@@ -190,9 +190,15 @@ jobs:
         run: |
           host=$(rustc +nightly -vV | sed -n 's/^host: //p')
           i=0
+          failed=""
           for target in $(cargo +nightly fuzz list); do
             if [ $((i % 6)) -eq ${{ matrix.shard }} ]; then
-              cargo +nightly fuzz run --target "$host" "$target" -- -max_total_time=300
+              # Every target runs, so one run shows every finding.
+              cargo +nightly fuzz run --target "$host" "$target" -- -max_total_time=300 || failed="$failed $target"
             fi
             i=$((i + 1))
           done
+          if [ -n "$failed" ]; then
+            echo "::error::fuzz targets with findings:$failed"
+            exit 1
+          fi
