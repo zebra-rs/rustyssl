@@ -31,6 +31,10 @@ const TARGETS: &[(&str, u64)] = &[
     ("rsa-raw-decrypt", 40_000),
     ("rsa-pkcs1-decrypt", 40_000),
     ("tls-cbc-record", 40_000),
+    ("dtls-cbc-record", 40_000),
+    ("dsa-sign-nonce", 40_000),
+    ("ecdsa-brainpool-nonce", 40_000),
+    ("sm2-sign", 40_000),
 ];
 
 /// dudect's line: above it, "definitely not constant time".

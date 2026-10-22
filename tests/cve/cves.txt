@@ -57,30 +57,30 @@ CVE-2010-0740 test cve_tls a record with major version 4 is refused
 CVE-2010-0742 test cve_pkcs EnvelopedData with OriginatorInfo certificates parses and decrypts
 CVE-2010-0928 n/a upstream a fault attack outside OpenSSL's threat model
 CVE-2010-1633 test cve_pkey verify-recover of a bad signature reports failure
-CVE-2010-3864 gap race a thread race on extension data: not reproducible deterministically
+CVE-2010-3864 test cve_race 8 threads of SNI handshakes and resumptions against one server's session cache
 CVE-2010-4180 n/a removed the Netscape cipher-change workaround; a no-op in 3.x
 CVE-2010-4252 n/a removed J-PAKE; removed upstream, not in rustyssl
 CVE-2010-5298 test cve_tls released read buffers are reacquired, not reused
 CVE-2011-0014 test cve_tls a malformed status_request extension is refused
 CVE-2011-3207 test cve_x509 a CRL whose nextUpdate has passed fails verification
-CVE-2011-3210 gap race a thread race on ECDH state: not reproducible deterministically
-CVE-2011-4108 gap timing DTLS CBC padding-oracle timing: tls-cbc-record measures TLS, not DTLS
+CVE-2011-3210 test cve_race 8 threads of ECDHE handshakes on one server context
+CVE-2011-4108 covered test-timing DTLS CBC padding check: dudect's dtls-cbc-record target (padding 0 against 255 over DTLS)
 CVE-2011-4109 test cve_x509 policy checking frees its tree once
 CVE-2011-4576 n/a sslv3 SSL 3.0 record padding; SSL 3.0 is disabled in the default build
 CVE-2011-4577 test cve_asn1 a malformed RFC 3779 address range
 CVE-2011-4619 n/a removed Server Gated Cryptography restarts; removed upstream
 CVE-2012-0027 n/a removed the GOST engine; not part of OpenSSL 3 or rustyssl
-CVE-2012-0050 gap dtls DTLS CBC records after a handshake: no in-memory DTLS handshake harness yet
+CVE-2012-0050 test cve_dtls forged CBC records (MAC then encrypt) of every short length into an established association are dropped; it lives on
 CVE-2012-0884 test cve_pkcs PKCS#7 decryption with the wrong RSA key reveals nothing (MMA)
 CVE-2012-2110 test cve_asn1 a header claiming 2 GiB on a short BIO fails
 CVE-2012-2131 test cve_asn1 a header claiming 2 GiB on a short BIO fails (0.9.8 fix)
-CVE-2012-2333 gap dtls DTLS explicit IV length check: no in-memory DTLS handshake harness yet
+CVE-2012-2333 test cve_dtls forged CBC records shorter than the explicit IV are dropped; the association lives on
 CVE-2012-2686 test cve_cipher a TLS 1.2 CBC record through the AES-NI path
 CVE-2013-0166 test cve_pkcs an OCSP signer certificate without a key fails verification
 CVE-2013-0169 test cve_tls CBC records of bad padding fail as bad MACs
 CVE-2013-4353 n/a 1.0.1 a 1.0.1 handshake-digest NULL dereference; not in 3.x's design
 CVE-2013-6449 n/a 1.0.1 a 1.0.1 TLS 1.2 digest-selection bug; not in 3.x's design
-CVE-2013-6450 gap dtls DTLS retransmission with the previous epoch's keys: no in-memory DTLS handshake harness yet
+CVE-2013-6450 test cve_dtls the server's final flight is lost; the client's retransmission is answered with the right keys
 CVE-2014-0076 covered test-timing ECDSA nonce cache timing: dudect's ecdsa-sign target (P-256)
 CVE-2014-0160 test cve_tls a heartbeat request is refused, echoing nothing
 CVE-2014-0195 test cve_tls a DTLS fragment past its message's length is dropped
@@ -92,8 +92,8 @@ CVE-2014-3505 test cve_tls a bad DTLS fragment's error path frees once
 CVE-2014-3506 test cve_tls DTLS message lengths can't make the server allocate 16 MiB
 CVE-2014-3507 test cve_tls zero-length DTLS fragments don't leak
 CVE-2014-3508 test cve_asn1 OBJ_obj2txt into a short buffer stays within it and NUL-terminates
-CVE-2014-3509 gap race a thread race on a resumed session's point formats: not reproducible deterministically
-CVE-2014-3510 gap dtls a DTLS client with anonymous (EC)DH: no crafted DTLS server flights yet
+CVE-2014-3509 test cve_race one ECDHE session (with its point formats) resumed on 8 threads at once
+CVE-2014-3510 test cve_dtls a DTLS client offering anonymous ECDH gets ServerHelloDone without ServerKeyExchange: unexpected_message
 CVE-2014-3511 test cve_tls a fragmented ClientHello still negotiates TLS 1.2
 CVE-2014-3512 test cve_pkey SRP rejects A = N and values longer than N
 CVE-2014-3513 test cve_tls a malformed use_srtp extension is refused without a leak
@@ -105,7 +105,7 @@ CVE-2014-3570 test cve_pkey BN_sqr equals BN_mul for 64- to 4096-bit all-ones va
 CVE-2014-3571 test cve_tls a zero-length DTLS record is dropped
 CVE-2014-3572 test cve_tls ECDHE without its ServerKeyExchange is refused
 CVE-2014-5139 test cve_tls a ServerHello with an SRP suite that wasn't offered is refused
-CVE-2014-8176 gap dtls DTLS application data between ChangeCipherSpec and Finished: no in-memory DTLS handshake harness yet
+CVE-2014-8176 test cve_dtls application data between ChangeCipherSpec and Finished in a resumed DTLS handshake
 CVE-2014-8275 test cve_x509 a certificate whose outer signature algorithm differs from the signed one fails
 CVE-2015-0204 test cve_tls a ServerKeyExchange for RSA key exchange is refused
 CVE-2015-0205 n/a removed fixed-DH client certificates; static DH authentication was removed upstream
@@ -126,32 +126,32 @@ CVE-2015-1787 test cve_tls an empty ClientKeyExchange with DHE and client auth f
 CVE-2015-1788 test cve_x509 malformed binary-field parameters don't loop forever
 CVE-2015-1789 test cve_asn1 X509_cmp_time rejects malformed times without reading past them
 CVE-2015-1790 test cve_pkcs PKCS#7 enveloped data without encrypted content fails
-CVE-2015-1791 gap race a thread race on NewSessionTicket: not reproducible deterministically
+CVE-2015-1791 test cve_race one TLS 1.2 session resumed on 8 threads, its ticket renewed on every resumption
 CVE-2015-1792 test cve_pkcs CMS verification with an unknown digest ends
 CVE-2015-1793 test cve_x509 alternative chain building doesn't let a non-CA issue certificates
 CVE-2015-1794 test cve_pkey DH with p=0 fails cleanly
 CVE-2015-3193 test cve_pkey Montgomery exponentiation equals the simple method (x86_64 squaring)
 CVE-2015-3194 test cve_x509 a PSS maskGenAlgorithm without parameters
 CVE-2015-3195 test cve_asn1 a malformed X509_ATTRIBUTE fails to parse, freeing what it built
-CVE-2015-3196 gap race a thread race on PSK identity hints: not reproducible deterministically
+CVE-2015-3196 test cve_race one PSK session with an identity hint resumed on 8 threads at once
 CVE-2015-3197 n/a sslv2 SSLv2 cipher negotiation; SSLv2 is not implemented
 CVE-2016-0701 test cve_pkey modular exponentiation equals the simple method (MIPS squaring)
 CVE-2016-0702 covered test-timing modular exponentiation cache-bank timing: dudect's bn-modexp-consttime target
 CVE-2016-0703 n/a sslv2 SSLv2 (DROWN); SSLv2 is not implemented
 CVE-2016-0704 n/a sslv2 SSLv2 (DROWN); SSLv2 is not implemented
 CVE-2016-0705 test cve_pkey a malformed DSA private key fails without a double free
-CVE-2016-0797 gap size BN_hex2bn/BN_dec2bn with INT_MAX digits: needs > 2 GiB input; lengths are checked (rule 3)
+CVE-2016-0797 test cve_size BN_hex2bn and BN_dec2bn on INT_MAX / 4 + 2 digits (512 MiB) fail
 CVE-2016-0798 test cve_pkey SRP_VBASE_get1_by_user of an unknown user returns an owned record
 CVE-2016-0799 test cve_asn1 BIO_printf's %s, width and precision stay within bounds
 CVE-2016-0800 n/a sslv2 SSLv2 (DROWN); SSLv2 is not implemented
-CVE-2016-2105 gap size EVP_EncodeUpdate overflow: needs > 2 GiB input; lengths are checked (rule 3)
-CVE-2016-2106 gap size EVP_EncryptUpdate overflow: needs > 2 GiB input; lengths are checked (rule 3)
+CVE-2016-2105 test cve_size EVP_EncodeUpdate of 1.6 GB, whose base64 passes INT_MAX, fails reporting no length
+CVE-2016-2106 test cve_size a buffered partial block plus INT_MAX octets to a legacy cipher fails before reading
 CVE-2016-2107 test cve_cipher a TLS CBC record with bad padding and MAC fails
 CVE-2016-2108 test cve_asn1 negative zero encodes as 0; odd INTEGERs round-trip
 CVE-2016-2109 test cve_asn1 d2i_CMS_bio with a 2 GiB length on a short BIO fails
 CVE-2016-2176 n/a platform EBCDIC builds
 CVE-2016-2177 n/a c undefined C pointer arithmetic; rustyssl's lengths are checked (AGENTS.md rule 3)
-CVE-2016-2178 gap timing DSA signing constant time: not measured by test-timing yet
+CVE-2016-2178 covered test-timing DSA signing: dudect's dsa-sign-nonce target (a full-length nonce against one 8 bits shorter, RFC 6979)
 CVE-2016-2179 test cve_tls buffered out-of-order DTLS messages are bounded
 CVE-2016-2180 test cve_asn1 TS_OBJ_print_bio prints a long OID within bounds
 CVE-2016-2181 test cve_tls replay protection holds for future-epoch records
@@ -160,7 +160,7 @@ CVE-2016-2183 test cve_tls no 3DES suite is enabled by default (SWEET32)
 CVE-2016-6302 test cve_tls a ticket shorter than its SHA-512 HMAC leads to a full handshake
 CVE-2016-6303 test cve_cipher MDC2 # skip MDC2 isn't offered here
 CVE-2016-6304 test cve_tls a status_request with 2000 responder ids is handled in bounds
-CVE-2016-6305 gap tls SSL_peek on an empty encrypted record: needs an encrypted empty record
+CVE-2016-6305 test cve_tls SSL_peek on a TLS 1.0 CBC stream whose write starts with an empty record returns the data
 CVE-2016-6306 test cve_tls a Certificate message with inconsistent lengths is refused
 CVE-2016-6307 test cve_tls a handshake message claiming 16 MiB is refused before buffering it
 CVE-2016-6308 test cve_tls the declared message length is checked first
@@ -172,16 +172,16 @@ CVE-2016-7055 test cve_pkey Montgomery multiplication equals the simple method (
 CVE-2017-3730 test cve_pkey a DH peer value of 1 is rejected
 CVE-2017-3731 test cve_tls a truncated AES-GCM record fails cleanly
 CVE-2017-3732 test cve_pkey modular exponentiation equals the simple method (x86_64 carry)
-CVE-2017-3733 gap tls Encrypt-then-MAC changing at renegotiation: needs a crafted renegotiation
+CVE-2017-3733 test cve_tls Encrypt-then-MAC added, and dropped, by a renegotiation of a CBC suite; data flows both ways after
 CVE-2017-3735 test cve_asn1 a 1-octet IPAddressFamily
 CVE-2017-3736 test cve_pkey modular exponentiation equals the simple method (bn_sqrx8x)
 CVE-2017-3737 test cve_tls after a fatal error, SSL_write and SSL_read keep failing
 CVE-2017-3738 test cve_pkey 1024-bit and longer exponentiation equals the simple method (AVX2)
 CVE-2018-0732 test cve_pkey DH key generation with a 20000-bit p is refused
 CVE-2018-0733 n/a asm HP-UX PA-RISC CRYPTO_memcmp assembly
-CVE-2018-0734 gap timing DSA signing timing: not measured by test-timing yet
+CVE-2018-0734 covered test-timing DSA signing: dudect's dsa-sign-nonce target (a full-length nonce against one 8 bits shorter, RFC 6979)
 CVE-2018-0735 covered test-timing ECDSA signing timing: dudect's ecdsa-sign target (P-256)
-CVE-2018-0737 gap timing RSA key generation cache timing: not measured by test-timing yet
+CVE-2018-0737 gap timing RSA key generation: its time depends on the primes it finds, so dudect's fixed-against-random classes don't apply; its exponentiations are bn-modexp-consttime's
 CVE-2018-0739 test cve_asn1 PKCS#7 content nested %d deep fails without exhausting the stack
 CVE-2018-5407 covered test-timing ECC scalar multiplication timing: dudect's ecdsa-sign target (P-256; SMT port contention isn't measured)
 CVE-2019-1543 test cve_cipher ChaCha20-Poly1305 refuses nonces over 12 octets
@@ -203,7 +203,7 @@ CVE-2021-3712 test cve_asn1 printing an ASN1_STRING that isn't NUL-terminated re
 CVE-2021-4044 test cve_tls a negative X509_verify_cert result fails the handshake
 CVE-2021-4160 test cve_pkey modular exponentiation equals the simple method (MIPS carry)
 CVE-2021-23839 n/a removed RSA_padding_check_SSLv23 and RSA_SSLV23_PADDING were removed in 3.0
-CVE-2021-23840 gap size EVP_CipherUpdate output length overflow: needs > 2 GiB input; lengths are checked (rule 3)
+CVE-2021-23840 test cve_size an update whose output would pass INT_MAX fails with OUTPUT_WOULD_OVERFLOW
 CVE-2021-23841 test cve_asn1 X509_issuer_and_serial_hash of a certificate without an issuer
 CVE-2022-0778 test cve_x509 BN_mod_sqrt with a composite modulus returns
 CVE-2022-1292 n/a script the c_rehash script; not shipped (rehash is the Rust tool, no shell)
@@ -239,7 +239,7 @@ CVE-2023-5678 test cve_pkey generating an X9.42 DH key with an oversized q ends 
 CVE-2023-6129 n/a asm PowerPC POLY1305 assembly
 CVE-2023-6237 test cve_pkey EVP_PKEY_public_check of a 20000-bit RSA modulus ends quickly
 CVE-2024-0727 test cve_pkcs PKCS#12 files with NULL ContentInfo fields are handled
-CVE-2024-2511 gap tls TLS 1.3 session cache growth with SSL_OP_NO_TICKET: memory use isn't observable here
+CVE-2024-2511 test cve_tls 120 TLS 1.3 handshakes, 80 resumed, with SSL_OP_NO_TICKET: the cache stays within its size of 8
 CVE-2024-4603 test cve_pkey checking an 11000-bit DSA key ends quickly
 CVE-2024-4741 test cve_tls SSL_free_buffers refuses while a record is partly read
 CVE-2024-5535 test cve_tls SSL_select_next_proto with an empty client list stays within the server's
@@ -249,12 +249,12 @@ CVE-2024-12797 test cve_tls a client expecting another raw public key aborts the
 CVE-2024-13176 covered test-timing ECDSA nonce top-word timing: dudect's ecdsa-sign target (P-256)
 CVE-2025-4575 apps x509 x509 -addreject adds a rejected use
 CVE-2025-9230 test cve_pkcs RFC 3211 KEK unwrap with wrong passwords stays in bounds (64 messages)
-CVE-2025-9231 gap timing SM2 timing: not measured by test-timing yet
+CVE-2025-9231 covered test-timing SM2 signing on 64-bit Arm: dudect's sm2-sign target (a fixed key against random ones)
 CVE-2025-9232 test cve_bio matching servers against no_proxy reads only the given names
 CVE-2025-11187 test cve_pkcs PBMAC1 parameters are validated (10 malformed files)
 CVE-2025-15467 test cve_pkcs
 CVE-2025-15468 test cve_tls SSL_CIPHER_find of an unknown id returns NULL, on TLS and QUIC
-CVE-2025-15469 gap apps dgst one-shot truncation past 16 MiB: test-apps has no 16 MiB input yet
+CVE-2025-15469 apps dgst one-shot Ed25519 signing of 17 MB fails (read error, no signature) instead of signing the first 16 MiB
 CVE-2025-66199 n/a build TLS 1.3 certificate compression needs zlib, brotli or zstd, none in the default build
 CVE-2025-68160 test cve_bio BIO_f_linebuffer with short writes downstream stays in bounds
 CVE-2025-69418 test cve_cipher low-level OCB authenticates and encrypts trailing octets
@@ -264,9 +264,9 @@ CVE-2025-69421 test cve_pkcs encrypted PKCS#12 data without encryptedContent fai
 CVE-2026-2673 test cve_tls DEFAULT in a server's group list keeps its tuple structure
 CVE-2026-7383 test cve_asn1 multibyte conversions size their output exactly
 CVE-2026-9076 test cve_pkcs a 2-octet PWRI encryptedKey fails without reading past it
-CVE-2026-14456 gap quic QUIC: no crafted-packet harness yet (fuzz target quic_port covers packet parsing)
+CVE-2026-14456 test cve_quic Initials for 5000 unknown connection IDs: the listener queues fewer, and memory stays bounded
 CVE-2026-14457 test cve_tls an RPK server with only a private key selects its signature safely
-CVE-2026-18798 gap quic QUIC: no crafted-packet harness yet (fuzz target quic_port covers packet parsing)
+CVE-2026-18798 test cve_quic the same flood: Initials whose channel isn't created are handled without a double free
 CVE-2026-22795 test cve_pkcs PKCS#12 bag attributes of the wrong type are handled
 CVE-2026-22796 test cve_pkcs a messageDigest attribute of the wrong type fails verification
 CVE-2026-28386 test cve_cipher AES-CFB-128 in odd pieces reads only its input
@@ -279,38 +279,38 @@ CVE-2026-31790 test cve_pkey RSASVE encapsulation reports success only with a se
 CVE-2026-34180 test cve_asn1 a primitive whose content runs past the input is rejected
 CVE-2026-34181 test cve_pkcs a PBMAC1 file with a short HMAC key is rejected
 CVE-2026-34182 test cve_pkcs AuthEnvelopedData with tampered authAttrs is rejected, releasing nothing
-CVE-2026-34183 gap quic QUIC: no crafted-packet harness yet (fuzz target quic_port covers packet parsing)
+CVE-2026-34183 test cve_quic 800000 PATH_CHALLENGE frames, never acknowledged: memory stays bounded
 CVE-2026-35188 test cve_tls malformed stapled OCSP responses are checked without a double free
 CVE-2026-35189 test cve_x509 3000 nameRelativeToCRLIssuer distribution points are processed quickly
-CVE-2026-35191 gap quic QUIC: no crafted-packet harness yet (fuzz target quic_port covers packet parsing)
-CVE-2026-42764 gap quic QUIC: no crafted-packet harness yet (fuzz target quic_port covers packet parsing)
+CVE-2026-35191 test cve_quic coalesced copies of an Initial in one datagram: the server sends at most 3x what it received
+CVE-2026-42764 test cve_quic an Initial with a token the server never issued, without address validation
 CVE-2026-42765 test cve_x509 a partial chain with OCSP checking and no issuer is verified safely
 CVE-2026-42766 test cve_pkcs a PWRI key-encryption cipher without an IV fails
 CVE-2026-42767 test cve_pkcs decrypting a CRMF EncryptedValue without symmAlg parameters fails
 CVE-2026-42768 test cve_pkcs CMS decryption across two RecipientInfos with an unrelated key reveals nothing
-CVE-2026-42769 gap cmp CMP rootCaKeyUpdate verification: needs a crafted CMP genp exchange
+CVE-2026-42769 test cve_cmp a rootCaKeyUpdate whose newWithOld names the old root but wasn't signed by it is refused; a genuine one is accepted
 CVE-2026-42770 test cve_pkey a DHX peer whose q differs from ours is refused as a peer
 CVE-2026-42771 n/a 4.0 OpenSSL 4.0 only (rustyssl targets the 3.x ABI)
-CVE-2026-42772 gap quic QUIC: no crafted-packet harness yet (fuzz target quic_port covers packet parsing)
+CVE-2026-42772 test cve_quic 20000 reversed one-octet STREAM frames reassemble quickly (found rustyssl closing with INTERNAL_ERROR)
 CVE-2026-45445 test cve_cipher AES-OCB through EVP_Cipher uses the IV, as EVP_EncryptUpdate does
 CVE-2026-45446 test cve_cipher AES-SIV and AES-GCM-SIV check the tag of an empty message
 CVE-2026-45447 test cve_pkcs PKCS#7 verification of a message with repeated certificates
-CVE-2026-54872 gap timing non-NIST curve scalar multiplication timing: ecdsa-sign measures P-256 only
-CVE-2026-54873 gap quic QUIC: no crafted-packet harness yet (fuzz target quic_port covers packet parsing)
+CVE-2026-54872 covered test-timing scalar multiplication on a curve without a dedicated implementation: dudect's ecdsa-brainpool-nonce target
+CVE-2026-54873 test cve_quic 200000 one-octet STREAM fragments around gaps never filled: memory stays bounded, the connection stays open
 CVE-2026-54874 test cve_tls DTLS records for a future epoch are buffered in bounds
-CVE-2026-54875 gap timing SM2 scalar multiplication timing: not measured by test-timing yet
+CVE-2026-54875 covered test-timing SM2 scalar multiplication on Arm64: dudect's sm2-sign target
 CVE-2026-54876 test cve_tls checking stapled OCSP responses releases what it parsed
 CVE-2026-63072 test cve_pkcs KARI with a key-wrap-pad OID fails without writing past its buffer
 CVE-2026-63073 covered test-openssl-suite a CMP sender DN as a format string: upstream's cmp_vfy_test, run by test-openssl-suite --all
-CVE-2026-63074 gap cmp CMP extraCerts cache growth: memory use isn't observable here
-CVE-2026-63075 gap quic QUIC: no crafted-packet harness yet (fuzz target quic_port covers packet parsing)
+CVE-2026-63074 test cve_cmp 50 requests failing validation, each with a new extra certificate, to one reused server context: none stays cached
+CVE-2026-63075 test cve_quic 20000 ack-eliciting packets whose ACK-only replies are never acknowledged: memory stays bounded
 CVE-2026-63076 test cve_pkcs a CMP request whose PBM protectionAlg parameter has the wrong type is refused
 CVE-2026-72897 test cve_tls switching SSL_CTX in the servername callback stays in bounds
 CVE-2026-75803 test cve_cipher an empty ciphertext with a forged tag fails through EVP_Cipher
-CVE-2026-75804 gap quic QUIC: no crafted-packet harness yet (fuzz target quic_port covers packet parsing)
-CVE-2026-75805 gap cmp a crafted CMP revocation response: needs a crafted CMP rp exchange
-CVE-2026-75806 gap dtls an undersized DTLS 1.2 AEAD record: no in-memory DTLS handshake harness yet
-CVE-2026-77696 gap timing SM2 signing timing: not measured by test-timing yet
-CVE-2026-84782 gap dtls DTLS retransmission from a stale offset: no in-memory DTLS handshake harness yet
+CVE-2026-75804 test cve_quic STREAM data over the connection window, each stream within its own: FLOW_CONTROL_ERROR
+CVE-2026-75805 test cve_cmp an rp carrying a CertId, for a revocation requested by PKCS#10 CSR (crafted, re-protected)
+CVE-2026-75806 test cve_dtls forged AES-GCM and ChaCha20-Poly1305 records shorter than nonce and tag are dropped; the association lives on
+CVE-2026-77696 covered test-timing SM2 signing's arithmetic on the private key: dudect's sm2-sign target (SM2 has no deterministic nonce to fix)
+CVE-2026-84782 test cve_dtls the server's flight is suspended by a full datagram pair and its timer expires: the flight stays intact
 CVE-2026-84783 n/a 4.0 OpenSSL 4.0 only (rustyssl targets the 3.x ABI)
-CVE-2026-84784 gap quic QUIC: no crafted-packet harness yet (fuzz target quic_port covers packet parsing)
+CVE-2026-84784 test cve_quic 20000 NEW_CONNECTION_ID frames each retiring the earlier IDs: memory stays bounded
