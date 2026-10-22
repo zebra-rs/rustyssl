@@ -57,6 +57,8 @@ services (sshd, nginx, httpd, PostgreSQL, ...) after switching.
 
 To try one program without switching the system, run it with `LD_LIBRARY_PATH` set to
 rustyssl's directory (`DYLD_LIBRARY_PATH` on macOS, for programs outside SIP).
+[TRY-ON-UBUNTU.md](TRY-ON-UBUNTU.md) walks through building and trying it on Ubuntu 22.04 and
+24.04 this way, its limits (setuid programs, `RPATH`, OpenSSH 8.9 on 22.04), and SSH.
 
 ## Check
 
