@@ -193,9 +193,9 @@ generator. Don't paste the number.
 ## Commands
 
 Working now: `cargo build`, `test`, `clippy`, `fmt`, `deny`, `vet`, and `fuzz`, and the
-xtask commands `vendor`, `codegen`, `dist`, `ref-openssl`, `abi-check`, `test-c`, `test-cve`,
+xtask commands `vendor`, `codegen`, `dist` (`--profile fedora`), `package`, `ref-openssl`, `abi-check`, `test-c`, `test-cve`,
 `test-apps`, `test-interop`, `test-differential`, `test-openssl-suite` (`evp_test`, `bntest`, `ectest`, `rsa_test`; libssl's programs with `--ssl`; the whole tree with `--all`, our CLI with `--cli ours`),
-`test-wycheproof`, `test-bogo`, `test-tlsfuzzer`, `test-timing`, `test-providers`, `test-consumers` (`rust`, `ruby`, `pyca`, `node`, `ngtcp2`, `curl-h3`), `test-quic-interop`, `coverage`, and `usage-scan`.
+`test-wycheproof`, `test-bogo`, `test-tlsfuzzer`, `test-timing`, `test-providers`, `test-consumers` (`rust`, `ruby`, `pyca`, `node`, `ngtcp2`, `curl-h3`), `test-quic-interop`, `test-distro`, `coverage`, and `usage-scan`.
 The other `cargo xtask` commands arrive later and fail with a message until then. Update this
 section when they change. CI (`.github/workflows/ci.yml`) runs the gates on every push.
 
@@ -242,6 +242,11 @@ Tools each command needs:
   fetched at a pinned commit).
 - **`test-bogo`:** what `dist` and `ref-openssl` need, plus `curl`, `tar`, and Go (at least
   the version BoringSSL's go.mod names; it builds the runner, fetching its modules).
+- **`package`:** what `dist` needs, plus `tar`; on macOS (`homebrew`) also `install_name_tool`,
+  `otool`, and `codesign` (from the Xcode command-line tools).
+- **`test-distro`:** Docker (the containers run on the host's architecture; images it pulls are
+  removed after the run), and on macOS for `homebrew`, Homebrew with `openssl@3` and a Python
+  that links it.
 - **`abi-check`:** what `dist` and `ref-openssl` need, plus `pkg-config`, and on macOS `otool`
   (from the Xcode command-line tools); its `compat35` check also needs what `codegen` needs
   (`clang` and bindgen 0.73.2).
@@ -279,8 +284,11 @@ cargo deny check && cargo vet                # supply-chain gates
 cargo xtask vendor 3.5.9                     # fetch, verify (PGP + SHA-256), and vendor a release into abi/
 cargo xtask codegen                          # regenerate bindings, export lists, stubs, error and object tables
 cargo xtask dist                             # build lib{crypto,ssl}.so.3 with soname + symbol versions, and bin/openssl (ours), into target/dist/
+cargo xtask dist --profile fedora            # the same with Fedora's ABI extras (MD2, SCTP, the OPENSSL_3.1.0 dup aliases); Linux
+cargo xtask package <debian|fedora|el|alpine|homebrew>  # a distribution's side-by-side install tree and tarball -> target/package/ (docs/MIGRATION.md)
+cargo xtask test-distro [distro...]          # TEST_PLAN L11 in Debian, Ubuntu, Fedora, EL10, Alpine containers (and Homebrew on macOS) -> target/distro-report.md
 cargo xtask ref-openssl [3.5.9]              # build the reference OpenSSL (default: the vendored version) into target/ref/
-cargo xtask abi-check [check...]             # L3: exports+versions, metadata, signatures, layouts, constants, linking, headers, compat35
+cargo xtask abi-check [--profile P] [check...]  # L3: exports+versions, metadata, signatures, layouts, constants, linking, headers, compat35
 cargo xtask coverage [--list PREFIX...]      # implemented exports per library and header -> docs/coverage.md
 cargo xtask usage-scan [--jobs N] [--limit N]  # rank exports by how many distro packages import them -> docs/symbol-usage.md
 cargo xtask test-c                           # tests/c/*.c, each run on the reference and on target/dist; output must match

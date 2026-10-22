@@ -80,6 +80,10 @@ const FILES: &[&str] = &[
     // The keys `openssl speed` benchmarks with: RSA private keys (DER) and DSA key parts.
     "apps/testrsa.h",
     "apps/testdsa.h",
+    // The default configuration files `make install` puts in OPENSSLDIR, which rustyssl's
+    // packages install (cargo xtask package).
+    "apps/openssl.cnf",
+    "apps/ct_log_list.cnf",
 ];
 
 /// Directories whose files with the given extension are vendored.

@@ -61,6 +61,8 @@ pub enum Algorithm {
     Blake2b512,
     /// RIPEMD-160.
     Ripemd160,
+    /// MD2 (the legacy provider's, in builds that offer it: the Fedora profile).
+    Md2,
     /// MD4 (legacy provider).
     Md4,
     /// Whirlpool (legacy provider).
@@ -102,7 +104,7 @@ impl Algorithm {
     pub const fn output_size(self) -> usize {
         match self {
             Self::Null => 0,
-            Self::Md4 | Self::Md5 => 16,
+            Self::Md2 | Self::Md4 | Self::Md5 => 16,
             Self::Sha1 | Self::Ripemd160 => 20,
             Self::Sha224 | Self::Sha512_224 | Self::Sha3_224 => 28,
             Self::Sha256
@@ -134,6 +136,7 @@ impl Algorithm {
             Self::Sha3_384 => 104,
             Self::Sha3_512 => 72,
             Self::Shake128 | Self::KeccakKmac128 => 168,
+            Self::Md2 => 16,
             Self::Md4
             | Self::Md5
             | Self::Md5Sha1
@@ -201,6 +204,7 @@ impl Backend for RustCrypto {
             Algorithm::Sha512_224 => Box::new(Fixed::<sha2::Sha512_224>::default()),
             Algorithm::Sha512_256 => Box::new(Fixed::<sha2::Sha512_256>::default()),
             Algorithm::Md5 => Box::new(Fixed::<md5::Md5>::default()),
+            Algorithm::Md2 => Box::new(Fixed::<md2::Md2>::default()),
             Algorithm::Md4 => Box::new(Fixed::<md4::Md4>::default()),
             Algorithm::Sm3 => Box::new(Fixed::<sm3::Sm3>::default()),
             Algorithm::Blake2s256 => Box::new(Fixed::<blake2::Blake2s256>::default()),

@@ -1,0 +1,33 @@
+# ClusterFuzzLite on pull requests (oss-fuzz/README.md): build the fuzz targets with
+# AddressSanitizer and fuzz the ones the change affects; a crash fails the job.
+name: ClusterFuzzLite PR fuzzing
+on:
+  pull_request:
+    paths:
+      - "crates/**"
+      - "fuzz/**"
+      - "oss-fuzz/**"
+      - ".clusterfuzzlite/**"
+      - "Cargo.lock"
+permissions: read-all
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+jobs:
+  pr:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Build the fuzz targets
+        id: build
+        uses: google/clusterfuzzlite/actions/build_fuzzers@v1
+        with:
+          language: rust
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          sanitizer: address
+      - name: Fuzz the targets the change affects
+        uses: google/clusterfuzzlite/actions/run_fuzzers@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          fuzz-seconds: 600
+          mode: code-change
+          sanitizer: address

@@ -1,0 +1,5 @@
+#!/bin/sh
+# Select the system's OpenSSL again before rustyssl's files go away.
+s=/usr/lib/rustyssl/bin/rustyssl-select
+[ -x "$s" ] && [ "$("$s" status)" = rustyssl ] && "$s" system
+exit 0

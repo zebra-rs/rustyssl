@@ -128,7 +128,8 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_BIO
     {
         let mut on = mode;
-        let request = c_long::from_ne_bytes(libc::FIONBIO.to_ne_bytes());
+        // FIONBIO is an `unsigned long` in glibc and macOS, an `int` in musl; it fits either way.
+        let Ok(request) = c_long::try_from(libc::FIONBIO) else { return 0 };
         // SAFETY: FIONBIO takes a pointer to an `int`.
         c_int::from(unsafe { BIO_socket_ioctl(s, request, (&raw mut on).cast()) } == 0)
     }

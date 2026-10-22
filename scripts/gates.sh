@@ -37,8 +37,12 @@ run cargo clippy --workspace --all-targets -- -D warnings
 grep -E "^(error|warning)" -A5 "$LAST" | head -30
 run cargo test --workspace
 grep -E "FAILED|panicked" "$LAST" | head
+run cargo clippy -p rustyssl-libcrypto -p rustyssl-capi --features rustyssl-capi/fedora --all-targets -- -D warnings
+run cargo test -p rustyssl-capi --features fedora --lib -- md2 sctp
 run cargo xtask codegen
 run cargo xtask coverage
+run cargo xtask unsafe-audit
+grep -E "FAIL" "$LAST" | head -5
 git diff --stat -- 'crates/*/src/generated' libs docs/coverage.md | tail -3
 run cargo xtask test-c
 grep -E "FAIL|passed|failed" "$LAST" | tail -5

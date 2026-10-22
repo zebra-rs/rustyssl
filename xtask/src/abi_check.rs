@@ -17,6 +17,10 @@
 //!
 //! Name checks to run only those. The checks use the host's target: CI runs them on each
 //! platform it builds.
+//!
+//! `--profile <name>` checks a distribution profile's build (`cargo xtask dist --profile`,
+//! Linux): `symbols` then also expects the profile's extra functions at their nodes and its
+//! version aliases as non-default versions, and nothing else changes.
 
 mod compat35;
 mod library;
@@ -28,6 +32,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::codegen::exports::{LIBRARIES, PRIVATE_PREFIX, parse_version_script};
+use crate::codegen::profiles::{self, Profile};
 use crate::codegen::stubs::{CAPI_SRC, implemented_functions};
 use crate::targets::{OPENSSL_SERIES, Target, host};
 use crate::test_c::prepare;
@@ -73,6 +78,10 @@ pub struct Context {
     exports: BTreeMap<&'static str, BTreeMap<String, String>>,
     /// The private functions the shipped modules call in libcrypto.
     module_imports: BTreeSet<String>,
+    /// The distribution profile checked, if any.
+    profile: Option<&'static Profile>,
+    /// Its extra libcrypto functions: name -> version node.
+    profile_exports: BTreeMap<String, String>,
 }
 
 impl Context {
@@ -110,6 +119,7 @@ impl Context {
             for name in &self.module_imports {
                 expected.insert(name.clone(), "RUSTYSSL_PRIVATE".to_owned());
             }
+            expected.extend(self.profile_exports.clone());
         }
         expected
     }
@@ -123,6 +133,10 @@ impl Context {
 }
 
 pub fn run(args: &[String]) -> Result {
+    let (profile, args) = match args {
+        [flag, name, rest @ ..] if flag == "--profile" => (Some(profiles::find(name)?), rest),
+        _ => (None, args),
+    };
     let selected: Vec<&(&str, Check)> = if args.is_empty() {
         CHECKS.iter().collect()
     } else {
@@ -139,7 +153,15 @@ pub fn run(args: &[String]) -> Result {
             .collect::<std::result::Result<_, _>>()?
     };
     let root = workspace_root();
-    let (reference, dist) = prepare(&root)?;
+    let (reference, dist) = match profile {
+        None => prepare(&root)?,
+        Some(profile) => {
+            let reference =
+                crate::reference::ensure(&root, &crate::reference::vendored_version(&root)?)?;
+            crate::dist::run(&["--profile".to_owned(), profile.name.to_owned()])?;
+            (reference, target_dir(&root).join("dist"))
+        }
+    };
     let (_, target) = host()?;
     let abi = root.join(format!("abi/openssl-{OPENSSL_SERIES}"));
     let mut exports = BTreeMap::new();
@@ -158,6 +180,14 @@ pub fn run(args: &[String]) -> Result {
         }
         exports.insert(*library, names);
     }
+    let mut profile_exports = BTreeMap::new();
+    if let Some(profile) = profile {
+        for (node, names) in profiles::libcrypto_extras(&abi, profile)? {
+            for name in names {
+                profile_exports.insert(name, node.clone());
+            }
+        }
+    }
     let module_imports = crate::codegen::exports::module_imports(&root)?;
     let work = target_dir(&root).join("xtask/abi-check");
     fresh_dir(&work)?;
@@ -170,6 +200,8 @@ pub fn run(args: &[String]) -> Result {
         work,
         exports,
         module_imports,
+        profile,
+        profile_exports,
     };
 
     let mut failed = Vec::new();

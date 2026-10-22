@@ -624,6 +624,9 @@ each release.
 
 ### L11: Distro system tests (release gate)
 
+`cargo xtask test-distro [distro...]` (`tests/distro/`, report `target/distro-report.md`): each
+scenario runs on the system's OpenSSL, then with rustyssl selected (`rustyssl-select`).
+
 - Container images: Debian 13, Ubuntu LTS, Fedora (current), an EL10-compatible distro, and
   Alpine (musl). Each has the system libssl and libcrypto replaced by rustyssl packages.
 - Scenarios:
