@@ -1,0 +1,127 @@
+# Release workflow (docs/RELEASING.md). A `v*` tag runs the whole CI gate on every runner, builds
+# the packages, and drafts a GitHub release with them; a manual run (workflow_dispatch) does the
+# same as a dry run, keeping the packages as workflow artifacts and drafting nothing.
+#
+# Linux packages are built on Ubuntu 22.04 runners: what they link needs at most glibc 2.34
+# (docs/TRY-ON-UBUNTU.md), so they load on Ubuntu 22.04 and every newer glibc distribution.
+# Alpine's are built in its own container (musl).
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  linux:
+    needs: ci
+    name: package (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-22.04-arm]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install the toolchain from rust-toolchain.toml
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - name: Debian/Ubuntu, Fedora, and EL layouts
+        run: |
+          cargo xtask package debian
+          cargo xtask package fedora
+          cargo xtask package el
+      - name: The tool runs on the built libraries
+        run: target/dist/bin/openssl version -a
+      - uses: actions/upload-artifact@v6
+        with:
+          name: packages-${{ matrix.os }}
+          path: target/package/*.tar.gz
+          if-no-files-found: error
+
+  alpine:
+    needs: ci
+    name: package (alpine, ${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    container: rust:1.99.0-alpine
+    steps:
+      - name: Build tools (musl's unwinder is Rust's on Alpine)
+        run: apk add --no-cache bash git gcc musl-dev binutils llvm-libunwind-dev tar
+      - uses: actions/checkout@v7
+      - name: Install the toolchain from rust-toolchain.toml
+        run: rustup show
+      - run: cargo xtask package alpine
+      - uses: actions/upload-artifact@v6
+        with:
+          name: packages-alpine-${{ matrix.os }}
+          path: target/package/*.tar.gz
+          if-no-files-found: error
+
+  macos:
+    needs: ci
+    name: package (homebrew, macos-15)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install the toolchain from rust-toolchain.toml
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - name: The Homebrew keg, at the formula's prefix
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          cargo xtask package homebrew --prefix "/opt/homebrew/Cellar/rustyssl/$version" \
+            --openssldir /opt/homebrew/etc/rustyssl
+      - uses: actions/upload-artifact@v6
+        with:
+          name: packages-macos
+          path: target/package/*.tar.gz
+          if-no-files-found: error
+
+  release:
+    needs: [linux, alpine, macos]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: packages-*
+          path: packages
+          merge-multiple: true
+      - name: Name the packages after the release, add the source, and sum them
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          mkdir dist
+          # rustyssl-<OpenSSL version>-<layout>-<arch>.tar.gz -> rustyssl-<version>-<layout>-<arch>.tar.gz
+          for f in packages/*.tar.gz; do
+            base=$(basename "$f")
+            cp "$f" "dist/rustyssl-$version-${base#rustyssl-*-}"
+          done
+          git archive --format=tar.gz --prefix="rustyssl-$version/" -o "dist/rustyssl-$version-source.tar.gz" HEAD
+          (cd dist && sha256sum *.tar.gz > SHA256SUMS)
+          cat dist/SHA256SUMS
+      - name: The packages, on a dry run
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-dry-run
+          path: dist/*
+      - name: Draft the GitHub release (published by hand, docs/RELEASING.md)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* --draft --verify-tag \
+            --title "rustyssl ${GITHUB_REF_NAME#v}" --notes-file docs/RELEASE-NOTES-1.0.md

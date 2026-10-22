@@ -6428,8 +6428,20 @@ The CLI's gaps closed (2026-10-21, local, branch `cli-gaps`, macOS arm64):
   through `DYLD_LIBRARY_PATH`; Homebrew's curl and Python 3.15 link `openssl@4`, so they can't
   use the 3.x ABI. Left: x86_64 containers (the same images; not run here), and Debian's and
   Ubuntu's apt over OpenSSL (it uses GnuTLS).
-- [ ] **12.5 Release 1.0.** The ABI stability promise is OpenSSL's 3.x ABI. The Rust crates
+- [~] **12.5 Release 1.0.** The ABI stability promise is OpenSSL's 3.x ABI. The Rust crates
   follow SemVer.
+  *Prepared, not released (2026-10-22; the user's decision: everything is prepared, and the user
+  is asked before the tag).* Version 1.0.0 (the crates; `OpenSSL_version` reads
+  `OpenSSL 3.6.5+rustyssl.1.0.0`; the ABI stays 3.6.5's); `CHANGELOG.md`;
+  `docs/RELEASE-NOTES-1.0.md`; `docs/RELEASING.md` (pre-flight, tag, checking the draft,
+  after publishing); `.github/workflows/release.yml` (a `v*` tag runs CI on every runner
+  (`ci.yml` is callable), builds the debian, fedora, and el packages on Ubuntu 22.04 x86_64 and
+  arm64, alpine in its container, homebrew on macOS 15, adds the source tarball and
+  `SHA256SUMS`, and drafts the GitHub release; a manual run is a dry run). The `usage-scan`
+  rerun 12.3 deferred is done here. M7's status: the distribution tests, the CVE suite, the
+  constant-time report, and the 1.0 performance targets are done; open are the external audit
+  (not done), M1's 24-hour EVP campaign, M3's OpenSSH regression suite, and M4's nginx-tests,
+  curl TLS tests, and CPython `test_ssl` (CHANGELOG.md's milestone table).
 
 ## Phase 13: OpenSSL 4.0 ABI → M8
 
