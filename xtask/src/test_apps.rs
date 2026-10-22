@@ -36,7 +36,8 @@
 //!
 //! A line `SERVER ARGS || CLIENT ARGS` pairs an `s_server` with a client (`{port}` is the
 //! server's port), each library's server with each library's client: see [`pair`]. (G5 used a
-//! lone `|`, which G2's `| check` already meant; it became `||` at the merge.)
+//! lone `|`, which G2's `| check` already meant; it became `||` at the merge.) A side run with
+//! `-nbio` is compared without its `read R BLOCK`/`write W BLOCK` lines, whose number is timing.
 //!
 //! After the prefixes, `@<fixture> ` makes the line stateful: before each of its runs, the directory
 //! `tests/apps/<fixture>` is copied afresh to `{dir}/<its last component>` (a CA's database and
