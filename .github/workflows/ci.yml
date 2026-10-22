@@ -93,6 +93,8 @@ jobs:
         run: cargo xtask abi-check
       # Last: it rebuilds target/dist with the profile.
       - name: The Fedora profile's exports (cargo xtask dist --profile fedora)
+        # Export profiles are for Linux distributions; dist refuses them elsewhere.
+        if: runner.os == 'Linux'
         run: cargo xtask abi-check --profile fedora symbols metadata binary
 
   # Miri interprets one thread at a time, so the tests run in parallel jobs, each one Miri
