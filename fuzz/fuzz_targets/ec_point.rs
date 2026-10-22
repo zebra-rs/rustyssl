@@ -3,7 +3,9 @@
 //! the rest is the encoding. Nothing may panic, and a point that decodes:
 //!
 //! - is on the curve;
-//! - encodes back, in its own form, to exactly the octets it came from;
+//! - encodes back, in its own form, to exactly the octets it came from, except that on a
+//!   binary curve a compressed point with x = 0 comes back with its y-bit clear (OpenSSL's
+//!   decoder ignores the bit there, y being the root of b, and its encoder writes 0);
 //! - multiplied by the group's order times its cofactor, is the point at infinity.
 
 #![no_main]
@@ -50,7 +52,15 @@ fuzz_target!(|data: &[u8]| {
         f => f,
     };
     let again = oct::encode(&g, &p, form, &mut rng).expect("re-encoding a decoded point");
-    assert_eq!(again, enc, "re-encoding differs");
+    let binary = !g.poly.is_empty();
+    let x_is_zero = enc.get(1..).is_some_and(|x| x.iter().all(|b| *b == 0));
+    if binary && form == oct::COMPRESSED && x_is_zero && enc.len() > 1 {
+        let mut expected = enc.to_vec();
+        expected[0] &= !1;
+        assert_eq!(again, expected, "re-encoding differs (x = 0 on a binary curve)");
+    } else {
+        assert_eq!(again, enc, "re-encoding differs");
+    }
     let n = bn::mul(&g.order, &g.cofactor).expect("order times cofactor");
     let mut r = Point::infinity();
     let pairs = [(&p, &n)];
