@@ -7,7 +7,7 @@ crates/rustyssl-capi/bio 1308 465 14 1 3
 crates/rustyssl-capi/bn 605 252 4 0 0
 crates/rustyssl-capi/buffer 44 7 0 0 0
 crates/rustyssl-capi/cmac 45 12 0 0 0
-crates/rustyssl-capi/cmp 1768 347 0 1 18
+crates/rustyssl-capi/cmp 1771 347 0 1 18
 crates/rustyssl-capi/cms 1625 264 0 0 8
 crates/rustyssl-capi/comp 21 20 0 0 0
 crates/rustyssl-capi/conf 398 111 4 0 27
