@@ -127,6 +127,9 @@ static void seal_edges(EVP_PKEY *k)
     check(EVP_SealInit(ctx, NULL, ek, ekl, iv, keys, 1) == 1, "the context's cipher with a NULL type");
     check(EVP_OpenInit(ctx, EVP_aes_128_cbc(), NULL, 0, NULL, NULL) == 1,
           "EVP_OpenInit without a key only sets the cipher");
+    /* Fixed octets: under implicit rejection, a bad ciphertext decrypts to a synthetic key whose
+     * length depends on it, and a random one is 16 octets (AES-128's key) about once in 250. */
+    memset(ek1, 0x5a, 3);
     check(EVP_OpenInit(ctx, NULL, ek1, 3, iv, k) == 0, "a short encrypted key fails");
     errors();
     EVP_CIPHER_CTX_free(ctx);
