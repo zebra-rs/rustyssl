@@ -5,7 +5,7 @@
 
 Name:           rustyssl
 Version:        3.6.5
-Release:        0.1.0%{?dist}
+Release:        1.0.0%{?dist}
 Summary:        Memory-safe drop-in replacement for OpenSSL's libraries
 License:        Apache-2.0
 URL:            https://github.com/zebra-rs/rustyssl
@@ -43,5 +43,8 @@ fi
 %config(noreplace) %{_sysconfdir}/pki/tls/ct_log_list.cnf.dist
 
 %changelog
+* Thu Oct 22 2026 rustyssl developers <rustyssl@localhost> - 3.6.5-1.0.0
+- rustyssl 1.0.0.
+
 * Wed Oct 21 2026 rustyssl developers <rustyssl@localhost> - 3.6.5-0.1.0
 - OpenSSL 3.6.5's ABI with the Fedora profile, side by side with the system's OpenSSL.

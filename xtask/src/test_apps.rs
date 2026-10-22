@@ -1074,7 +1074,7 @@ mod tests {
     #[test]
     fn masking() {
         assert_eq!(
-            masked("OpenSSL 3.5.9 (Library: OpenSSL 3.5.9+rustyssl.0.1.0 29 Sep)"),
+            masked("OpenSSL 3.5.9 (Library: OpenSSL 3.5.9+rustyssl.1.0.0 29 Sep)"),
             "OpenSSL 3.5.9 (Library: OpenSSL 3.5.9 29 Sep)"
         );
         assert_eq!(
