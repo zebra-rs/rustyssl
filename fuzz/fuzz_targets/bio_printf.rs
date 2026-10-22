@@ -1,12 +1,14 @@
 //! Fuzzes OpenSSL's printf through its C ABI: the input is a buffer size and a format. Every
 //! argument is the same pointer, to a NUL-terminated string in a writable buffer, which every
-//! conversion can take (`%s` and `%n` among them; integers and doubles read its bits). The
+//! conversion can take (`%s` and `%n` among them; integers read its bits). The
 //! format is kept to as many conversions as there are arguments, and away from widths that
 //! would make `BIO_printf` build gigabytes.
 //!
 //! Checks: nothing panics or crashes; `BIO_snprintf` never writes past its buffer, and a
 //! non-negative return is the length before the NUL it wrote; and what fits in a large buffer
-//! is exactly what `BIO_printf` writes to a memory BIO.
+//! is exactly what `BIO_printf` writes to a memory BIO, unless the format has a floating-point
+//! conversion: where the calling convention passes doubles in their own registers (x86_64's
+//! SSE registers), those conversions read whatever is there, which differs between calls.
 
 #![no_main]
 
@@ -24,6 +26,25 @@ unsafe extern "C" {
     fn BIO_ctrl(b: *mut BIO, cmd: c_int, larg: c_long, parg: *mut c_void) -> c_long;
     fn BIO_snprintf(buf: *mut c_char, n: usize, format: *const c_char, ...) -> c_int;
     fn BIO_printf(bio: *mut BIO, format: *const c_char, ...) -> c_int;
+}
+
+/// Whether a conversion in `format` takes a double (`%e`, `%f`, `%g`, `%a` in either case),
+/// whose value the pointer arguments don't determine on every target.
+fn has_float_conversion(format: &[u8]) -> bool {
+    let mut i = 0;
+    while let Some(off) = format.get(i..).and_then(|rest| rest.iter().position(|b| *b == b'%')) {
+        i += off + 1;
+        // Flags, width, precision and length modifiers come before the conversion.
+        while format.get(i).is_some_and(|b| b"-+ #0123456789.*hlLqjzt'".contains(b)) {
+            i += 1;
+        }
+        match format.get(i) {
+            Some(b'e' | b'E' | b'f' | b'F' | b'g' | b'G' | b'a' | b'A') => return true,
+            Some(_) => i += 1,
+            None => break,
+        }
+    }
+    false
 }
 
 /// The arguments' target, reset before each call (`%n` writes to it).
@@ -84,7 +105,7 @@ fuzz_target!(|data: &[u8]| {
     } else {
         Vec::new()
     };
-    if fitted >= 0 {
+    if fitted >= 0 && !has_float_conversion(&format) {
         let fitted = usize::try_from(fitted).unwrap();
         assert_eq!(written, &large[..fitted]);
         assert_eq!(usize::try_from(printed.max(0)).unwrap(), fitted);
