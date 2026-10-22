@@ -6310,7 +6310,7 @@ The CLI's gaps closed (2026-10-21, local, branch `cli-gaps`, macOS arm64):
 
 ## Phase 12: Hardening, performance, release 1.0 → M7
 
-- [~] **12.1 Performance:** benchmark against the reference (per TEST_PLAN L10). Close the gaps
+- [x] **12.1 Performance:** benchmark against the reference (per TEST_PLAN L10). Close the gaps
   with intrinsics in vetted backends and with profiling. Assembly is not allowed. Set the
   targets once there's a baseline (initial goal: within 1.25× of the reference on hot
   symmetric paths and within 1.5× on handshakes).
@@ -6325,7 +6325,10 @@ The CLI's gaps closed (2026-10-21, local, branch `cli-gaps`, macOS arm64):
   full TLS 1.3 ECDSA handshakes 7.8× → 3.1×; TLS 1.2 resumption 4.1× → 2.6×; TLS bulk 12× → 4.3×.
   Met: hashes from 1 KiB, Ed25519, ML-DSA, memory, start-up. Missed: the initial 1.25×/1.5× goals
   for AES/ChaCha bulk and handshakes (no assembly; P-256, RSA and AES are the gaps); the
-  follow-ups are listed in docs/PERFORMANCE.md.
+  follow-ups are listed in docs/PERFORMANCE.md. **The user's decision (2026-10-22):** 1.0 uses
+  the targets set from this baseline (docs/PERFORMANCE.md: handshakes within 4×, resumption
+  within 3×, AEAD bulk within 5×, hashes within 1.25× from 1 KiB, and no regression past 5%);
+  the initial 1.25×/1.5× goals are post-1.0 work.
 - [~] **12.2 Security:**
   - a third-party audit (the crypto backends and all `unsafe` in capi). The user's decision
     (2026-10-21): rustyssl prepares the package, the user engages a firm. **Package done:**

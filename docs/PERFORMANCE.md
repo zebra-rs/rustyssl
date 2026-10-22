@@ -165,7 +165,7 @@ assembly ruled out (AGENTS.md) and primitives from vetted crates:
 | Memory per connection | **met** | 0.94×; per `SSL_CTX` 0.59× |
 | Start-up (whole process) | **met** | ~1.05× |
 
-**Targets set for 1.0** (from this baseline; tracked with `bench --compare`): no regression past 5%
+**Targets set for 1.0** (from this baseline, the user's decision 2026-10-22; tracked with `bench --compare`): no regression past 5%
 on a dedicated machine; hashes ≤ 1.25× at 1 KiB and up (met); handshakes ≤ 4× and resumption
 ≤ 3× (met); AEAD bulk ≤ 5× (met). The initial 1.25×/1.5× goals stay the aim, and need the
 follow-ups below.
