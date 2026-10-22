@@ -14,9 +14,11 @@ use crate::wire::frame_type as ft;
 
 /// The most bytes a send buffer holds unacknowledged (OpenSSL's `MAX_WRITE_BUF_SIZE`).
 pub const MAX_SEND_BUF: usize = 6 * 1024 * 1024;
-/// The most separate gaps a receive buffer tracks (ours; flow control bounds the octets, this
-/// bounds the fragments a peer can scatter within them).
-pub const MAX_RECV_FRAGMENTS: usize = 8192;
+/// The furthest a receive buffer reaches past what was read (ours, far above any window flow
+/// control allows: 12 times the 512 KiB stream window, or the crypto buffer). Flow control is
+/// what bounds a buffer: its octets, and so its gaps, at most one for every two octets, as in
+/// OpenSSL.
+pub const MAX_RECV_REACH: usize = 64 * 1024 * 1024;
 /// OpenSSL's initial connection receive window and its growth limit.
 pub const DEFAULT_INIT_CONN_RXFC_WND: u64 = 768 * 1024;
 pub const DEFAULT_CONN_RXFC_MAX_WND_MUL: u64 = 20;
@@ -321,53 +323,78 @@ impl SendBuf {
     }
 }
 
-/// A receive buffer: data reassembled in order.
+/// A receive buffer: data reassembled in order, as OpenSSL's ring buffer and range set do. The
+/// octets from `read` on live in one buffer (flow control bounds how far it reaches), and the
+/// ranges that arrived are kept merged, so contiguous data costs nothing per fragment however it
+/// was split or ordered (CVE-2026-42772, CVE-2026-54873).
 #[derive(Clone, Debug, Default)]
 pub struct RecvBuf {
-    /// Fragments by offset, disjoint, at or above `read`.
-    frags: BTreeMap<u64, Vec<u8>>,
+    /// The octets from `read` on; those outside `have` are zero.
+    data: VecDeque<u8>,
+    /// The ranges received, start to end, disjoint and not adjacent, at or above `read`.
+    have: BTreeMap<u64, u64>,
     /// Octets before this were read.
     read: u64,
     final_size: Option<u64>,
 }
 
 impl RecvBuf {
-    /// Queues `data` at `offset`, trimming what was read or is already held.
+    /// Queues `data` at `offset`, trimming what was read.
     ///
     /// # Errors
-    /// The data would scatter into too many fragments (INTERNAL_ERROR, our own bound).
+    /// The data would reach further than any window allows (INTERNAL_ERROR, our own bound;
+    /// flow control is checked before this).
     pub fn insert(&mut self, offset: u64, data: &[u8], frame_type: u64) -> Result<()> {
-        let end = offset.saturating_add(u64::try_from(data.len()).unwrap_or(u64::MAX));
-        let mut pos = offset.max(self.read);
-        while pos < end {
-            // The fragment at or before pos, if it covers pos, skips us past it.
-            if let Some((&fs, f)) = self.frags.range(..=pos).next_back() {
-                let fe = fs.saturating_add(u64::try_from(f.len()).unwrap_or(u64::MAX));
-                if fe > pos {
-                    pos = fe;
-                    continue;
+        let internal = || {
+            Error::new(
+                rustyssl_abi::OSSL_QUIC_ERR_INTERNAL_ERROR,
+                frame_type,
+                "internal error (rstream queue)",
+            )
+        };
+        let len = u64::try_from(data.len()).map_err(|_| internal())?;
+        let end = offset.saturating_add(len);
+        let start = offset.max(self.read);
+        if start >= end {
+            return Ok(());
+        }
+        // Where the buffer must reach, relative to `read`.
+        let reach = usize::try_from(end.saturating_sub(self.read)).map_err(|_| internal())?;
+        if reach > MAX_RECV_REACH {
+            return Err(internal());
+        }
+        let (mut s, mut e) = (start, end);
+        let mut merged = Vec::new();
+        if let Some((&ps, &pe)) = self.have.range(..=s).next_back()
+            && pe >= s
+        {
+            s = ps;
+            e = e.max(pe);
+            merged.push(ps);
+        }
+        for (&ns, &ne) in self.have.range(s..) {
+            if ns > e {
+                break;
+            }
+            e = e.max(ne);
+            merged.push(ns);
+        }
+        if self.data.len() < reach {
+            self.data.resize(reach, 0);
+        }
+        let from = usize::try_from(start.saturating_sub(offset)).map_err(|_| internal())?;
+        let at = usize::try_from(start.saturating_sub(self.read)).map_err(|_| internal())?;
+        if let Some(src) = data.get(from..) {
+            for (i, &b) in src.iter().enumerate() {
+                if let Some(d) = self.data.get_mut(at.saturating_add(i)) {
+                    *d = b;
                 }
             }
-            // A gap until the next fragment (or the end).
-            let gap_end = self
-                .frags
-                .range(pos..)
-                .next()
-                .map_or(end, |(&ns, _)| ns.min(end));
-            if self.frags.len() >= MAX_RECV_FRAGMENTS {
-                return Err(Error::new(
-                    rustyssl_abi::OSSL_QUIC_ERR_INTERNAL_ERROR,
-                    frame_type,
-                    "internal error (rstream queue)",
-                ));
-            }
-            let from = usize::try_from(pos.saturating_sub(offset)).unwrap_or(usize::MAX);
-            let to = usize::try_from(gap_end.saturating_sub(offset)).unwrap_or(usize::MAX);
-            if let Some(piece) = data.get(from..to) {
-                self.frags.insert(pos, piece.to_vec());
-            }
-            pos = gap_end;
         }
+        for k in merged {
+            self.have.remove(&k);
+        }
+        self.have.insert(s, e);
         Ok(())
     }
 
@@ -379,14 +406,10 @@ impl RecvBuf {
     /// Octets readable in order now.
     #[must_use]
     pub fn available(&self) -> u64 {
-        let mut pos = self.read;
-        for (&s, f) in self.frags.range(self.read..) {
-            if s != pos {
-                break;
-            }
-            pos = pos.saturating_add(u64::try_from(f.len()).unwrap_or(u64::MAX));
+        match self.have.first_key_value() {
+            Some((&s, &e)) if s <= self.read => e.saturating_sub(self.read),
+            _ => 0,
         }
-        pos.saturating_sub(self.read)
     }
 
     /// Whether every octet up to the final size has arrived.
@@ -398,25 +421,17 @@ impl RecvBuf {
 
     /// Reads into `buf`; returns the octets read and whether the end was reached.
     pub fn read(&mut self, buf: &mut [u8]) -> (usize, bool) {
-        let mut n = 0usize;
-        while n < buf.len() {
-            let Some(mut f) = self.frags.remove(&self.read) else {
-                break;
-            };
-            let room = buf.len().saturating_sub(n);
-            let take = room.min(f.len());
-            if let (Some(dst), Some(src)) = (buf.get_mut(n..n.saturating_add(take)), f.get(..take))
-            {
-                dst.copy_from_slice(src);
-            }
-            n = n.saturating_add(take);
+        let n = self.copy_out(buf);
+        if n > 0 {
+            self.data.drain(..n);
             self.read = self
                 .read
-                .saturating_add(u64::try_from(take).unwrap_or(u64::MAX));
-            if take < f.len() {
-                f.drain(..take);
-                self.frags.insert(self.read, f);
-                break;
+                .saturating_add(u64::try_from(n).unwrap_or(u64::MAX));
+            if let Some((&s, &e)) = self.have.first_key_value() {
+                self.have.remove(&s);
+                if e > self.read {
+                    self.have.insert(self.read, e);
+                }
             }
         }
         (n, self.final_size == Some(self.read))
@@ -426,24 +441,22 @@ impl RecvBuf {
     /// copied and whether the end would be reached.
     #[must_use]
     pub fn peek(&self, buf: &mut [u8]) -> (usize, bool) {
-        let mut n = 0usize;
-        let mut off = self.read;
-        while n < buf.len() {
-            let Some(f) = self.frags.get(&off) else {
-                break;
-            };
-            let take = buf.len().saturating_sub(n).min(f.len());
-            if let (Some(dst), Some(src)) = (buf.get_mut(n..n.saturating_add(take)), f.get(..take))
-            {
-                dst.copy_from_slice(src);
-            }
-            n = n.saturating_add(take);
-            off = off.saturating_add(u64::try_from(take).unwrap_or(u64::MAX));
-            if take < f.len() {
-                break;
-            }
+        let n = self.copy_out(buf);
+        let end = self
+            .read
+            .saturating_add(u64::try_from(n).unwrap_or(u64::MAX));
+        (n, self.final_size == Some(end))
+    }
+
+    /// Copies the readable octets into `buf`; returns how many.
+    fn copy_out(&self, buf: &mut [u8]) -> usize {
+        let n = usize::try_from(self.available())
+            .unwrap_or(usize::MAX)
+            .min(buf.len());
+        for (d, &s) in buf.iter_mut().zip(self.data.iter()).take(n) {
+            *d = s;
         }
-        (n, self.final_size == Some(off))
+        n
     }
 
     /// The offset read so far.

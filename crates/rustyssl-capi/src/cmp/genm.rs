@@ -614,6 +614,7 @@ ffi_export! {
         let mut old_copy: *mut X509 = ptr::null_mut();
         let mut my_new_with_old: *mut X509 = ptr::null_mut();
         let mut my_old_with_new: *mut X509 = ptr::null_mut();
+        let (mut wrote_new_with_old, mut wrote_old_with_new) = (false, false);
         'end: {
             // SAFETY: the ITAV; the rooms.
             if unsafe { OSSL_CMP_ITAV_get0_rootCaKeyUpdate(itav, newWithNew, &raw mut my_new_with_old, &raw mut my_old_with_new) } == 0 {
@@ -652,6 +653,7 @@ ffi_export! {
                 if !newWithOld.is_null() {
                     // SAFETY: the caller's room.
                     unsafe { *newWithOld = my_new_with_old };
+                    wrote_new_with_old = true;
                     // SAFETY: the certificate of the ITAV.
                     if !my_new_with_old.is_null() && unsafe { X509_up_ref(my_new_with_old) } == 0 {
                         break 'free;
@@ -663,6 +665,7 @@ ffi_export! {
                 }
                 // SAFETY: the caller's room.
                 unsafe { *oldWithNew = my_old_with_new };
+                wrote_old_with_new = true;
                 // SAFETY: the certificate of the ITAV.
                 if my_old_with_new.is_null() || unsafe { X509_up_ref(my_old_with_new) } != 0 {
                     res = 1;
@@ -682,6 +685,20 @@ ffi_export! {
         unsafe { OSSL_CMP_ITAV_free(itav) };
         // SAFETY: the copy, or NULL.
         unsafe { X509_free(old_copy) };
+        if res == 0 {
+            // OpenSSL leaves the outputs pointing into the freed ITAV; ours fail closed
+            // (docs/DEVIATIONS.md).
+            // SAFETY: the caller's room, checked non-NULL above.
+            unsafe { *newWithNew = ptr::null_mut() };
+            if wrote_new_with_old {
+                // SAFETY: the caller's room, written above.
+                unsafe { *newWithOld = ptr::null_mut() };
+            }
+            if wrote_old_with_new {
+                // SAFETY: the caller's room, written above.
+                unsafe { *oldWithNew = ptr::null_mut() };
+            }
+        }
         res
     }
 }

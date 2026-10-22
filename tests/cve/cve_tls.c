@@ -1236,6 +1236,153 @@ static void dtls_inputs(void)
     }
 }
 
+/* The number of TLS records in a buffer of whole records. */
+static int count_records(const buf *b)
+{
+    int n = 0;
+
+    for (size_t p = 0; p + 5 <= b->n; n++)
+        p += 5 + (((size_t)b->p[p + 3] << 8) | b->p[p + 4]);
+    return n;
+}
+
+/* CVE-2016-6305: SSL_peek on a TLS 1.0 CBC stream, whose writes start with an empty record
+ * (the BEAST countermeasure), returns the data rather than spinning on the empty one. */
+static void empty_record_peek(void)
+{
+    const char *suite = "ECDHE-ECDSA-AES128-SHA:@SECLEVEL=0";
+    SSL_CTX *sctx = make_server_ctx(), *cctx = client_ctx(suite, TLS1_VERSION);
+    end c, s;
+    buf wire = {0};
+    char data[16];
+    int ok, r;
+
+    SSL_CTX_set_cipher_list(sctx, suite);
+    SSL_CTX_set_min_proto_version(sctx, TLS1_VERSION);
+    SSL_CTX_set_min_proto_version(cctx, TLS1_VERSION);
+    end_init(&c, cctx, 0);
+    end_init(&s, sctx, 1);
+    ok = handshake(&c, &s);
+    SSL_write(c.ssl, "hello", 5);
+    take(&c, &wire);
+    note("TLS 1.0 CBC write of 5 octets: %d records", count_records(&wire));
+    feed(&s, wire.p, wire.n);
+    r = SSL_peek(s.ssl, data, sizeof(data));
+    note("peek %d (%.*s), error %d", r, r > 0 ? r : 0, data, SSL_get_error(s.ssl, r));
+    check(ok && r == 5 && memcmp(data, "hello", 5) == 0,
+          "CVE-2016-6305: SSL_peek past an empty encrypted record returns the data");
+    r = SSL_read(s.ssl, data, sizeof(data));
+    check(r == 5, "CVE-2016-6305: SSL_read after the peek returns the same data");
+    free_buf(&wire);
+    end_free(&c);
+    end_free(&s);
+    SSL_CTX_free(sctx);
+    SSL_CTX_free(cctx);
+    ERR_clear_error();
+}
+
+/* Drives a client-initiated renegotiation to its end; 1 when it finished. */
+static int renegotiate(end *c, end *s)
+{
+    char sink[64];
+
+    if (!SSL_renegotiate(c->ssl))
+        return 0;
+    for (int i = 0; i < 32 && SSL_renegotiate_pending(c->ssl); i++) {
+        SSL_do_handshake(c->ssl);
+        relay(c, s);
+        SSL_read(s->ssl, sink, sizeof(sink));
+        relay(s, c);
+        SSL_read(c->ssl, sink, sizeof(sink));
+        relay(c, s);
+    }
+    return !SSL_renegotiate_pending(c->ssl);
+}
+
+/* CVE-2017-3733: Encrypt-then-MAC switched on, or off, by a renegotiation of a CBC suite. */
+static void etm_renegotiation(void)
+{
+    for (int on_first = 0; on_first < 2; on_first++) {
+        const char *suite = "ECDHE-ECDSA-AES128-SHA";
+        SSL_CTX *sctx = make_server_ctx(), *cctx = client_ctx(suite, TLS1_2_VERSION);
+        end c, s;
+        char data[32];
+        int ok, reneg, r = 0;
+
+        SSL_CTX_set_options(sctx, SSL_OP_ALLOW_CLIENT_RENEGOTIATION);
+        end_init(&c, cctx, 0);
+        end_init(&s, sctx, 1);
+        if (!on_first)
+            SSL_set_options(c.ssl, SSL_OP_NO_ENCRYPT_THEN_MAC);
+        ok = handshake(&c, &s);
+        if (on_first)
+            SSL_set_options(c.ssl, SSL_OP_NO_ENCRYPT_THEN_MAC);
+        else
+            SSL_clear_options(c.ssl, SSL_OP_NO_ENCRYPT_THEN_MAC);
+        reneg = ok && renegotiate(&c, &s);
+        errors("renegotiation");
+        if (reneg) {
+            SSL_write(c.ssl, "after", 5);
+            relay(&c, &s);
+            r = SSL_read(s.ssl, data, sizeof(data));
+            SSL_write(s.ssl, "back", 4);
+            relay(&s, &c);
+            r = r == 5 ? SSL_read(c.ssl, data, sizeof(data)) : -1;
+        }
+        note("Encrypt-then-MAC %s by renegotiation: handshake %d, renegotiated %d, data %d",
+             on_first ? "dropped" : "added", ok, reneg, r);
+        check(ok && reneg && r == 4, "CVE-2017-3733: Encrypt-then-MAC %s at renegotiation "
+              "works both ways", on_first ? "dropped" : "added");
+        end_free(&c);
+        end_free(&s);
+        SSL_CTX_free(sctx);
+        SSL_CTX_free(cctx);
+        ERR_clear_error();
+    }
+}
+
+/* CVE-2024-2511: a TLS 1.3 server with SSL_OP_NO_TICKET (stateful sessions) keeps its session
+ * cache within its size over many full and resumed handshakes. */
+static void session_cache_growth(void)
+{
+    SSL_CTX *sctx = make_server_ctx(), *cctx = client_ctx(NULL, TLS1_3_VERSION);
+    SSL_SESSION *sess = NULL;
+    int reused = 0, done = 0;
+
+    SSL_CTX_set_options(sctx, SSL_OP_NO_TICKET);
+    SSL_CTX_sess_set_cache_size(sctx, 8);
+    for (int i = 0; i < 120; i++) {
+        end c, s;
+        char sink[8];
+
+        end_init(&c, cctx, 0);
+        end_init(&s, sctx, 1);
+        if (sess != NULL && i % 3 != 0)
+            SSL_set_session(c.ssl, sess);
+        if (handshake(&c, &s)) {
+            done++;
+            relay(&s, &c);
+            SSL_read(c.ssl, sink, sizeof(sink));
+            reused += SSL_session_reused(c.ssl);
+            SSL_SESSION_free(sess);
+            sess = SSL_get1_session(c.ssl);
+        }
+        SSL_set_shutdown(c.ssl, SSL_SENT_SHUTDOWN | SSL_RECEIVED_SHUTDOWN);
+        SSL_set_shutdown(s.ssl, SSL_SENT_SHUTDOWN | SSL_RECEIVED_SHUTDOWN);
+        end_free(&c);
+        end_free(&s);
+    }
+    ERR_clear_error();
+    note("session cache: %d handshakes, %d resumed, %ld sessions cached (size 8)", done, reused,
+         SSL_CTX_sess_number(sctx));
+    check(done == 120 && reused > 0 && SSL_CTX_sess_number(sctx) <= 8,
+          "CVE-2024-2511: TLS 1.3 sessions with SSL_OP_NO_TICKET don't grow the cache past its "
+          "size");
+    SSL_SESSION_free(sess);
+    SSL_CTX_free(sctx);
+    SSL_CTX_free(cctx);
+}
+
 int main(void)
 {
     server_key = ec_key();
@@ -1260,6 +1407,9 @@ int main(void)
     api_edges();
     client_inputs();
     dtls_inputs();
+    empty_record_peek();
+    etm_renegotiation();
+    session_cache_growth();
 
     X509_free(server_cert);
     EVP_PKEY_free(server_key);

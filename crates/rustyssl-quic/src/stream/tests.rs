@@ -46,15 +46,70 @@ fn recv_buf_reassembles_overlaps() {
 }
 
 #[test]
-fn recv_buf_bounds_fragments() {
+fn recv_buf_tracks_many_gaps() {
+    // Every other octet of 512 KiB, in reverse: as many gaps as a stream window allows.
     let mut b = RecvBuf::default();
-    let mut err = None;
-    for i in 0..(MAX_RECV_FRAGMENTS as u64 + 1) {
-        if let Err(e) = b.insert(i * 2 + 1, &[0], 0) {
-            err = Some(e);
+    let n = 512 * 1024u64;
+    for i in (0..n / 2).rev() {
+        b.insert(i * 2 + 1, &[1], 0).unwrap();
+    }
+    assert_eq!(b.available(), 0);
+    for i in 0..n / 2 {
+        b.insert(i * 2, &[0], 0).unwrap();
+    }
+    assert_eq!(b.available(), n);
+}
+
+/// Contiguous data arriving in reverse, one octet at a time, is one range (CVE-2026-42772).
+#[test]
+fn recv_buf_merges_reversed_octets() {
+    let mut b = RecvBuf::default();
+    let n = 200_000u64;
+    for i in (0..n).rev() {
+        b.insert(i, &[(i % 251) as u8], 0).unwrap();
+        if i > 0 {
+            assert_eq!(b.available(), 0);
         }
     }
-    assert!(err.is_some());
+    assert_eq!(b.available(), n);
+    let mut out = vec![0u8; n as usize];
+    let (got, _) = b.read(&mut out);
+    assert_eq!(got as u64, n);
+    assert!(
+        out.iter()
+            .enumerate()
+            .all(|(i, &v)| v == (i as u64 % 251) as u8)
+    );
+}
+
+/// Overlapping and duplicate data, partial reads, and data past the end of what was read.
+#[test]
+fn recv_buf_overlaps_and_partial_reads() {
+    let mut b = RecvBuf::default();
+    let msg: Vec<u8> = (0..100u8).collect();
+    b.insert(50, &msg[50..], 0).unwrap();
+    b.insert(10, &msg[10..60], 0).unwrap();
+    assert_eq!(b.available(), 0);
+    b.insert(0, &msg[..20], 0).unwrap();
+    assert_eq!(b.available(), 100);
+    let mut out = [0u8; 30];
+    assert_eq!(b.read(&mut out), (30, false));
+    assert_eq!(out[..], msg[..30]);
+    b.insert(0, &msg[..40], 0).unwrap();
+    b.set_final_size(100);
+    let mut rest = [0u8; 100];
+    assert_eq!(b.peek(&mut rest), (70, true));
+    assert_eq!(b.read(&mut rest), (70, true));
+    assert_eq!(rest[..70], msg[30..]);
+    assert!(b.all_received());
+}
+
+/// Data reaching further than any window is refused.
+#[test]
+fn recv_buf_bounds_reach() {
+    let mut b = RecvBuf::default();
+    assert!(b.insert(MAX_RECV_REACH as u64, &[0], 0).is_err());
+    assert!(b.insert(MAX_RECV_REACH as u64 - 1, &[0], 0).is_ok());
 }
 
 /// A sender and receiver over a channel that loses, reorders and duplicates chunks: the

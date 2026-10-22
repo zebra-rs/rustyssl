@@ -25,6 +25,7 @@
 #include <openssl/bn.h>
 #include <openssl/core_names.h>
 #include <openssl/crypto.h>
+#include <openssl/ec.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
@@ -348,6 +349,243 @@ static void ecdsa_run(size_t i)
     sink ^= out[0];
 }
 
+/* ---- Signing with deterministic nonces (RFC 6979): one key and two fixed digests, chosen
+ * here so the nonce of class 0's has its full length and class 1's at least 8 leading zero
+ * bits (the length leak lattice attacks use), both found without RFC 6979's retry. A signer
+ * whose time depends on the nonce tells them apart: DSA (CVE-2016-2178, CVE-2018-0734) and
+ * ECDSA on a curve without a dedicated implementation, brainpoolP256r1 (CVE-2026-54872). The
+ * nonces are computed here (RFC 6979 3.2, HMAC-SHA256) and checked against the signatures'
+ * r. ---- */
+static EVP_PKEY *nonce_key;
+static unsigned char nonce_digest[2][32];
+static int nonce_is_dsa;
+
+static void hmac256(const unsigned char *key, const unsigned char *a, size_t alen,
+                    const unsigned char *b, size_t blen, const unsigned char *c, size_t clen,
+                    unsigned char out32[32])
+{
+    EVP_MAC *mac = EVP_MAC_fetch(NULL, "HMAC", NULL);
+    EVP_MAC_CTX *ctx = EVP_MAC_CTX_new(mac);
+    OSSL_PARAM params[2];
+    size_t n = 32;
+
+    params[0] = OSSL_PARAM_construct_utf8_string(OSSL_MAC_PARAM_DIGEST, "SHA256", 0);
+    params[1] = OSSL_PARAM_construct_end();
+    EVP_MAC_init(ctx, key, 32, params);
+    EVP_MAC_update(ctx, a, alen);
+    if (blen != 0)
+        EVP_MAC_update(ctx, b, blen);
+    if (clen != 0)
+        EVP_MAC_update(ctx, c, clen);
+    EVP_MAC_final(ctx, out32, &n, 32);
+    EVP_MAC_CTX_free(ctx);
+    EVP_MAC_free(mac);
+}
+
+/* RFC 6979's first candidate nonce for `digest` (q of 256 bits, x the private key); 0 if it
+ * would be retried (k >= q or k == 0). */
+static int rfc6979_k(const BIGNUM *q, const BIGNUM *x, const unsigned char digest[32], BIGNUM *k)
+{
+    unsigned char v[32], key[32], xo[32], ho[32], buf[32 + 1 + 64];
+    BIGNUM *h = BN_bin2bn(digest, 32, NULL);
+    BN_CTX *bc = BN_CTX_new();
+    int ok;
+
+    BN_nnmod(h, h, q, bc);
+    BN_bn2binpad(x, xo, 32);
+    BN_bn2binpad(h, ho, 32);
+    memset(v, 1, 32);
+    memset(key, 0, 32);
+    for (int round = 0; round < 2; round++) {
+        memcpy(buf, v, 32);
+        buf[32] = (unsigned char)round;
+        memcpy(buf + 33, xo, 32);
+        memcpy(buf + 65, ho, 32);
+        hmac256(key, buf, sizeof(buf), NULL, 0, NULL, 0, key);
+        hmac256(key, v, 32, NULL, 0, NULL, 0, v);
+    }
+    hmac256(key, v, 32, NULL, 0, NULL, 0, v);
+    BN_bin2bn(v, 32, k);
+    ok = !BN_is_zero(k) && BN_cmp(k, q) < 0;
+    BN_free(h);
+    BN_CTX_free(bc);
+    return ok;
+}
+
+/* The signature's r for `digest`, from a deterministic signature. */
+static BIGNUM *signed_r(const unsigned char digest[32])
+{
+    EVP_PKEY_CTX *s = EVP_PKEY_CTX_new(nonce_key, NULL);
+    unsigned int deterministic = 1;
+    OSSL_PARAM params[3];
+    unsigned char sig[1024];
+    const unsigned char *p = sig;
+    size_t n = sizeof(sig);
+    BIGNUM *r = NULL;
+
+    params[0] = OSSL_PARAM_construct_uint(OSSL_SIGNATURE_PARAM_NONCE_TYPE, &deterministic);
+    params[1] = OSSL_PARAM_construct_utf8_string(OSSL_SIGNATURE_PARAM_DIGEST, "SHA256", 0);
+    params[2] = OSSL_PARAM_construct_end();
+    if (EVP_PKEY_sign_init_ex(s, params) > 0 && EVP_PKEY_sign(s, sig, &n, digest, 32) > 0) {
+        /* Both DSA's and ECDSA's signatures are SEQUENCE { r INTEGER, s INTEGER }. */
+        ECDSA_SIG *es = d2i_ECDSA_SIG(NULL, &p, (long)n);
+
+        if (es != NULL)
+            r = BN_dup(ECDSA_SIG_get0_r(es));
+        ECDSA_SIG_free(es);
+    }
+    EVP_PKEY_CTX_free(s);
+    return r;
+}
+
+/* The r a nonce k gives: (g^k mod p) mod q for DSA, the x of kG mod n for ECDSA. */
+static BIGNUM *expected_r(const BIGNUM *q, const BIGNUM *k)
+{
+    BN_CTX *bc = BN_CTX_new();
+    BIGNUM *r = BN_new();
+
+    if (nonce_is_dsa) {
+        BIGNUM *p = NULL, *g = NULL;
+
+        EVP_PKEY_get_bn_param(nonce_key, OSSL_PKEY_PARAM_FFC_P, &p);
+        EVP_PKEY_get_bn_param(nonce_key, OSSL_PKEY_PARAM_FFC_G, &g);
+        BN_mod_exp(r, g, k, p, bc);
+        BN_nnmod(r, r, q, bc);
+        BN_free(p);
+        BN_free(g);
+    } else {
+        EC_GROUP *grp = EC_GROUP_new_by_curve_name(NID_brainpoolP256r1);
+        EC_POINT *pt = EC_POINT_new(grp);
+
+        EC_POINT_mul(grp, pt, k, NULL, NULL, bc);
+        EC_POINT_get_affine_coordinates(grp, pt, r, NULL, bc);
+        BN_nnmod(r, r, q, bc);
+        EC_POINT_free(pt);
+        EC_GROUP_free(grp);
+    }
+    BN_CTX_free(bc);
+    return r;
+}
+
+/* Picks the two digests; 0 if the nonces computed here aren't the signer's. */
+static int nonce_pick(void)
+{
+    BIGNUM *q = NULL, *x = NULL, *k = BN_new();
+    int found[2] = {0, 0}, ok = 1;
+    unsigned int counter = 0;
+
+    if (!EVP_PKEY_get_bn_param(nonce_key, nonce_is_dsa ? OSSL_PKEY_PARAM_FFC_Q
+                                                       : OSSL_PKEY_PARAM_EC_ORDER, &q)
+        || !EVP_PKEY_get_bn_param(nonce_key, OSSL_PKEY_PARAM_PRIV_KEY, &x)
+        || BN_num_bits(q) != 256)
+        return 0;
+    while ((!found[0] || !found[1]) && counter < 100000) {
+        unsigned char d[32];
+        int c;
+
+        memset(d, 0, sizeof(d));
+        memcpy(d, &counter, sizeof(counter));
+        counter++;
+        if (!rfc6979_k(q, x, d, k))
+            continue;
+        c = BN_num_bits(k) <= 248 ? 1 : BN_num_bits(k) >= 255 ? 0 : -1;
+        if (c < 0 || found[c])
+            continue;
+        memcpy(nonce_digest[c], d, 32);
+        found[c] = 1;
+    }
+    for (int c = 0; c < 2 && ok; c++) {
+        BIGNUM *got = signed_r(nonce_digest[c]), *want;
+
+        ok = found[c] && got != NULL && rfc6979_k(q, x, nonce_digest[c], k);
+        want = ok ? expected_r(q, k) : NULL;
+        ok = ok && want != NULL && BN_cmp(got, want) == 0;
+        BN_free(got);
+        BN_free(want);
+    }
+    if (!ok)
+        fprintf(stderr, "the nonces computed here aren't the signer's\n");
+    BN_free(q);
+    BN_free(x);
+    BN_free(k);
+    return ok;
+}
+
+static int nonce_setup_dsa(void)
+{
+    EVP_PKEY_CTX *pc = EVP_PKEY_CTX_new_from_name(NULL, "DSA", NULL);
+    EVP_PKEY *params = NULL;
+    EVP_PKEY_CTX *kc;
+
+    if (pc == NULL || EVP_PKEY_paramgen_init(pc) <= 0
+        || EVP_PKEY_CTX_set_dsa_paramgen_bits(pc, 2048) <= 0
+        || EVP_PKEY_CTX_set_dsa_paramgen_q_bits(pc, 256) <= 0
+        || EVP_PKEY_paramgen(pc, &params) <= 0)
+        return 0;
+    kc = EVP_PKEY_CTX_new(params, NULL);
+    if (kc == NULL || EVP_PKEY_keygen_init(kc) <= 0 || EVP_PKEY_keygen(kc, &nonce_key) <= 0)
+        return 0;
+    EVP_PKEY_CTX_free(kc);
+    EVP_PKEY_CTX_free(pc);
+    EVP_PKEY_free(params);
+    nonce_is_dsa = 1;
+    return nonce_pick();
+}
+
+static int nonce_setup_brainpool(void)
+{
+    nonce_key = EVP_PKEY_Q_keygen(NULL, NULL, "EC", "brainpoolP256r1");
+    nonce_is_dsa = 0;
+    return nonce_key != NULL && nonce_pick();
+}
+
+static size_t nonce_class[BATCH];
+
+static void nonce_prepare(size_t i, int c)
+{
+    nonce_class[i] = (size_t)c;
+}
+
+static void nonce_run(size_t i)
+{
+    EVP_PKEY_CTX *s = EVP_PKEY_CTX_new(nonce_key, NULL);
+    unsigned int deterministic = 1;
+    OSSL_PARAM params[3];
+    size_t n = sizeof(out);
+
+    params[0] = OSSL_PARAM_construct_uint(OSSL_SIGNATURE_PARAM_NONCE_TYPE, &deterministic);
+    params[1] = OSSL_PARAM_construct_utf8_string(OSSL_SIGNATURE_PARAM_DIGEST, "SHA256", 0);
+    params[2] = OSSL_PARAM_construct_end();
+    if (EVP_PKEY_sign_init_ex(s, params) <= 0
+        || EVP_PKEY_sign(s, out, &n, nonce_digest[nonce_class[i]], 32) <= 0) {
+        fprintf(stderr, "deterministic signing failed\n");
+        exit(2);
+    }
+    EVP_PKEY_CTX_free(s);
+    sink ^= out[0];
+}
+
+/* ---- SM2 signing: a fixed key (class 0) or random ones (class 1), as ecdsa-sign does; its
+ * private-key arithmetic and scalar multiplication (CVE-2025-9231, CVE-2026-54875,
+ * CVE-2026-77696). SM2 has no deterministic nonces to hold the nonce fixed. ---- */
+static int sm2_setup(void)
+{
+    EVP_PKEY *fixed_key = EVP_PKEY_Q_keygen(NULL, NULL, "SM2");
+    int i;
+
+    if (fixed_key == NULL)
+        return 0;
+    for (i = 0; i < POOL; i++) {
+        if ((pool[i] = EVP_PKEY_Q_keygen(NULL, NULL, "SM2")) == NULL)
+            return 0;
+        if ((fixed_pool[i] = EVP_PKEY_dup(fixed_key)) == NULL)
+            return 0;
+    }
+    EVP_PKEY_free(fixed_key);
+    memset(digest32, 0x33, sizeof(digest32));
+    return 1;
+}
+
 /* ---- RSA-2048 PKCS #1 v1.5 decryption, implicit rejection on (Marvin's classes): a valid
  * ciphertext, or ciphertexts of random paddings (almost all invalid). ---- */
 static EVP_PKEY *rsa;
@@ -664,6 +902,110 @@ static void tls_run(size_t i)
     sink ^= (unsigned char)SSL_read(tls_srv[i], out, (int)sizeof(out));
 }
 
+/* ---- DTLS 1.2 CBC records (CVE-2011-4108): as tls-cbc-record, over DTLS, where a record
+ * that fails its MAC is dropped rather than ending the association. ---- */
+static SSL_CTX *dtls_cctx, *dtls_sctx;
+static SSL_SESSION *dtls_sess;
+static SSL *dtls_srv[TLS_BATCH];
+
+static int dtls_pair(SSL **c, SSL **s)
+{
+    BIO *c2s = BIO_new(BIO_s_dgram_mem()), *s2c = BIO_new(BIO_s_dgram_mem());
+
+    *c = SSL_new(dtls_cctx);
+    *s = SSL_new(dtls_sctx);
+    if (*c == NULL || *s == NULL || c2s == NULL || s2c == NULL)
+        return 0;
+    BIO_up_ref(c2s);
+    BIO_up_ref(s2c);
+    SSL_set_bio(*c, s2c, c2s);
+    SSL_set_bio(*s, c2s, s2c);
+    SSL_set_options(*c, SSL_OP_NO_QUERY_MTU);
+    SSL_set_options(*s, SSL_OP_NO_QUERY_MTU);
+    SSL_set_mtu(*c, 1400);
+    SSL_set_mtu(*s, 1400);
+    SSL_set_connect_state(*c);
+    SSL_set_accept_state(*s);
+    if (dtls_sess != NULL)
+        SSL_set_session(*c, dtls_sess);
+    return tls_pump(*c, *s);
+}
+
+static int dtls_setup(void)
+{
+    EVP_PKEY *key = EVP_PKEY_Q_keygen(NULL, NULL, "EC", "P-256");
+    X509 *cert = X509_new();
+    SSL *c, *s;
+    int ok;
+
+    if (key == NULL || cert == NULL)
+        return 0;
+    ASN1_INTEGER_set(X509_get_serialNumber(cert), 1);
+    X509_gmtime_adj(X509_getm_notBefore(cert), 0);
+    X509_gmtime_adj(X509_getm_notAfter(cert), 86400);
+    X509_set_pubkey(cert, key);
+    X509_NAME_add_entry_by_txt(X509_get_subject_name(cert), "CN", MBSTRING_ASC,
+                               (const unsigned char *)"dudect", -1, -1, 0);
+    X509_set_issuer_name(cert, X509_get_subject_name(cert));
+    X509_sign(cert, key, EVP_sha256());
+    dtls_cctx = SSL_CTX_new(DTLS_client_method());
+    dtls_sctx = SSL_CTX_new(DTLS_server_method());
+    if (dtls_cctx == NULL || dtls_sctx == NULL)
+        return 0;
+    SSL_CTX_set_cipher_list(dtls_cctx, "ECDHE-ECDSA-AES128-SHA");
+    SSL_CTX_set_options(dtls_cctx, SSL_OP_NO_ENCRYPT_THEN_MAC);
+    SSL_CTX_set_cipher_list(dtls_sctx, "ECDHE-ECDSA-AES128-SHA");
+    SSL_CTX_set_options(dtls_sctx, SSL_OP_NO_ENCRYPT_THEN_MAC);
+    SSL_CTX_use_certificate(dtls_sctx, cert);
+    SSL_CTX_use_PrivateKey(dtls_sctx, key);
+    X509_free(cert);
+    EVP_PKEY_free(key);
+    ok = dtls_pair(&c, &s);
+    if (ok)
+        dtls_sess = SSL_get1_session(c);
+    SSL_set_shutdown(c, SSL_SENT_SHUTDOWN | SSL_RECEIVED_SHUTDOWN);
+    SSL_set_shutdown(s, SSL_SENT_SHUTDOWN | SSL_RECEIVED_SHUTDOWN);
+    SSL_free(c);
+    SSL_free(s);
+    return ok && dtls_sess != NULL;
+}
+
+static void dtls_prepare(size_t i, int c)
+{
+    static unsigned char msg[512];
+    unsigned char rec[1024];
+    SSL *cl, *sv;
+    BIO *rb;
+    int n;
+    size_t pad, body;
+
+    SSL_free(dtls_srv[i]);
+    dtls_srv[i] = NULL;
+    if (!dtls_pair(&cl, &sv) || SSL_write(cl, msg, (int)sizeof(msg)) != (int)sizeof(msg)) {
+        fprintf(stderr, "dtls-cbc-record: no association\n");
+        exit(2);
+    }
+    rb = SSL_get_rbio(sv);
+    n = BIO_read(rb, rec, (int)sizeof(rec));
+    /* header 13, explicit IV 16, then the message, the MAC (20) and the padding */
+    body = n > 13 + 16 ? (size_t)n - 13 - 16 : 0;
+    if (body < sizeof(msg) + 20 + 1 || body % 16 != 0 || n < 13 + 16 + 32) {
+        fprintf(stderr, "dtls-cbc-record: unexpected record of %d octets\n", n);
+        exit(2);
+    }
+    pad = body - sizeof(msg) - 20 - 1;
+    rec[n - 16 - 1] ^= (unsigned char)(pad ^ (c == 0 ? 0 : 255));
+    BIO_write(rb, rec, n);
+    SSL_set_shutdown(cl, SSL_SENT_SHUTDOWN | SSL_RECEIVED_SHUTDOWN);
+    SSL_free(cl);
+    dtls_srv[i] = sv;
+}
+
+static void dtls_run(size_t i)
+{
+    sink ^= (unsigned char)SSL_read(dtls_srv[i], out, (int)sizeof(out));
+}
+
 static const struct target targets[] = {
     { "aes-gcm", aes_setup, key_prepare, aes_run, 8, 0 },
     { "ghash", ghash_setup, tag_prepare, ghash_run, 8, 0 },
@@ -678,6 +1020,10 @@ static const struct target targets[] = {
     { "memcmp", memcmp_setup, memcmp_prepare, memcmp_run, 1024, 0 },
     { "ml-kem-decap", mlkem_setup, mlkem_prepare, mlkem_run, 1, 0 },
     { "tls-cbc-record", tls_setup, tls_prepare, tls_run, 1, TLS_BATCH },
+    { "dtls-cbc-record", dtls_setup, dtls_prepare, dtls_run, 1, TLS_BATCH },
+    { "dsa-sign-nonce", nonce_setup_dsa, nonce_prepare, nonce_run, 1, 0 },
+    { "ecdsa-brainpool-nonce", nonce_setup_brainpool, nonce_prepare, nonce_run, 1, 0 },
+    { "sm2-sign", sm2_setup, ecdsa_prepare, ecdsa_run, 1, 0 },
 };
 
 int main(int argc, char **argv)

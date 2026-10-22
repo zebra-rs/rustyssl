@@ -553,15 +553,17 @@ fixed class's are copies of one key), and the reference reads 2–4.
 **CVE regression suite (`tests/cve/`, `cargo xtask test-cve`).** Every OpenSSL CVE, from
 the reference's `CHANGES.md` and OpenSSL's vulnerabilities page (304 as of 3.6.5, 2002 to
 2026), is in `tests/cve/cves.txt` with how it's covered: a check in a `tests/cve/*.c`
-program (203), a commented `test-apps` line (1), another suite (12: `test-timing`'s dudect
+program (235), a commented `test-apps` line (2), another suite (19: `test-timing`'s dudect
 targets, or upstream's own regression test run by `test-openssl-suite --all`), not
 applicable with the reason (47: SSLv2, Kerberos, other platforms' assembly, the FIPS module,
-scripts, 4.0-only), or a gap with the reason (41: QUIC and post-handshake DTLS need crafted
-traffic, thread races, timing not yet measured, triggers needing > 2 GiB). The programs are
+scripts, 4.0-only), or a gap with the reason (1: RSA key generation's cache timing, whose
+time depends on the primes found). The programs are
 TAP programs like L4's: built once, run on the reference (which has every fix) and on
 rustyssl, passing with identical output. They reproduce each trigger (malformed DER, PKCS#7,
 CMS and PKCS#12 inputs, some of them upstream's own regression files; handcrafted
-ClientHellos, records, server flights and DTLS datagrams through memory BIOs; API misuse) and
+ClientHellos, records, server flights and DTLS datagrams through memory BIOs; QUIC packets
+built under keys taken from the keylog callback; CMP responses rebuilt and re-protected;
+threads sharing contexts and sessions; lengths near INT_MAX; API misuse) and
 print only outcomes (results, error codes, alerts), so the reference shows what the fixed
 behavior is. The driver also fails if the reference's `CHANGES.md` names a CVE the index
 lacks, so each new release's advisories must be classified. It runs in the gates and in CI.
@@ -572,7 +574,7 @@ Representative entries:
 | CVE-2014-0160 (Heartbleed) | over-read | the heartbeat extension is not supported; the peer request is ignored or rejected |
 | CVE-2014-0224 | early CCS state confusion | an out-of-order ChangeCipherSpec is rejected |
 | CVE-2015-1793 | alternate-chain forgery | the forged chain is rejected |
-| CVE-2016-2105/2106 | length overflow | a gap: the trigger needs > 2 GiB of input; lengths are checked arithmetic (AGENTS.md rule 3) |
+| CVE-2016-2105/2106 | length overflow | `cve_size.c`: base64 output past INT_MAX, and a partial block plus INT_MAX octets, fail |
 | CVE-2016-2108 | ASN.1 negative zero | encode and decode are correct |
 | CVE-2016-6309 | UAF on message realloc | large handshake messages are handled safely |
 | CVE-2020-1971 | EDIPARTYNAME NULL deref | GENERAL_NAME_cmp is correct |

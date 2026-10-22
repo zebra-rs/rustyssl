@@ -114,3 +114,7 @@ dgst -sha256 -x -y {txt}
 dgst -help -sha256
 dgst -h
 dgst -signature
+# CVE-2025-15469: one-shot signing (Ed25519) of more than 16 MiB fails instead of signing the first 16 MiB
+rand -out {dir}/big.bin 17000000
+dgst -sign {src}/test/certs/client-ed25519-key.pem -out {dir}/big.sig {dir}/big.bin
+dgst -sign {src}/test/certs/client-ed25519-key.pem -hex {dir}/big.bin

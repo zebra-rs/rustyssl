@@ -730,3 +730,32 @@ fn generated_messages_round_trip() {
         );
     }
 }
+
+/// A CertificateStatus of only its type (3.6 reads it as no response) round-trips: found by
+/// ClusterFuzzLite's `tls_msgs` (the encoder wrote an empty length, which is `SSL_R_BAD_PACKET`).
+#[test]
+fn certificate_status_without_response_round_trips() {
+    let cx = Context {
+        tls13: true,
+        dtls: false,
+        sigalgs: false,
+        from_server: false,
+        rpk: false,
+        kx: kx::Kx::default(),
+    };
+    let m = HandshakeMessage::decode(ht::CERTIFICATE_STATUS, &[1], &cx).unwrap();
+    assert_eq!(
+        m,
+        HandshakeMessage::CertificateStatus(CertificateStatus {
+            response: Vec::new()
+        })
+    );
+    let enc = m.encode_body().unwrap();
+    assert_eq!(enc, [1]);
+    assert_eq!(
+        HandshakeMessage::decode(ht::CERTIFICATE_STATUS, &enc, &cx).unwrap(),
+        m
+    );
+    // An explicit empty response stays refused.
+    assert!(CertificateStatus::parse(&[1, 0, 0, 0]).is_err());
+}

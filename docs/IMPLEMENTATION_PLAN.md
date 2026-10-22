@@ -6337,18 +6337,29 @@ The CLI's gaps closed (2026-10-21, local, branch `cli-gaps`, macOS arm64):
     reports.
   - [x] the complete CVE regression suite (2026-10-21): `tests/cve/` and `cargo xtask test-cve`
     (TEST_PLAN L9), in the gates and CI. All 304 OpenSSL CVEs are indexed in
-    `tests/cve/cves.txt`: 203 with a check in seven TAP programs (213 checks, identical on the
-    reference and rustyssl), 1 in `test-apps`, 12 covered by `test-timing` or upstream's own
-    regression tests, 47 not applicable (with the reason), and 41 gaps (with the reason: ten
-    QUIC and seven post-handshake DTLS cases need crafted traffic, five thread races, eight
-    timing cases not yet measured by `test-timing`, four triggers needing > 2 GiB of input,
-    three CMP exchanges, three TLS cases, `dgst`'s 16 MiB one-shot). Differences it found and
-    fixed: DTLS reassembly (an empty fragment of a longer message is processed as it arrived;
-    a fragment past its message's end or of an oversized message ends the handshake quietly,
-    as OpenSSL does), and a `status_request` ResponderID of another tag now queues
-    `d2i_OCSP_RESPID`'s ASN.1 error. It also found the reference crashing on aarch64 macOS
-    when RC4-HMAC-MD5 is used (it's offered there but only implemented for x86_64), which
-    rustyssl doesn't; the check runs on x86_64 only.
+    `tests/cve/cves.txt`: 235 with a check in twelve TAP programs (identical on the reference
+    and rustyssl), 2 in `test-apps`, 19 covered by `test-timing` or upstream's own regression
+    tests, 47 not applicable (with the reason), and 1 gap: CVE-2018-0737, RSA key generation's
+    cache timing, whose time depends on the primes it finds. The first pass (PR #208) found and
+    fixed DTLS reassembly differences and a `status_request` ResponderID's error, and found the
+    reference crashing on aarch64 macOS with RC4-HMAC-MD5 (that check runs on x86_64 only).
+    The second pass (branch `p12-cve2`) closed 40 of its 41 gaps with new harnesses:
+    - `cve_quic.c`: the program sits between a QUIC client and a listener, takes the client's
+      1-RTT secret from the keylog callback, and injects its own packets (1-RTT, and Initials
+      re-encrypted under new connection IDs): the ten QUIC CVEs. It found rustyssl closing a
+      connection with INTERNAL_ERROR once a stream held 8192 separate fragments, even
+      contiguous ones out of order; reassembly now keeps one buffer and merged ranges, as
+      OpenSSL's ring buffer does, and flow control bounds the gaps.
+    - `cve_dtls.c`: an in-memory DTLS association with record-level drop, reorder, inject and
+      timer firing: forged short CBC and AEAD records, a lost final flight, a flight suspended
+      by a full datagram pair, data between CCS and Finished, an anonymous-ECDH client.
+    - `cve_cmp.c`: a client and an in-process CMP server whose responses can be rebuilt and
+      re-protected. `OSSL_CMP_get1_rootCaKeyUpdate` now leaves its outputs NULL on failure
+      (OpenSSL leaves them pointing into freed memory; docs/DEVIATIONS.md).
+    - `cve_race.c` (8 threads sharing contexts and sessions), `cve_size.c` (lengths near
+      INT_MAX; up to 3.7 GB touched), three TLS checks in `cve_tls.c`, `dgst`'s 16 MiB one-shot in
+      `test-apps`, and four `test-timing` targets (`dtls-cbc-record`, `dsa-sign-nonce`,
+      `ecdsa-brainpool-nonce`, `sm2-sign`).
   - OSS-Fuzz onboarding (start after M2). The user's decision (2026-10-21): the project files
     live in our repository and run in our CI; the user submits them to google/oss-fuzz.
     **Done:** `oss-fuzz/` (build.sh, Dockerfile, project.yaml, README.md) and ClusterFuzzLite
