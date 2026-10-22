@@ -171,14 +171,26 @@ jobs:
   fuzz:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.workflow == 'Release'
     runs-on: ubuntu-24.04
+    # Every target for 5 minutes is over a job's 6 hours, so the targets are split across shards.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5]
     steps:
       - uses: actions/checkout@v7
       - run: rustup toolchain install nightly --profile minimal
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-fuzz
-      - name: Fuzz every target for 5 minutes
+      - name: Fuzz this shard's targets for 5 minutes each
+        # The installed cargo-fuzz is a static musl build, and it builds for its own triple unless
+        # told otherwise: AddressSanitizer can't link against a static libc.
         run: |
+          host=$(rustc +nightly -vV | sed -n 's/^host: //p')
+          i=0
           for target in $(cargo +nightly fuzz list); do
-            cargo +nightly fuzz run "$target" -- -max_total_time=300
+            if [ $((i % 6)) -eq ${{ matrix.shard }} ]; then
+              cargo +nightly fuzz run --target "$host" "$target" -- -max_total_time=300
+            fi
+            i=$((i + 1))
           done

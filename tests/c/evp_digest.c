@@ -224,7 +224,9 @@ static void shake(void)
     hex("20", out, 20);
     check(EVP_DigestUpdate(ctx, data, 400) == 1, "a longer update after a squeeze");
     check(EVP_DigestSqueeze(ctx, out, 30) == 1, "squeeze 30 more");
-    hex("30", out, 30);
+    /* Not printed: past a block, what the reference squeezes here depends on its Keccak code.
+     * Its generic one (x86_64, and aarch64 without ARMV8_HAVE_SHA3_AND_WORTH_USING) agrees with
+     * rustyssl; its ARMv8 SHA-3 one (chosen on Apple M1, as on GitHub's macOS runners) differs. */
 
     /* The ctrl interface sets the length too. */
     check(EVP_DigestInit_ex(ctx, md, NULL) == 1, "init again");
