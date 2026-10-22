@@ -175,18 +175,20 @@ pub(crate) unsafe fn write(out: *mut u8, o: &Output) -> bool {
     }
     // Past the octets the operation leaves as they were.
     let out = out.wrapping_add(o.at);
-    let mut data = o.data.clone();
-    if o.last_mask != 0xff {
-        // The bits of the last octet that aren't written keep the output's.
-        let at = out.wrapping_add(n.wrapping_sub(1));
+    // The bits of the last octet that aren't written keep the output's.
+    let last = out.wrapping_add(n.wrapping_sub(1));
+    let merged = (o.last_mask != 0xff).then(|| {
         // SAFETY: the caller's guarantee: the last octet of the room.
-        let old = unsafe { at.read() };
-        if let Some(last) = data.last_mut() {
-            *last = (*last & o.last_mask) | (old & !o.last_mask);
-        }
+        let old = unsafe { last.read() };
+        let new = o.data.last().copied().unwrap_or(0);
+        (new & o.last_mask) | (old & !o.last_mask)
+    });
+    // SAFETY: the caller's guarantee; `o.data` is ours, so the two don't overlap.
+    unsafe { ptr::copy_nonoverlapping(o.data.as_ptr(), out, n) };
+    if let Some(m) = merged {
+        // SAFETY: as above: the last octet of the room.
+        unsafe { last.write(m) };
     }
-    // SAFETY: the caller's guarantee; `data` is ours, so the two don't overlap.
-    unsafe { ptr::copy_nonoverlapping(data.as_ptr(), out, n) };
     true
 }
 
@@ -452,6 +454,38 @@ unsafe fn process(
         let r = g.cts_update(data, outsize, !out.is_null());
         // SAFETY: the caller's guarantee.
         return unsafe { finish(r, out, outl, "ossl_cipher_cbc_cts_block_update") };
+    }
+    if inl > 0
+        && outsize >= inl
+        && !in_.is_null()
+        && !out.is_null()
+        && !outl.is_null()
+        && ctx.core.in_place_ok()
+    {
+        // A stream mode: the input moved to where the output goes (the two may overlap, or be
+        // one), then transformed there, with no copy of its own.
+        // SAFETY: the caller's guarantee: `in_` holds `inl` octets and `out` has room for
+        // `outsize`, at least `inl`; `ptr::copy` allows them to overlap.
+        unsafe { ptr::copy(in_, out, inl) };
+        // SAFETY: as above: `inl` octets of the output's room, which nothing else borrows (the
+        // input is only a pointer here).
+        let buf = unsafe { core::slice::from_raw_parts_mut(out, inl) };
+        let function = if one_shot {
+            "ossl_cipher_generic_cipher"
+        } else {
+            "ossl_cipher_generic_stream_update"
+        };
+        return match ctx.core.update_in_place(buf) {
+            Ok(()) => {
+                // SAFETY: the caller's guarantee.
+                unsafe { outl.write(inl) };
+                1
+            }
+            Err(e) => {
+                raise(e, function);
+                0
+            }
+        };
     }
     let n = ctx.core.input_len(inl);
     // SAFETY: the caller's guarantee.

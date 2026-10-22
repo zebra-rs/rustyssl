@@ -112,8 +112,8 @@ impl Curve {
             r1,
             r2,
             base: Point {
-                x: f0.clone(),
-                y: f0.clone(),
+                x: f0,
+                y: f0,
                 z: f0,
             },
         };
@@ -167,8 +167,8 @@ impl Curve {
     fn neg(&self, p: &Point) -> Point {
         Point {
             x: self.f.neg(&p.x),
-            y: p.y.clone(),
-            z: p.z.clone(),
+            y: p.y,
+            z: p.z,
         }
     }
 
@@ -301,7 +301,7 @@ fn x448_ladder(
         *last |= 128;
     }
     let x1 = f.from_le_bytes(u)?;
-    let (mut x2, mut z2, mut x3, mut z3) = (f.one(), f.zero(), x1.clone(), f.one());
+    let (mut x2, mut z2, mut x3, mut z3) = (f.one(), f.zero(), x1, f.one());
     let mut swap = false;
     for byte in k.iter().rev() {
         for i in (0..8).rev() {

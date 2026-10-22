@@ -61,6 +61,8 @@ const GHASH_CHUNK: usize = 3 * 1024;
 #[derive(Clone)]
 pub struct Gcm {
     h: [u8; BLOCK],
+    /// GHASH keyed with `h`, cloned for each hashing so the key's powers are made once.
+    gh: Option<ghash::GHash>,
     yi: [u8; BLOCK],
     eki: [u8; BLOCK],
     ek0: [u8; BLOCK],
@@ -99,23 +101,27 @@ enum Start {
 impl Gcm {
     /// `CRYPTO_gcm128_init`: the hash key is the block function's encryption of zeros.
     pub fn new(b: &impl Block128) -> Self {
-        crate::dit::with(|| Self {
-            h: b.block(&[0; BLOCK]),
-            yi: [0; BLOCK],
-            eki: [0; BLOCK],
-            ek0: [0; BLOCK],
-            xi: [0; BLOCK],
-            xn: [0; 3 * BLOCK],
-            mres: 0,
-            ares: 0,
-            alen: 0,
-            mlen: 0,
+        crate::dit::with(|| {
+            let h = b.block(&[0; BLOCK]);
+            Self {
+                gh: ghash::GHash::new_from_slice(&h).ok(),
+                h,
+                yi: [0; BLOCK],
+                eki: [0; BLOCK],
+                ek0: [0; BLOCK],
+                xi: [0; BLOCK],
+                xn: [0; 3 * BLOCK],
+                mres: 0,
+                ares: 0,
+                alen: 0,
+                mlen: 0,
+            }
         })
     }
 
     /// Hashes `data` (whole blocks) into the running hash.
     fn ghash(&mut self, data: &[u8]) {
-        let Ok(mut g) = ghash::GHash::new_from_slice(&self.h) else {
+        let Some(mut g) = self.gh.clone() else {
             return;
         };
         let mut first = block_at(data, 0);
@@ -280,13 +286,12 @@ impl Gcm {
     /// past the message length limit.
     fn crypt(
         &mut self,
-        input: &[u8],
-        out: &mut [u8],
+        data: &mut [u8],
         b: &impl Block128,
         stream: Option<&dyn Ctr128>,
         enc: bool,
     ) -> i32 {
-        let len = input.len();
+        let len = data.len();
         let (mut mres, mut ctr) = match self.start(len) {
             Start::Return(r) => return r,
             Start::Go(m, c) => (m, c),
@@ -295,11 +300,10 @@ impl Gcm {
         let mut n = mres % BLOCK;
         if n != 0 {
             while n != 0 && i < len {
-                let x = at(input, i);
+                let Some(d) = data.get_mut(i) else { break };
+                let x = *d;
                 let y = x ^ at(&self.eki, n);
-                if let Some(o) = out.get_mut(i) {
-                    *o = y;
-                }
+                *d = y;
                 if let Some(slot) = self.xn.get_mut(mres) {
                     *slot = if enc { y } else { x };
                 }
@@ -328,41 +332,37 @@ impl Gcm {
                 rest
             };
             let end = i.saturating_add(take);
-            let chunk = input.get(i..end).unwrap_or_default();
+            let Some(chunk) = data.get_mut(i..end) else {
+                break;
+            };
             if !enc {
                 self.ghash(chunk);
             }
             if let Some(f) = stream {
                 let blocks = take / BLOCK;
-                if let Some(o) = out.get_mut(i..end) {
-                    f.ctr(chunk, o, blocks, &self.yi);
-                }
+                f.ctr_in_place(chunk, blocks, &self.yi);
                 ctr = ctr.wrapping_add(u32::try_from(blocks).unwrap_or(0));
                 self.set_ctr(ctr);
             } else {
-                for k in (i..end).step_by(BLOCK) {
+                for block in chunk.chunks_mut(BLOCK) {
                     self.next_keystream(&mut ctr, b);
-                    for (j, e) in self.eki.iter().enumerate() {
-                        if let Some(o) = out.get_mut(k.saturating_add(j)) {
-                            *o = at(input, k.saturating_add(j)) ^ e;
-                        }
+                    for (d, e) in block.iter_mut().zip(self.eki.iter()) {
+                        *d ^= e;
                     }
                 }
             }
             if enc {
-                let written = out.get(i..end).unwrap_or_default().to_vec();
-                self.ghash(&written);
+                self.ghash(chunk);
             }
             i = end;
         }
         if i < len {
             self.next_keystream(&mut ctr, b);
             while i < len {
-                let x = at(input, i);
+                let Some(d) = data.get_mut(i) else { break };
+                let x = *d;
                 let y = x ^ at(&self.eki, n);
-                if let Some(o) = out.get_mut(i) {
-                    *o = y;
-                }
+                *d = y;
                 if let Some(slot) = self.xn.get_mut(mres) {
                     *slot = if enc { y } else { x };
                 }
@@ -375,14 +375,52 @@ impl Gcm {
         0
     }
 
+    /// `input` into `out` (as long as `input`; a shorter `out` takes what fits, and the rest
+    /// is processed and dropped, as the C functions' callers never allow), then [`Self::crypt`]
+    /// there.
+    fn crypt_into(
+        &mut self,
+        input: &[u8],
+        out: &mut [u8],
+        b: &impl Block128,
+        stream: Option<&dyn Ctr128>,
+        enc: bool,
+    ) -> i32 {
+        if out.len() >= input.len() {
+            let Some(data) = out.get_mut(..input.len()) else {
+                return -1;
+            };
+            data.copy_from_slice(input);
+            return self.crypt(data, b, stream, enc);
+        }
+        let mut data = zeroize::Zeroizing::new(input.to_vec());
+        let r = self.crypt(&mut data, b, stream, enc);
+        for (o, d) in out.iter_mut().zip(data.iter()) {
+            *o = *d;
+        }
+        r
+    }
+
+    /// [`Self::encrypt`] or [`Self::decrypt`] on `data` in place, the stream (if any) doing the
+    /// whole blocks.
+    pub fn crypt_in_place(
+        &mut self,
+        data: &mut [u8],
+        b: &impl Block128,
+        stream: Option<&dyn Ctr128>,
+        enc: bool,
+    ) -> i32 {
+        crate::dit::with(|| self.crypt(data, b, stream, enc))
+    }
+
     /// `CRYPTO_gcm128_encrypt`.
     pub fn encrypt(&mut self, input: &[u8], out: &mut [u8], b: &impl Block128) -> i32 {
-        crate::dit::with(|| self.crypt(input, out, b, None, true))
+        crate::dit::with(|| self.crypt_into(input, out, b, None, true))
     }
 
     /// `CRYPTO_gcm128_decrypt`.
     pub fn decrypt(&mut self, input: &[u8], out: &mut [u8], b: &impl Block128) -> i32 {
-        crate::dit::with(|| self.crypt(input, out, b, None, false))
+        crate::dit::with(|| self.crypt_into(input, out, b, None, false))
     }
 
     /// `CRYPTO_gcm128_encrypt_ctr32`: whole blocks through `stream`.
@@ -393,7 +431,7 @@ impl Gcm {
         b: &impl Block128,
         stream: &impl Ctr128,
     ) -> i32 {
-        crate::dit::with(|| self.crypt(input, out, b, Some(stream), true))
+        crate::dit::with(|| self.crypt_into(input, out, b, Some(stream), true))
     }
 
     /// `CRYPTO_gcm128_decrypt_ctr32`: whole blocks through `stream`.
@@ -404,7 +442,7 @@ impl Gcm {
         b: &impl Block128,
         stream: &impl Ctr128,
     ) -> i32 {
-        crate::dit::with(|| self.crypt(input, out, b, Some(stream), false))
+        crate::dit::with(|| self.crypt_into(input, out, b, Some(stream), false))
     }
 
     /// `CRYPTO_gcm128_finish`: hashes what's buffered and the lengths into the tag, then

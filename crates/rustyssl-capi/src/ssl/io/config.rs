@@ -59,6 +59,8 @@ pub(crate) struct CtxSnapshot {
     pub(crate) session_timeout: core::ffi::c_long,
     /// The ticket keys every `SSL_CTX` makes (`SSL_CTX_set_tlsext_ticket_keys`).
     pub(crate) ticket_keys: rustyssl_tls::conn::TicketKeys,
+    /// The context's providers' TLS offerings, shared by its connections.
+    pub(crate) tls_found: std::sync::Arc<super::super::tls_provider::Discovered>,
 }
 
 impl CtxSnapshot {
@@ -102,6 +104,7 @@ pub(crate) fn ctx_snapshot(c: &Ctx) -> CtxSnapshot {
         propq: c.propq.clone(),
         session_cache_mode: cs.session_cache_mode,
         session_timeout: cs.session_timeout,
+        tls_found: std::sync::Arc::clone(&c.tls_found),
         ticket_keys: rustyssl_tls::conn::TicketKeys {
             name: cs.tick_key_name,
             hmac_key: rustyssl_tls::crypto::Secret::new(cs.tick_hmac_key.to_vec()),

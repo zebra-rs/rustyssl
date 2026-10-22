@@ -199,7 +199,8 @@ unsafe fn mod_exp(
             err::raise(ERR_LIB_BN, BN_R_CALLED_WITH_EVEN_MODULUS, "BN_mod_exp_mont");
             return None;
         }
-        return core_bn::modular::exp_mod(a, e, m).ok();
+        // The group's prime is public: its Montgomery context is kept.
+        return core_bn::modular::exp_mod_public(a, e, m).ok();
     }
     // SAFETY: the key's library context (via the key), or NULL.
     let libctx = unsafe { dh(d) }.map_or(ptr::null_mut(), |k| k.libctx.get());

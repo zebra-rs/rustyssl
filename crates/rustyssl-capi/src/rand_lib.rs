@@ -22,7 +22,7 @@ use core::cell::{RefCell, UnsafeCell};
 use core::ffi::{CStr, c_char, c_double, c_int, c_uchar, c_uint, c_void};
 use core::ptr;
 use std::ffi::CString;
-use std::sync::atomic::{AtomicPtr, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicU64, Ordering};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use rustyssl_abi::{
@@ -80,12 +80,16 @@ struct State {
 pub(crate) struct Global {
     id: u64,
     state: Mutex<State>,
+    /// Whether `state.random_provider` is set, kept beside it so that every `RAND_bytes`
+    /// needn't take the lock to find there is none.
+    has_random_provider: AtomicBool,
 }
 
 impl Default for Global {
     fn default() -> Self {
         Self {
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
+            has_random_provider: AtomicBool::new(false),
             state: Mutex::new(State {
                 seed: Ptr(ptr::null_mut()),
                 primary: Ptr(ptr::null_mut()),
@@ -773,6 +777,8 @@ ffi_export! {
                         s.random_provider = Ptr(prov);
                     }
                 }
+                g.has_random_provider
+                    .store(!s.random_provider.0.is_null(), Ordering::Release);
                 1
             })
         }
@@ -799,6 +805,7 @@ pub(crate) fn check_random_provider_on_load(
     let name = (!n.is_null()).then(|| unsafe { CStr::from_ptr(n) });
     if name.is_some_and(|n| s.random_provider_name.as_deref() == Some(n)) {
         s.random_provider = Ptr(prov);
+        held.rand.has_random_provider.store(true, Ordering::Release);
     }
     true
 }
@@ -810,6 +817,9 @@ pub(crate) fn check_random_provider_on_unload(libctx: *mut OSSL_LIB_CTX, prov: *
         let mut s = held.rand.lock();
         if s.random_provider.0 == prov {
             s.random_provider = Ptr(ptr::null_mut());
+            held.rand
+                .has_random_provider
+                .store(false, Ordering::Release);
         }
     }
 }
@@ -1114,7 +1124,11 @@ unsafe fn bytes_ex(
         return unsafe { bytes(buf, n) };
     }
     let generate = |l: *mut OSSL_LIB_CTX, g: &Global| {
-        let prov = g.lock().random_provider.0;
+        let prov = if g.has_random_provider.load(Ordering::Acquire) {
+            g.lock().random_provider.0
+        } else {
+            ptr::null_mut()
+        };
         if !prov.is_null() {
             let which = if private {
                 OSSL_PROV_RANDOM_PRIVATE

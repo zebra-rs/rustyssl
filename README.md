@@ -16,6 +16,10 @@ Priority order when goals conflict:
 2. **ABI and behavioral compatibility** with OpenSSL
 3. Performance
 
+To try it: [docs/TRY-ON-UBUNTU.md](docs/TRY-ON-UBUNTU.md) (build it, run programs on it with
+`LD_LIBRARY_PATH`, or install it side by side on Ubuntu 22.04 and 24.04);
+[docs/MIGRATION.md](docs/MIGRATION.md) for other distributions.
+
 Plans: [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) (phased steps) and
 [docs/TEST_PLAN.md](docs/TEST_PLAN.md) (verification strategy). Keep both current: mark
 steps done and record decisions as they're made.
@@ -195,7 +199,7 @@ generator. Don't paste the number.
 Working now: `cargo build`, `test`, `clippy`, `fmt`, `deny`, `vet`, and `fuzz`, and the
 xtask commands `vendor`, `codegen`, `dist` (`--profile fedora`), `package`, `ref-openssl`, `abi-check`, `test-c`, `test-cve`,
 `test-apps`, `test-interop`, `test-differential`, `test-openssl-suite` (`evp_test`, `bntest`, `ectest`, `rsa_test`; libssl's programs with `--ssl`; the whole tree with `--all`, our CLI with `--cli ours`),
-`test-wycheproof`, `test-bogo`, `test-tlsfuzzer`, `test-timing`, `test-providers`, `test-consumers` (`rust`, `ruby`, `pyca`, `node`, `ngtcp2`, `curl-h3`), `test-quic-interop`, `test-distro`, `coverage`, and `usage-scan`.
+`test-wycheproof`, `test-bogo`, `test-tlsfuzzer`, `test-timing`, `test-providers`, `test-consumers` (`rust`, `ruby`, `pyca`, `node`, `ngtcp2`, `curl-h3`), `test-quic-interop`, `test-distro`, `bench`, `coverage`, and `usage-scan`.
 The other `cargo xtask` commands arrive later and fail with a message until then. Update this
 section when they change. CI (`.github/workflows/ci.yml`) runs the gates on every push.
 
@@ -308,6 +312,7 @@ cargo xtask test-bogo [pattern...]           # BoringSSL's runner with tests/bog
 cargo xtask test-tlsfuzzer [--timing] [script...]  # tlsfuzzer (tests/tlsfuzzer/scripts.txt) against s_server, both libraries -> target/tlsfuzzer-report.md
 cargo xtask test-providers [oqs|pkcs11|tpm2...]  # third-party providers (tests/providers/pins.txt) and their suites, both libraries
 cargo xtask test-timing [target...]          # dudect constant-time checks and Marvin's RSA split (tests/timing/dudect.c), both libraries
+cargo xtask bench [--quick] [--compare FILE] [speed|tls|misc...]  # performance against the reference: openssl speed and tests/bench/bench.c -> target/bench-report.md (docs/PERFORMANCE.md)
 cargo xtask test-consumers [--jobs N] [consumer...]  # rust-openssl, ruby/openssl, pyca/cryptography, Node.js, ngtcp2, curl-h3 suites (tests/consumers/pins.txt), both libraries -> target/consumers-report.md
 cargo xtask test-quic-interop [--peer P] [--reference-only] [case...]  # quic-interop-runner's core cases, OpenSSL's QUIC endpoint vs quiche/ngtcp2/quic-go (tests/quic-interop/pins.txt), both libraries -> target/quic-interop-report.md
 cargo +nightly miri test -p rustyssl-capi    # the unsafe FFI layer under Miri (and its doctests)

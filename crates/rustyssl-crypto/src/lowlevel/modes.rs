@@ -33,6 +33,12 @@ pub trait Cbc128 {
 pub trait Ctr128 {
     /// Encrypts (or decrypts) `blocks` blocks.
     fn ctr(&self, input: &[u8], out: &mut [u8], blocks: usize, iv: &[u8; BLOCK]);
+
+    /// [`Ctr128::ctr`] on `data` in place: the input there, the output there too.
+    fn ctr_in_place(&self, data: &mut [u8], blocks: usize, iv: &[u8; BLOCK]) {
+        let input = zeroize::Zeroizing::new(data.to_vec());
+        self.ctr(&input, data, blocks, iv);
+    }
 }
 
 /// A position in the current block past its end.
