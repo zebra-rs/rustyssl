@@ -13,6 +13,8 @@ on:
   schedule:
     - cron: "17 3 * * 1"
   workflow_dispatch:
+  # The release workflow (release.yml) runs the whole gate, on every runner, before it builds.
+  workflow_call:
 
 permissions:
   contents: read
@@ -30,7 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '["ubuntu-24.04", "ubuntu-24.04-arm", "macos-15"]' || '["ubuntu-24.04"]') }}
+        os: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.workflow == 'Release') && '["ubuntu-24.04", "ubuntu-24.04-arm", "macos-15"]' || '["ubuntu-24.04"]') }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -167,7 +169,7 @@ jobs:
       - run: cargo vet --locked
 
   fuzz:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.workflow == 'Release'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
