@@ -18,6 +18,7 @@ mod tests {
             .collect()
     }
 
+    #[allow(clippy::large_enum_variant)] // GCM keeps its keyed GHASH; only a test holds these
     enum Aead {
         Gcm(Gcm),
         Ccm(Ccm),

@@ -608,8 +608,9 @@ each release.
 
 ### L10: Performance and resources
 
-- **Benchmarks**, using `criterion` plus a C bench harness that follows the `openssl speed`
-  methodology:
+- **Benchmarks** (`cargo xtask bench`, docs/PERFORMANCE.md): upstream's `openssl speed` (the
+  reference's binary) run on each library, plus a C harness (`tests/bench/bench.c`) built against
+  each, for:
   - digests, ciphers, and AEADs at 16 B to 16 KiB
   - sign and verify ops/s and key-exchange/KEM ops/s per algorithm
   - the RSA keygen time distribution
@@ -618,9 +619,12 @@ each release.
   - memory per idle connection and per `SSL_CTX`
   - `OPENSSL_init_crypto` startup cost, DRBG throughput
   - multithreaded scaling (a shared `SSL_CTX`, session-cache and DRBG contention)
-- Everything is compared against the reference on the same dedicated runner. A slowdown of
-  **more than 5% against the `main` baseline blocks merges**. The release targets against the
-  reference are set after the first baseline (initial goals are in Implementation Plan 12.1).
+- Everything is compared against the reference on the same machine, medians of runs that
+  alternate the libraries. A slowdown of **more than 5% against the `main` baseline blocks
+  merges** on a dedicated runner: `cargo xtask bench --compare <baseline.json>` fails on one.
+  Shared CI runners are too noisy for that gate, so CI doesn't run it (docs/PERFORMANCE.md says
+  how to). The targets against the reference, set from the first baseline, are in
+  docs/PERFORMANCE.md and Implementation Plan 12.1.
 
 ### L11: Distro system tests (release gate)
 

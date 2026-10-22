@@ -37,6 +37,66 @@ struct Blind {
     counter: i32,
 }
 
+/// The Montgomery contexts made for a key's moduli, kept as OpenSSL keeps an `RSA`'s
+/// (`_method_mod_n`, `_method_mod_p`, `_method_mod_q`): shared by the key's copies (the
+/// snapshots of one key object), new for a new key. Each use checks the context's modulus
+/// against the key's, in constant time, so a key whose numbers change makes new ones.
+#[derive(Clone, Default)]
+pub struct MontCache(Arc<Mutex<Vec<Arc<Montgomery>>>>);
+
+/// How many contexts a key keeps (`n`, `p`, `q`, and a few more primes).
+const MONT_CACHE: usize = 8;
+
+impl MontCache {
+    /// The context for `m`: the kept one, or a new one (`consttime` for a secret modulus).
+    fn get(&self, m: &BigNum, consttime: bool) -> Option<Arc<Montgomery>> {
+        let same = |c: &Montgomery| {
+            let (a, b) = (c.modulus().limbs(), m.limbs());
+            a.len() == b.len() && ct::eq_limbs(a, b) != 0
+        };
+        let kept = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some(c) = kept.iter().find(|c| same(c)) {
+            return Some(Arc::clone(c));
+        }
+        drop(kept);
+        let made = if consttime {
+            Montgomery::new_consttime(m)
+        } else {
+            Montgomery::new(m)
+        };
+        let made = Arc::new(made.ok()?);
+        let mut kept = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        if kept.len() >= MONT_CACHE {
+            kept.remove(0);
+        }
+        kept.push(Arc::clone(&made));
+        Some(made)
+    }
+}
+
+/// `a * b mod m` for `a` and `b` of at most `m`'s limbs, fully reduced, in constant time: two
+/// Montgomery products, `(a b / R) R^2 / R`, the first below `R + m` and the second below `m`.
+fn mont_mul_mod(mont: &Montgomery, a: &[Limb], b: &[Limb]) -> Option<Vec<Limb>> {
+    let nl = mont.limbs();
+    if a.len() > nl || b.len() > nl {
+        return None;
+    }
+    let pad = |x: &[Limb]| {
+        let mut v = Zeroizing::new(x.to_vec());
+        v.resize(nl, 0);
+        v
+    };
+    let (a, b) = (pad(a), pad(b));
+    let mut rr = mont.rr().limbs().to_vec();
+    rr.resize(nl, 0);
+    let mut t = Zeroizing::new(vec![0; nl.saturating_mul(2).saturating_add(2)]);
+    let mut x = Zeroizing::new(vec![0; nl]);
+    let mut out = vec![0; nl];
+    mont.mul_into(&mut x, &a, &b, &mut t);
+    mont.mul_into(&mut out, &x, &rr, &mut t);
+    Some(out)
+}
+
 /// A key's blinding, made at its first private operation and kept, as OpenSSL keeps an
 /// `RSA`'s: shared by the key's copies (the snapshots of one key object), new for a new key.
 #[derive(Clone, Default)]
@@ -62,6 +122,8 @@ pub struct Key {
     pub blinding: bool,
     /// The blinding private operations use, once made.
     pub blinding_state: Blinding,
+    /// The Montgomery contexts of the key's moduli, once made.
+    pub mont: MontCache,
 }
 
 /// The number in `from`, big-endian.
@@ -122,8 +184,37 @@ impl Key {
 
     /// `f^e mod n` for `f < n` and an odd `n` (the public operations' `BN_MONT_CTX_set` of `n`
     /// fails first for an even one: `BN_mod_inverse`'s `BN_R_NO_INVERSE`).
-    fn public_op(n: &BigNum, e: &BigNum, f: &BigNum) -> Option<BigNum> {
+    fn public_op(&self, n: &BigNum, e: &BigNum, f: &BigNum) -> Option<BigNum> {
+        self.exp_mod_n(f, e, n)
+    }
+
+    /// `exp_mod`'s value for `f^e mod n` through the key's kept context for `n`, when `f`
+    /// is below an odd `n` and `e` isn't zero (`exp_mod` itself otherwise).
+    fn exp_mod_n(&self, f: &BigNum, e: &BigNum, n: &BigNum) -> Option<BigNum> {
+        if !e.is_zero()
+            && n.is_odd()
+            && !f.is_negative()
+            && bn::ucmp(f, n).is_lt()
+            && let Some(mont) = self.mont.get(n, false)
+        {
+            // The exponent is the public one.
+            return Some(mont.exp_public(f, e));
+        }
         exp_mod(f, e, n).ok()
+    }
+
+    /// `(a * b) mod m` over fixed lengths, in constant time, through the key's kept context
+    /// for `m` when there is one to make (else by division).
+    fn mul_mod_key(&self, a: &[Limb], b: &[Limb], m: &BigNum, consttime: bool) -> Vec<Limb> {
+        if m.is_odd()
+            && let Some(r) = self
+                .mont
+                .get(m, consttime)
+                .and_then(|mont| mont_mul_mod(&mont, a, b))
+        {
+            return r;
+        }
+        Self::mul_mod(a, b, m.limbs())
     }
 
     /// `BN_BLINDING_create_param`: a random invertible `r` (32 tries after the first), and
@@ -210,7 +301,7 @@ impl Key {
                 let nl = n.limbs();
                 let sq = |x: &BigNum| {
                     let xf = fixed(x, nl.len());
-                    BigNum::from_limbs(false, Self::mul_mod(&xf, &xf, nl))
+                    BigNum::from_limbs(false, self.mul_mod_key(&xf, &xf, n, false))
                 };
                 b.a = sq(&b.a).map_err(|_| ())?;
                 b.ai = sq(&b.ai).map_err(|_| ())?;
@@ -248,7 +339,7 @@ impl Key {
             }
             let (n, d) = (self.n.as_ref()?, self.d.as_ref()?);
             let i = BigNum::from_limbs(false, reduce(i.limbs(), n.limbs())).ok()?;
-            Some(Montgomery::new(n).ok()?.exp_consttime(&i, d.limbs()))
+            Some(self.mont.get(n, false)?.exp_consttime(&i, d.limbs()))
         })
     }
 
@@ -270,8 +361,8 @@ impl Key {
         if pl.is_empty() || ql.is_empty() {
             return None;
         }
-        let mont_p = Montgomery::new_consttime(p).ok()?;
-        let mont_q = Montgomery::new_consttime(q).ok()?;
+        let mont_p = self.mont.get(p, true)?;
+        let mont_q = self.mont.get(q, true)?;
         let r1 = BigNum::from_limbs(false, reduce(il, pl)).ok()?;
         let m1 = BigNum::from_limbs(false, reduce(il, ql)).ok()?;
         let r0 = mont_p.exp_consttime(&r1, dmp1.limbs());
@@ -290,7 +381,7 @@ impl Key {
         let r0p = fixed(&r0, pl.len());
         let m1p = reduce(m1.limbs(), pl);
         let h = sub_mod(&r0p, &m1p, pl);
-        let h = Self::mul_mod(&h, iqmp.limbs(), pl);
+        let h = self.mul_mod_key(&h, iqmp.limbs(), p, true);
         let mut r = add(&mul_fixed(&h, ql), &fixed(&m1, ql.len()));
         // The other primes: r += ((m_i - r) t_i mod r_i) * (p q r_0 ... r_{i-1}).
         let mut pp = mul_fixed(pl, ql);
@@ -305,11 +396,11 @@ impl Key {
         let mut r0 = BigNum::from_limbs(false, r).ok()?;
         // The fault check: r0^e must give i back, or the result is computed again with d.
         if let Some(e) = &self.e {
-            let vrfy = exp_mod(&r0, e, n).ok()?;
+            let vrfy = self.exp_mod_n(&r0, e, n)?;
             let (il, vl) = (fixed(i, n.top()), fixed(&vrfy, n.top()));
             if ct::eq_limbs(&il, &vl) == 0 {
                 let d = self.d.as_ref()?;
-                let mont_n = Montgomery::new(n).ok()?;
+                let mont_n = self.mont.get(n, false)?;
                 r0 = mont_n.exp_consttime(i, d.limbs());
             }
         }
@@ -348,7 +439,7 @@ impl Key {
             None
         };
         let fb = match &blind {
-            Some((a, _)) => Self::mul_mod(&fixed(f, nl.len()), &fixed(a, nl.len()), nl),
+            Some((a, _)) => self.mul_mod_key(&fixed(f, nl.len()), &fixed(a, nl.len()), n, false),
             None => fixed(f, nl.len()),
         };
         let Ok(fb) = BigNum::from_limbs(false, fb) else {
@@ -363,13 +454,15 @@ impl Key {
             let Some(d) = self.d.as_ref() else {
                 return Err(vec![Entry::raised(func, Reason::MissingPrivateKey)]);
             };
-            let Ok(mont) = Montgomery::new(n) else {
+            let Some(mont) = self.mont.get(n, false) else {
                 return Err(vec![Entry::raised(func, Reason::BnLib)]);
             };
             mont.exp_consttime(&fb, d.limbs())
         };
         let ret = match &blind {
-            Some((_, ai)) => Self::mul_mod(&fixed(&ret, nl.len()), &fixed(ai, nl.len()), nl),
+            Some((_, ai)) => {
+                self.mul_mod_key(&fixed(&ret, nl.len()), &fixed(ai, nl.len()), n, false)
+            }
             None => fixed(&ret, nl.len()),
         };
         BigNum::from_limbs(false, ret).map_err(|_| vec![Entry::raised(func, Reason::BnLib)])
@@ -413,7 +506,7 @@ impl Key {
         if !n.is_odd() {
             return fail("BN_mod_inverse", Reason::NoInverse);
         }
-        let Some(ret) = Self::public_op(n, e, &f) else {
+        let Some(ret) = self.public_op(n, e, &f) else {
             return silent();
         };
         match (i2osp(&ret, num), to.get_mut(..num)) {
@@ -623,7 +716,7 @@ impl Key {
         if !n.is_odd() {
             return fail("BN_mod_inverse", Reason::NoInverse);
         }
-        let Some(mut ret) = Self::public_op(n, e, &f) else {
+        let Some(mut ret) = self.public_op(n, e, &f) else {
             return silent();
         };
         if padding == Padding::X931 && ret.limbs().first().copied().unwrap_or(0) & 0xf != 12 {

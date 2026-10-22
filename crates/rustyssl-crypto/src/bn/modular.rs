@@ -48,6 +48,45 @@ pub fn exp_mod(base: &BigNum, p: &BigNum, m: &BigNum) -> Result<BigNum, Error> {
     Ok(div_rem(&r, &m)?.1)
 }
 
+/// [`exp_mod`] for a modulus that is public (a DH or DSA group's prime): its Montgomery context
+/// is kept for the process, as the named groups' primes come back again and again, so only the
+/// first exponentiation divides to find `R^2`. Never pass a secret modulus: it would be kept.
+pub fn exp_mod_public(base: &BigNum, p: &BigNum, m: &BigNum) -> Result<BigNum, Error> {
+    if p.is_zero()
+        || m.is_negative()
+        || !m.is_odd()
+        || base.is_negative()
+        || ucmp(base, m) != Ordering::Less
+    {
+        return exp_mod(base, p, m);
+    }
+    match public_mont(m) {
+        Some(mont) => Ok(mont.exp_consttime(base, p.limbs())),
+        None => exp_mod(base, p, m),
+    }
+}
+
+/// The kept Montgomery context of a public, odd, positive modulus.
+fn public_mont(m: &BigNum) -> Option<std::sync::Arc<Montgomery>> {
+    use std::sync::{Arc, Mutex, PoisonError};
+    /// How many moduli are kept (the most recently made).
+    const KEPT: usize = 16;
+    static KEPT_MONT: Mutex<Vec<Arc<Montgomery>>> = Mutex::new(Vec::new());
+    {
+        let kept = KEPT_MONT.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some(c) = kept.iter().find(|c| cmp(c.modulus(), m).is_eq()) {
+            return Some(Arc::clone(c));
+        }
+    }
+    let made = Arc::new(Montgomery::new(m).ok()?);
+    let mut kept = KEPT_MONT.lock().unwrap_or_else(PoisonError::into_inner);
+    if kept.len() >= KEPT {
+        kept.remove(0);
+    }
+    kept.push(Arc::clone(&made));
+    Some(made)
+}
+
 /// `BN_mod_exp2_mont`'s value for an odd `m`: `(a1 mod m)^|p1| * (a2 mod m)^|p2|` reduced
 /// modulo `n` (the Montgomery modulus), where each `a mod m` is `BN_mod`'s (signed, so a
 /// negative base gives a negative result for an odd power); 1 when both powers are 0, and 0

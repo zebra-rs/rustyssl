@@ -256,6 +256,9 @@ pub(crate) unsafe extern "C" fn name_free(p: *mut c_void) {
 /// A context (`SSL_CTX`, shared by reference).
 pub(crate) struct Ctx {
     references: AtomicI32,
+    /// What the providers offer for TLS (groups, signature algorithms), found at first use and
+    /// shared by the context's connections.
+    pub(crate) tls_found: std::sync::Arc<super::tls_provider::Discovered>,
     /// The library context algorithms come from (not owned).
     pub(crate) libctx: *mut OSSL_LIB_CTX,
     /// The property query, or `None`.
@@ -585,6 +588,7 @@ ffi_export! {
             ex_data: UnsafeCell::new(unsafe { core::mem::zeroed() }),
             state: Mutex::new(state),
             cache: super::sess_cache::Cache::new(),
+            tls_found: std::sync::Arc::default(),
         });
         // SAFETY: the new context.
         let Some(x) = (unsafe { ctx(c) }) else { return ptr::null_mut() };

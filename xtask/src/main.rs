@@ -8,6 +8,7 @@
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 
 mod abi_check;
+mod bench;
 mod codegen;
 mod coverage;
 mod dist;
@@ -64,7 +65,7 @@ const COMMANDS: &[(&str, &str)] = &[
     ("test-timing", "dudect's constant-time checks (and Marvin's RSA split) on both libraries"),
     ("test-consumers", "consumers' own test suites (rust-openssl, ...) built against the reference, on both libraries"),
     ("regen-golden", "regenerate golden files from the reference OpenSSL"),
-    ("bench", "benchmark against the reference OpenSSL"),
+    ("bench", "performance against the reference: speed, handshakes, memory, threads -> target/bench-report.md"),
 ];
 
 fn main() -> ExitCode {
@@ -97,6 +98,7 @@ fn main() -> ExitCode {
         Some("test-wycheproof") => report("test-wycheproof", test_wycheproof::run(&rest)),
         Some("test-timing") => report("test-timing", test_timing::run(&rest)),
         Some("unsafe-audit") => report("unsafe-audit", unsafe_audit::run(&rest)),
+        Some("bench") => report("bench", bench::run(&rest)),
         Some("usage-scan") => report("usage-scan", usage_scan::run(&rest)),
         Some("vendor") => report("vendor", vendor::run(&rest)),
         Some(name) if COMMANDS.iter().any(|(known, _)| *known == name) => {

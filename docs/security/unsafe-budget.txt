@@ -67,7 +67,7 @@ crates/rustyssl-capi/pkcs12 574 135 0 0 6
 crates/rustyssl-capi/pkcs7 647 145 0 0 4
 crates/rustyssl-capi/pkcs8_crypt 67 15 0 0 0
 crates/rustyssl-capi/property 18 7 0 0 0
-crates/rustyssl-capi/provider 4444 1365 19 0 5
+crates/rustyssl-capi/provider 4451 1365 19 0 5
 crates/rustyssl-capi/pvkfmt 122 27 0 0 0
 crates/rustyssl-capi/rand 9 0 0 0 0
 crates/rustyssl-capi/rand_file 9 3 0 0 0
@@ -83,7 +83,7 @@ crates/rustyssl-capi/secure 26 16 2 0 0
 crates/rustyssl-capi/self_test 13 7 0 0 0
 crates/rustyssl-capi/sleep 0 1 0 0 0
 crates/rustyssl-capi/srp 231 41 2 0 1
-crates/rustyssl-capi/ssl 3040 955 29 1 14
+crates/rustyssl-capi/ssl 3041 956 29 1 14
 crates/rustyssl-capi/stack 72 39 2 0 1
 crates/rustyssl-capi/store 336 110 1 0 0
 crates/rustyssl-capi/string 45 18 0 0 0

@@ -274,6 +274,35 @@ unsafe fn process(
     let Some(c) = (unsafe { context(vctx) }) else {
         return 0;
     };
+    if let Aead::Gcm(g) = &mut *c
+        && op == Op::Update
+        && inl > 0
+        && outsize >= inl
+        && !in_.is_null()
+        && !out.is_null()
+        && !outl.is_null()
+        && g.in_place_ok()
+    {
+        // Data through GCM: the input moved to where the output goes (the two may overlap, or
+        // be one), then encrypted or decrypted there, with no copy of its own.
+        // SAFETY: the caller's guarantee: `in_` holds `inl` octets and `out` has room for
+        // `outsize`, at least `inl`; `ptr::copy` allows them to overlap.
+        unsafe { ptr::copy(in_, out, inl) };
+        // SAFETY: as above: `inl` octets of the output's room, which nothing else borrows (the
+        // input is only a pointer here).
+        let buf = unsafe { core::slice::from_raw_parts_mut(out, inl) };
+        return match g.update_in_place(buf) {
+            Ok(()) => {
+                // SAFETY: the caller's guarantee.
+                unsafe { outl.write(inl) };
+                1
+            }
+            Err(r) => {
+                raise_all(r, "ossl_gcm_stream_update");
+                0
+            }
+        };
+    }
     let io = Io {
         // SAFETY: the caller's guarantee.
         input: unsafe { arg(in_, inl) },

@@ -102,8 +102,8 @@ impl Rfc6979 {
 }
 
 /// The order's field, if its arithmetic works (an odd order above 2).
-fn order_field(order: &BigNum) -> Option<Fp> {
-    Fp::new(order)
+fn order_field(order: &BigNum) -> Option<std::sync::Arc<Fp>> {
+    super::fe::cached(order)
 }
 
 /// `k^-1 mod n` by Fermat's little theorem in constant time (`ec_field_inverse_mod_ord`), for
