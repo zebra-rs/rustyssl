@@ -141,6 +141,8 @@ jobs:
       - run: cargo xtask codegen
       # Also fails if an export is defined without a C conformance test that calls it.
       - run: cargo xtask coverage
+      # The unsafe budget (docs/security/unsafe-budget.txt) and the panic guard on every export.
+      - run: cargo xtask unsafe-audit
       - name: Fail if the committed generated code or docs/coverage.md differs
         run: git diff --exit-code
 

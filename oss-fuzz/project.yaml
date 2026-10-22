@@ -1,0 +1,11 @@
+# OSS-Fuzz's projects/rustyssl/project.yaml (README.md in this directory).
+homepage: "https://github.com/zebra-rs/rustyssl"
+main_repo: "https://github.com/zebra-rs/rustyssl.git"
+language: rust
+primary_contact: "kunihiro@zebra.dev"
+sanitizers:
+  - address
+fuzzing_engines:
+  - libfuzzer
+architectures:
+  - x86_64

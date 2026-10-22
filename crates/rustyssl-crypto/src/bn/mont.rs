@@ -29,6 +29,12 @@ fn mask(c: bool) -> Limb {
     Limb::from(c).wrapping_neg()
 }
 
+/// `m`, hidden from the optimizer so that a selection by it stays arithmetic: LLVM can turn a
+/// mask it can see through into a data-dependent branch (it did in the TLS CBC padding check).
+fn barrier(m: Limb) -> Limb {
+    core::hint::black_box(m)
+}
+
 /// All ones if `a == b`, else zero, without a branch on either.
 fn eq_mask(a: usize, b: usize) -> Limb {
     let d = u64::try_from(a ^ b).unwrap_or(1);
@@ -42,7 +48,8 @@ fn sub_into(out: &mut [Limb], a: &[Limb], b: &[Limb]) -> bool {
         let (d1, b1) = x.overflowing_sub(y);
         let (d2, b2) = d1.overflowing_sub(Limb::from(borrow));
         *o = d2;
-        borrow = b1 || b2;
+        // `|`, not `||`: no branch on the operands.
+        borrow = b1 | b2;
     }
     borrow
 }
@@ -151,8 +158,9 @@ impl Montgomery {
             }
             if let Some(top) = window.get_mut(nl) {
                 let v = c.wrapping_add(Limb::from(carry)).wrapping_add(*top);
-                // OpenSSL's carry: set if the sum wrapped.
-                carry = (carry || v != *top) && v <= *top;
+                // OpenSSL's carry: set if the sum wrapped (`|` and `&`, not the short-circuit
+                // operators, so no branch depends on the operands).
+                carry = (carry | (v != *top)) & (v <= *top);
                 *top = v;
             }
         }
@@ -162,7 +170,7 @@ impl Montgomery {
         // OpenSSL's `carry - borrow` as a mask: keep `ap` when it's all ones (no carry, a
         // borrow), take the difference when 0, and mix the two (as OpenSSL does, though no
         // input can reach it) when 1.
-        let sel = Limb::from(carry).wrapping_sub(Limb::from(borrow));
+        let sel = barrier(Limb::from(carry).wrapping_sub(Limb::from(borrow)));
         for (o, &a) in out.iter_mut().zip(ap) {
             *o = (sel & a) | (!sel & *o);
         }
@@ -242,7 +250,7 @@ impl Montgomery {
             let w = bits_at(exp, pos, step);
             let mut entry = vec![0; nl];
             for (i, t) in table.iter().enumerate() {
-                let m = eq_mask(i, w);
+                let m = barrier(eq_mask(i, w));
                 for (e, &x) in entry.iter_mut().zip(t) {
                     *e |= x & m;
                 }
@@ -254,7 +262,7 @@ impl Montgomery {
         // A final subtraction makes the result fully reduced, as OpenSSL's is.
         let mut reduced = vec![0; nl];
         let borrow = sub_into(&mut reduced, &out, np);
-        let keep = mask(borrow);
+        let keep = barrier(mask(borrow));
         for (r, &o) in reduced.iter_mut().zip(&out) {
             *r = (keep & o) | (!keep & *r);
         }

@@ -18,7 +18,8 @@ use core::ffi::{CStr, c_char, c_int, c_uint, c_void};
 use core::ptr;
 
 use rustyssl_abi::{
-    ERR_LIB_EVP, ERR_LIB_RSA, ERR_R_PASSED_INVALID_ARGUMENT, ERR_R_UNSUPPORTED, EVP_PKEY_CTX,
+    ERR_LIB_EVP, ERR_LIB_RSA, ERR_R_PASSED_INVALID_ARGUMENT, ERR_R_UNSUPPORTED,
+    EVP_PKEY_CTRL_DH_KDF_UKM, EVP_PKEY_CTRL_EC_KDF_UKM, EVP_PKEY_CTRL_RSA_OAEP_LABEL, EVP_PKEY_CTX,
     EVP_R_COMMAND_NOT_SUPPORTED, OSSL_PARAM, OSSL_PARAM_INTEGER, OSSL_PARAM_UNSIGNED_INTEGER,
     RSA_R_UNKNOWN_PADDING_TYPE,
 };
@@ -29,6 +30,7 @@ use super::{
 };
 use crate::err;
 use crate::evp::pkey_ctx::{self, PkeyCtx};
+use crate::mem;
 use crate::params::{
     OSSL_PARAM_get_int, OSSL_PARAM_get_octet_ptr, OSSL_PARAM_get_octet_string, OSSL_PARAM_get_uint,
     OSSL_PARAM_get_utf8_string, OSSL_PARAM_get_utf8_string_ptr, OSSL_PARAM_set_int,
@@ -63,6 +65,23 @@ struct Ctx<'a> {
     p2: P2,
     bufp: *mut c_void,
     name_buf: [u8; NAME_SIZE],
+    /// The copy of a parameter's octets the fixup made for the ctrl, or NULL: freed after the
+    /// ctrl unless the command took it ([`takes_octets`]).
+    copy: *mut c_void,
+}
+
+/// Whether a translation's ctrl, when it succeeds, keeps the octets `p2` points to (a "set0":
+/// the method frees them later), rather than copying them (a "set1"). The reference never frees
+/// the copy it makes for either kind; rustyssl frees it unless it was handed over. The set0
+/// commands are the KDF UKMs and the OAEP label, each for its key type: a command's number alone
+/// doesn't say, since `EVP_PKEY_ALG_CTRL + n` means something else for another key type (the
+/// scrypt salt, a set1 for any type, is `EC_KDF_UKM`'s number).
+fn takes_octets(tr: &Translation) -> bool {
+    tr.keytype1 != -1
+        && matches!(
+            tr.ctrl_num,
+            EVP_PKEY_CTRL_DH_KDF_UKM | EVP_PKEY_CTRL_EC_KDF_UKM | EVP_PKEY_CTRL_RSA_OAEP_LABEL
+        )
 }
 
 impl Ctx<'_> {
@@ -149,6 +168,14 @@ unsafe fn default_fixup(state: State, tr: Option<&Translation>, c: &mut Ctx<'_>)
                 // SAFETY: the caller's parameter; the locals.
                 let ok =
                     unsafe { OSSL_PARAM_get_octet_string(c.param, &raw mut p, 0, &raw mut used) };
+                if used == 0 && takes_octets(tr) {
+                    // No octets: NULL, which every set0 command takes as none (a method keeps an
+                    // empty buffer only as its pointer, which would otherwise be lost).
+                    // SAFETY: the block just allocated, or NULL.
+                    unsafe { mem::release(p) };
+                    p = ptr::null_mut();
+                }
+                c.copy = p;
                 c.p2 = P2::Ptr(p);
                 c.p1 = c_int::try_from(used).unwrap_or(c_int::MAX);
                 ok
@@ -602,14 +629,23 @@ pub(crate) unsafe fn params_to_ctrl(
             p2: P2::Ptr(ptr::null_mut()),
             bufp: ptr::null_mut(),
             name_buf: [0; NAME_SIZE],
+            copy: ptr::null_mut(),
         };
         // SAFETY: the caller's parameter.
         let mut ret = unsafe { fixup(State::Pre, tr, &mut c) };
+        let cmd = tr.map_or(0, |t| t.ctrl_num);
+        let mut kept = false;
         if ret > 0 && c.action != Action::None {
-            let cmd = tr.map_or(0, |t| t.ctrl_num);
             let p2 = c.p2();
             // SAFETY: the caller's context; what the command takes (as the fixup made it).
             ret = unsafe { super::ctrl(ctx, keytype, optype, cmd, c.p1, p2) };
+            kept = ret > 0 && tr.is_some_and(takes_octets);
+        }
+        if !kept {
+            // SAFETY: the fixup's copy (or NULL), which nothing else holds: the ctrl failed, or
+            // its command copies.
+            unsafe { mem::release(c.copy) };
+            c.copy = ptr::null_mut();
         }
         // The ctrl's answer goes back (0 too: some ctrls answer 0 for success).
         if ret >= 0 {

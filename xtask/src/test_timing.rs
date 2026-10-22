@@ -24,7 +24,8 @@ const TARGETS: &[(&str, u64)] = &[
     ("x25519", 100_000),
     ("x25519-derive", 100_000),
     ("x25519-ctx", 100_000),
-    ("bn-modexp-consttime", 40_000),
+    // 160,000: a 0.07% signal (redc's selection, fixed in Phase 12.2) only crossed 10 past 100,000.
+    ("bn-modexp-consttime", 160_000),
     ("ml-kem-decap", 100_000),
     ("ecdsa-sign", 40_000),
     ("rsa-raw-decrypt", 40_000),

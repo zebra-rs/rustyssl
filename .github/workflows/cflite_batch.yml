@@ -1,0 +1,25 @@
+# ClusterFuzzLite's daily batch fuzzing (oss-fuzz/README.md): every target, an hour in all.
+# A crash fails the job and uploads its reproducer as an artifact.
+name: ClusterFuzzLite batch fuzzing
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+permissions: read-all
+jobs:
+  batch:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Build the fuzz targets
+        id: build
+        uses: google/clusterfuzzlite/actions/build_fuzzers@v1
+        with:
+          language: rust
+          sanitizer: address
+      - name: Fuzz every target
+        uses: google/clusterfuzzlite/actions/run_fuzzers@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          fuzz-seconds: 3600
+          mode: batch
+          sanitizer: address

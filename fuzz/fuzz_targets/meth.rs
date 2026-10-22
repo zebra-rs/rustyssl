@@ -19,6 +19,9 @@ use std::ffi::CString;
 use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
+use rustyssl_abi::{
+    EVP_PKEY_CTRL_DH_KDF_UKM, EVP_PKEY_CTRL_EC_KDF_UKM, EVP_PKEY_CTRL_RSA_OAEP_LABEL,
+};
 // Linked for its exports, which the declarations below resolve to.
 use rustyssl_capi as _;
 
@@ -44,6 +47,7 @@ type DeriveFn = unsafe extern "C" fn(*mut Ctx, *mut u8, *mut usize) -> c_int;
 type GenFn = unsafe extern "C" fn(*mut Ctx, *mut c_void) -> c_int;
 
 unsafe extern "C" {
+    fn CRYPTO_free(p: *mut c_void, file: *const c_char, line: c_int);
     fn EVP_PKEY_meth_new(id: c_int, flags: c_int) -> *mut Meth;
     fn EVP_PKEY_meth_free(m: *mut Meth);
     fn EVP_PKEY_meth_add0(m: *const Meth) -> c_int;
@@ -97,15 +101,20 @@ unsafe extern "C" {
 struct Log {
     ret: c_int,
     octets: Option<Vec<u8>>,
+    /// The parameter being set is one whose ctrl takes its octets over (a "set0").
+    set0: bool,
     calls: usize,
 }
 
 thread_local! {
-    static LOG: RefCell<Log> = const { RefCell::new(Log { ret: 1, octets: None, calls: 0 }) };
+    static LOG: RefCell<Log> =
+        const { RefCell::new(Log { ret: 1, octets: None, set0: false, calls: 0 }) };
 }
 
-unsafe extern "C" fn ctrl(_: *mut Ctx, _: c_int, p1: c_int, p2: *mut c_void) -> c_int {
-    LOG.with_borrow_mut(|log| {
+unsafe extern "C" fn ctrl(_: *mut Ctx, cmd: c_int, p1: c_int, p2: *mut c_void) -> c_int {
+    let mut set0 = false;
+    let ret = LOG.with_borrow_mut(|log| {
+        set0 = log.set0;
         log.calls += 1;
         if let Some(want) = &log.octets
             && !p2.is_null()
@@ -116,7 +125,21 @@ unsafe extern "C" fn ctrl(_: *mut Ctx, _: c_int, p1: c_int, p2: *mut c_void) -> 
             assert_eq!(got, &want[..]);
         }
         log.ret
-    })
+    });
+    // A set0 parameter's command hands its octets over on success: a method frees them (a real
+    // one keeps them until its context is freed). The number alone doesn't say which command it
+    // is (`EVP_PKEY_ALG_CTRL + n` differs by key type), so only while such a parameter is set.
+    if ret > 0
+        && set0
+        && matches!(
+            cmd,
+            EVP_PKEY_CTRL_DH_KDF_UKM | EVP_PKEY_CTRL_EC_KDF_UKM | EVP_PKEY_CTRL_RSA_OAEP_LABEL
+        )
+    {
+        // SAFETY: the octets handed over, from the library's allocator, or NULL.
+        unsafe { CRYPTO_free(p2, c"meth.rs".as_ptr(), 0) };
+    }
+    ret
 }
 
 unsafe extern "C" fn ctrl_str(ctx: *mut Ctx, name: *const c_char, value: *const c_char) -> c_int {
@@ -245,6 +268,7 @@ fn param(ctx: *mut Ctx, input: &mut Input<'_>) {
     LOG.with_borrow_mut(|log| {
         log.calls = 0;
         log.octets = (set && kind == 3).then(|| octets.clone());
+        log.set0 = set && kind == 3 && (key == c"kdf-ukm" || key == c"oaep-label");
     });
     let r = if set {
         // SAFETY: the context; the array above.
@@ -255,7 +279,10 @@ fn param(ctx: *mut Ctx, input: &mut Input<'_>) {
     };
     assert!(r == 0 || r == 1);
     LOG.with_borrow(|log| assert!(log.calls <= 1));
-    LOG.with_borrow_mut(|log| log.octets = None);
+    LOG.with_borrow_mut(|log| {
+        log.octets = None;
+        log.set0 = false;
+    });
     // A string got is NUL-terminated within its room.
     if !set && kind == 2 {
         assert!(text.contains(&0));
