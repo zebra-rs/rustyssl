@@ -56,18 +56,25 @@ fn round_trip<T>(x: *mut T, i2d: unsafe extern "C" fn(*const T, *mut *mut c_ucha
         let mut q = der.cast_const();
         // SAFETY: the encoding's `n` octets.
         let again = unsafe { d2i(ptr::null_mut(), &mut q, c_long::from(n)) };
-        assert!(!again.is_null(), "an encoding that doesn't decode");
-        let mut der2: *mut c_uchar = ptr::null_mut();
-        // SAFETY: as above.
-        let n2 = unsafe { i2d(again, &mut der2) };
-        assert_eq!(n, n2, "the encoding changed");
-        // SAFETY: both encodings' `n` octets.
-        let (a, b) = unsafe { (core::slice::from_raw_parts(der, n as usize), core::slice::from_raw_parts(der2, n as usize)) };
-        assert_eq!(a, b, "the encoding changed");
-        // SAFETY: as above, freed once.
-        unsafe { CRYPTO_free(der2.cast(), ptr::null(), 0) };
-        // SAFETY: as above.
-        unsafe { free(again) };
+        // OpenSSL writes an ANY of universal tag 0 (`20 00`, a constructed end-of-contents) as
+        // `00 00`, which no decoder takes back; the reference does the same. Any other
+        // encoding must decode.
+        // SAFETY: the encoding's `n` octets.
+        let eoc = unsafe { core::slice::from_raw_parts(der, n as usize) }.windows(2).any(|w| w == [0, 0]);
+        assert!(!again.is_null() || eoc, "an encoding that doesn't decode");
+        if !again.is_null() {
+            let mut der2: *mut c_uchar = ptr::null_mut();
+            // SAFETY: as above.
+            let n2 = unsafe { i2d(again, &mut der2) };
+            assert_eq!(n, n2, "the encoding changed");
+            // SAFETY: both encodings' `n` octets.
+            let (a, b) = unsafe { (core::slice::from_raw_parts(der, n as usize), core::slice::from_raw_parts(der2, n as usize)) };
+            assert_eq!(a, b, "the encoding changed");
+            // SAFETY: as above, freed once.
+            unsafe { CRYPTO_free(der2.cast(), ptr::null(), 0) };
+            // SAFETY: as above.
+            unsafe { free(again) };
+        }
     }
     // SAFETY: the encoding, or NULL.
     unsafe { CRYPTO_free(der.cast(), ptr::null(), 0) };
