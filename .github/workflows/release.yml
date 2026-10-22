@@ -54,14 +54,18 @@ jobs:
       matrix:
         os: [ubuntu-24.04, ubuntu-24.04-arm]
     runs-on: ${{ matrix.os }}
-    container: rust:1.99.0-alpine
     steps:
-      - name: Build tools (musl's unwinder is Rust's on Alpine)
-        run: apk add --no-cache bash git gcc musl-dev binutils llvm-libunwind-dev tar
       - uses: actions/checkout@v7
-      - name: Install the toolchain from rust-toolchain.toml
-        run: rustup show
-      - run: cargo xtask package alpine
+      # Not a job container: JavaScript actions (checkout, upload-artifact) don't run in an
+      # Alpine container on arm64 runners, so only the build runs in Alpine.
+      - name: Build in Alpine (musl's unwinder is Rust's on Alpine)
+        run: |
+          docker run --rm -v "$PWD":/src -w /src rust:1.99.0-alpine sh -euc '
+            apk add --no-cache bash git gcc musl-dev binutils llvm-libunwind-dev tar
+            git config --global --add safe.directory /src
+            rustup show
+            cargo xtask package alpine
+          '
       - uses: actions/upload-artifact@v6
         with:
           name: packages-alpine-${{ matrix.os }}
