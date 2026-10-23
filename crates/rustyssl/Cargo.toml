@@ -1,0 +1,18 @@
+[package]
+name = "rustyssl"
+description = "Memory-safe drop-in replacement for OpenSSL 3's libcrypto and libssl; this crate only points to the releases"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage = "https://github.com/zebra-rs/rustyssl"
+readme = "README.md"
+keywords = ["openssl", "tls", "crypto", "ssl", "drop-in"]
+categories = ["cryptography", "network-programming"]
+# The only published crate (the name's placeholder). The others stay unpublished: their Rust
+# APIs are internal, and the drop-in libraries come from `cargo xtask dist`, not from cargo.
+publish = true
+
+[lints]
+workspace = true

@@ -375,6 +375,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustyssl"
+version = "1.0.0"
+
+[[package]]
 name = "rustyssl-abi"
 version = "1.0.0"
 dependencies = [

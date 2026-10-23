@@ -2,7 +2,10 @@
 
 A release is a `v<version>` tag on `main`. The tag runs `.github/workflows/release.yml`: the whole
 CI gate on Linux x86_64 and arm64 and macOS arm64, then the packages, then a **draft** GitHub
-release, which a maintainer checks and publishes. Nothing is published to crates.io.
+release, which a maintainer checks and publishes. On crates.io only the `rustyssl` crate is
+published: it has no API and holds the name, pointing to the releases (the user's decision,
+2026-10-23). The other crates keep `publish = false`: their Rust APIs are internal, and the
+drop-in libraries come from `cargo xtask dist`, not from cargo.
 
 ## Before tagging
 
@@ -47,6 +50,9 @@ The draft has, for `<version>`:
 
 ## After publishing
 
+- crates.io: `cargo publish -p rustyssl` from the tag, with the maintainer's token
+  (`cargo login`). A version can be published only once. (1.0.0 was published from `main`: the
+  crate was added after the tag.)
 - Homebrew: set `sha256` in `packaging/homebrew/rustyssl.rb` to the source tarball's (GitHub's
   `archive/refs/tags/v<version>.tar.gz`, which differs from `rustyssl-<version>-source.tar.gz`).
 - Start the next version's section in `CHANGELOG.md` (`## [Unreleased]`).
