@@ -5,7 +5,9 @@ All notable changes to rustyssl are recorded here. The format follows
 [Semantic Versioning](https://semver.org/). The C ABI is OpenSSL's 3.x ABI and doesn't change
 with rustyssl's version.
 
-## [1.0.0] - unreleased
+## [Unreleased]
+
+## [1.0.0] - 2026-10-23
 
 The first release: a memory-safe Rust reimplementation of OpenSSL 3.6.5's `libcrypto.so.3` and
 `libssl.so.3` (macOS: `lib*.3.dylib`) and of the `openssl` command-line tool, as drop-in binary
@@ -50,4 +52,5 @@ replacements. Applications built against OpenSSL 3.x run on it unchanged. See
 | M6 Full libcrypto | met (macOS and Linux) |
 | M7 1.0 | distribution tests, the CVE suite, the constant-time report, and the 1.0 performance targets are done; open: the external security audit (not done) and the M1, M3, and M4 items above |
 
+[Unreleased]: https://github.com/zebra-rs/rustyssl/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/zebra-rs/rustyssl/releases/tag/v1.0.0

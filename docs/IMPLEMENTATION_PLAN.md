@@ -6443,10 +6443,14 @@ The CLI's gaps closed (2026-10-21, local, branch `cli-gaps`, macOS arm64):
   through `DYLD_LIBRARY_PATH`; Homebrew's curl and Python 3.15 link `openssl@4`, so they can't
   use the 3.x ABI. Left: x86_64 containers (the same images; not run here), and Debian's and
   Ubuntu's apt over OpenSSL (it uses GnuTLS).
-- [~] **12.5 Release 1.0.** The ABI stability promise is OpenSSL's 3.x ABI. The Rust crates
+- [x] **12.5 Release 1.0.** The ABI stability promise is OpenSSL's 3.x ABI. The Rust crates
   follow SemVer.
-  *Prepared, not released (2026-10-22; the user's decision: everything is prepared, and the user
-  is asked before the tag).* Version 1.0.0 (the crates; `OpenSSL_version` reads
+  *Released (2026-10-23): the annotated tag `v1.0.0` on `478ca7d1` (the user's decisions: tag
+  1.0 with the open items documented; Ubuntu 22.04's OpenSSH 8.9 refusal is a documented
+  limitation; annotated, unsigned), the GitHub release with ten packages and `SHA256SUMS`
+  (checked before publishing), and the Homebrew formula's `sha256` set afterwards. The Alpine
+  arm64 job builds through `docker run`: GitHub's JavaScript actions don't run in an Alpine job
+  container on arm64 runners.* Prepared on 2026-10-22: Version 1.0.0 (the crates; `OpenSSL_version` reads
   `OpenSSL 3.6.5+rustyssl.1.0.0`; the ABI stays 3.6.5's); `CHANGELOG.md`;
   `docs/RELEASE-NOTES-1.0.md`; `docs/RELEASING.md` (pre-flight, tag, checking the draft,
   after publishing); `.github/workflows/release.yml` (a `v*` tag runs CI on every runner
