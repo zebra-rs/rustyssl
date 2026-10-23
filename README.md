@@ -96,6 +96,7 @@ crates/
                       OSSL_PARAM, ex_data, ERR queue, CRYPTO_malloc, the ASN1_ITEM template engine
   rustyssl-ossl/      the CLI's bindings: safe wrappers over the public C API (generated externs, loaded at run time)
   rustyssl-cli/       the `openssl` command-line tool (ADR 0007), `#![forbid(unsafe_code)]`
+  rustyssl/           no API: holds the name on crates.io and points to the releases (the only published crate)
 libs/
   libcrypto/          static archive, linked into libcrypto.so.3 by `cargo xtask dist`; contains the WHOLE implementation
   libssl/             static archive of generated forwarders, linked into libssl.so.3; no implementation of its own
