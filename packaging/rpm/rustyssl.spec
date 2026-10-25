@@ -5,7 +5,7 @@
 
 Name:           rustyssl
 Version:        3.6.5
-Release:        1.0.0%{?dist}
+Release:        1.0.1%{?dist}
 Summary:        Memory-safe drop-in replacement for OpenSSL's libraries
 License:        Apache-2.0
 URL:            https://github.com/zebra-rs/rustyssl
@@ -43,6 +43,9 @@ fi
 %config(noreplace) %{_sysconfdir}/pki/tls/ct_log_list.cnf.dist
 
 %changelog
+* Sat Oct 24 2026 rustyssl developers <rustyssl@localhost> - 3.6.5-1.0.1
+- rustyssl 1.0.1: ctutils 0.4.5 (RUSTSEC-2026-0385, constant-time masks).
+
 * Thu Oct 22 2026 rustyssl developers <rustyssl@localhost> - 3.6.5-1.0.0
 - rustyssl 1.0.0.
 

@@ -420,14 +420,14 @@ dependencies = [
 
 [[package]]
 name = "rustyssl-abi"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "libc",
 ]
 
 [[package]]
 name = "rustyssl-asn1"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "rustyssl-abi",
  "zeroize",
@@ -435,7 +435,7 @@ dependencies = [
 
 [[package]]
 name = "rustyssl-capi"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "libc",
  "rustyssl-abi",
@@ -450,11 +450,11 @@ dependencies = [
 
 [[package]]
 name = "rustyssl-conf"
-version = "1.0.0"
+version = "1.0.1"
 
 [[package]]
 name = "rustyssl-crypto"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "aes",
  "aria",
@@ -506,7 +506,7 @@ dependencies = [
 
 [[package]]
 name = "rustyssl-pki"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "rustyssl-asn1",
  "rustyssl-crypto",
@@ -514,7 +514,7 @@ dependencies = [
 
 [[package]]
 name = "rustyssl-quic"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "rustyssl-abi",
  "rustyssl-crypto",
@@ -525,7 +525,7 @@ dependencies = [
 
 [[package]]
 name = "rustyssl-tls"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "rustyssl-abi",
  "rustyssl-asn1",

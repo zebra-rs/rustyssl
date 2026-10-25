@@ -6461,6 +6461,8 @@ The CLI's gaps closed (2026-10-21, local, branch `cli-gaps`, macOS arm64):
   constant-time report, and the 1.0 performance targets are done; open are the external audit
   (not done), M1's 24-hour EVP campaign, M3's OpenSSH regression suite, and M4's nginx-tests,
   curl TLS tests, and CPython `test_ssl` (CHANGELOG.md's milestone table).
+  *1.0.1 (2026-10-24, the user's decision):* a security release for RUSTSEC-2026-0385 (`ctutils`
+  0.4.5, #221), nothing else changed.
   *crates.io (2026-10-23, the user's decision):* only `crates/rustyssl` is published, a crate
   with no API that holds the name and points to the releases. The other crates stay unpublished:
   their Rust APIs are internal, and the drop-in libraries come from `cargo xtask dist`.

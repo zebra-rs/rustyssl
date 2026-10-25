@@ -7,6 +7,15 @@ with rustyssl's version.
 
 ## [Unreleased]
 
+## [1.0.1] - unreleased
+
+### Security
+
+- `ctutils` 0.4.3 → 0.4.5, for [RUSTSEC-2026-0385](https://rustsec.org/advisories/RUSTSEC-2026-0385):
+  before 0.4.4, `ctutils::Choice`'s mask functions could compile to a branch on a secret value,
+  and its `u128` comparisons branched on 32-bit targets. RustCrypto's `digest` (MAC verification)
+  and `universal-hash` (Poly1305, POLYVAL/GHASH) use it. No API or ABI change.
+
 ## [1.0.0] - 2026-10-23
 
 The first release: a memory-safe Rust reimplementation of OpenSSL 3.6.5's `libcrypto.so.3` and
@@ -52,5 +61,6 @@ replacements. Applications built against OpenSSL 3.x run on it unchanged. See
 | M6 Full libcrypto | met (macOS and Linux) |
 | M7 1.0 | distribution tests, the CVE suite, the constant-time report, and the 1.0 performance targets are done; open: the external security audit (not done) and the M1, M3, and M4 items above |
 
-[Unreleased]: https://github.com/zebra-rs/rustyssl/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/zebra-rs/rustyssl/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/zebra-rs/rustyssl/releases/tag/v1.0.1
 [1.0.0]: https://github.com/zebra-rs/rustyssl/releases/tag/v1.0.0

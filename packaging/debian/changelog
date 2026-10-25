@@ -1,3 +1,9 @@
+rustyssl (3.6.5+rustyssl1.0.1-1) unstable; urgency=high
+
+  * rustyssl 1.0.1: ctutils 0.4.5 (RUSTSEC-2026-0385, constant-time masks).
+
+ -- rustyssl developers <rustyssl@localhost>  Sat, 24 Oct 2026 00:00:00 +0000
+
 rustyssl (3.6.5+rustyssl1.0.0-1) unstable; urgency=medium
 
   * rustyssl 1.0.0: OpenSSL 3.6.5's ABI, side by side with the system's OpenSSL.
