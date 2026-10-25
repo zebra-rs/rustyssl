@@ -15,8 +15,10 @@ drop-in libraries come from `cargo xtask dist`, not from cargo.
 3. The version: `version` in the workspace's `Cargo.toml` (it becomes `+rustyssl.<version>` in
    `OpenSSL_version()`), the entries in `packaging/debian/changelog` and
    `packaging/rpm/rustyssl.spec`, and `url` in `packaging/homebrew/rustyssl.rb`.
-4. `CHANGELOG.md` has the version's section with its date, and the release notes
-   (`docs/RELEASE-NOTES-<major.minor>.md`, which `release.yml` attaches) are current.
+4. `CHANGELOG.md` has the version's section with its date, and the version has its own release
+   notes, `docs/RELEASE-NOTES-<version>.md` (`release.yml` makes them the release's description,
+   and a dry run fails without them). They describe that release only: a patch release's notes
+   say what changed since the last one and link to the earlier releases for the rest.
 5. A dry run: Actions → Release → Run workflow on `main`. It runs everything but the draft and
    keeps the packages as the `release-dry-run` artifact; check them as below.
 

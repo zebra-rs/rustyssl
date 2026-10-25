@@ -21,7 +21,7 @@ with rustyssl's version.
 The first release: a memory-safe Rust reimplementation of OpenSSL 3.6.5's `libcrypto.so.3` and
 `libssl.so.3` (macOS: `lib*.3.dylib`) and of the `openssl` command-line tool, as drop-in binary
 replacements. Applications built against OpenSSL 3.x run on it unchanged. See
-[docs/RELEASE-NOTES-1.0.md](docs/RELEASE-NOTES-1.0.md).
+[docs/RELEASE-NOTES-1.0.0.md](docs/RELEASE-NOTES-1.0.0.md).
 
 ### Added
 

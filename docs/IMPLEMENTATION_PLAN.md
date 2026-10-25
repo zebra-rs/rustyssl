@@ -6452,7 +6452,7 @@ The CLI's gaps closed (2026-10-21, local, branch `cli-gaps`, macOS arm64):
   arm64 job builds through `docker run`: GitHub's JavaScript actions don't run in an Alpine job
   container on arm64 runners.* Prepared on 2026-10-22: Version 1.0.0 (the crates; `OpenSSL_version` reads
   `OpenSSL 3.6.5+rustyssl.1.0.0`; the ABI stays 3.6.5's); `CHANGELOG.md`;
-  `docs/RELEASE-NOTES-1.0.md`; `docs/RELEASING.md` (pre-flight, tag, checking the draft,
+  `docs/RELEASE-NOTES-1.0.0.md`; `docs/RELEASING.md` (pre-flight, tag, checking the draft,
   after publishing); `.github/workflows/release.yml` (a `v*` tag runs CI on every runner
   (`ci.yml` is callable), builds the debian, fedora, and el packages on Ubuntu 22.04 x86_64 and
   arm64, alpine in its container, homebrew on macOS 15, adds the source tarball and
@@ -6467,7 +6467,8 @@ The CLI's gaps closed (2026-10-21, local, branch `cli-gaps`, macOS arm64):
   publishing), and the Homebrew formula's `sha256` set afterwards. Three tests that depended
   on chance were made deterministic first (#223: RSA implicit rejection's random-length
   message in CRMF, and `verify_recover` on a fresh key; #224: `ocsp -multi`'s log, which the
-  reference's processes interleave).
+  reference's processes interleave). The release's description was at first the 1.0 series'
+  notes, 1.0.0's included; each release now has its own, `docs/RELEASE-NOTES-<version>.md`.
   *crates.io (2026-10-23, the user's decision):* only `crates/rustyssl` is published, a crate
   with no API that holds the name and points to the releases. The other crates stay unpublished:
   their Rust APIs are internal, and the drop-in libraries come from `cargo xtask dist`.
