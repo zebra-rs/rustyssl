@@ -29,7 +29,7 @@ which library a program loaded:
 
 ```console
 $ LD_LIBRARY_PATH=$HOME/rustyssl/target/dist/lib openssl version
-OpenSSL 3.0.2 15 Mar 2022 (Library: OpenSSL 3.6.5+rustyssl.1.0.0 29 Sep 2026)
+OpenSSL 3.0.2 15 Mar 2022 (Library: OpenSSL 3.6.5+rustyssl.1.0.1 29 Sep 2026)
 ```
 
 (That is Ubuntu's own `openssl` binary, 3.0.2, running on rustyssl's library.)
@@ -169,7 +169,7 @@ rustyssl's: upstream OpenSSL 3.6 is refused the same way. OpenSSH 9.4 and later 
 
 ```sh
 LD_LIBRARY_PATH=$R ssh -V
-#   OpenSSH_9.6p1 Ubuntu-3ubuntu13.x, OpenSSL 3.6.5+rustyssl.1.0.0 29 Sep 2026
+#   OpenSSH_9.6p1 Ubuntu-3ubuntu13.x, OpenSSL 3.6.5+rustyssl.1.0.1 29 Sep 2026
 
 LD_LIBRARY_PATH=$R ssh -c aes256-gcm@openssh.com -o KexAlgorithms=ecdh-sha2-nistp256 \
     -o HostKeyAlgorithms=ecdsa-sha2-nistp256 -i ~/.ssh/id_ecdsa user@host

@@ -4,7 +4,7 @@
 //! same `MAJOR.MINOR.PATCH`, and the same release date, all from the vendored headers. It names
 //! itself in the build metadata, the part of the version OpenSSL reserves "for other parties,
 //! such as `+fips`, or `+vendor.1`": `+rustyssl.<version>`. So `OpenSSL_version(OPENSSL_VERSION)`
-//! reads `OpenSSL 3.6.5+rustyssl.1.0.0 29 Sep 2026`, which version parsers accept and people and
+//! reads `OpenSSL 3.6.5+rustyssl.1.0.1 29 Sep 2026`, which version parsers accept and people and
 //! vulnerability scanners can tell apart from OpenSSL (docs/DEVIATIONS.md).
 //!
 //! The directories are those of OpenSSL's default build for the target (`/usr/local/ssl` and
