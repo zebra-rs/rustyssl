@@ -898,7 +898,9 @@ static void crmf_encrypted_value(void)
         0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00, 0x03, 0x09, 0x00, 1, 2, 3, 4, 5, 6, 7, 8};
     const unsigned char *p = der;
     OSSL_CRMF_ENCRYPTEDVALUE *ev = d2i_OSSL_CRMF_ENCRYPTEDVALUE(NULL, &p, sizeof(der));
-    EVP_PKEY *key = rsa_key(2048);
+    /* A fixed key: with a fresh one, RSA's implicit rejection gives a synthetic symmetric key of
+     * random length, which is 16 octets (the IV check then fails instead) for about 1 in 245. */
+    EVP_PKEY *key = read_key("rsa2048.pem");
     X509 *cert = ev != NULL ? OSSL_CRMF_ENCRYPTEDVALUE_get1_encCert(ev, NULL, NULL, key) : NULL;
 
     check(ev != NULL && cert == NULL,
