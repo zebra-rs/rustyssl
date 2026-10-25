@@ -5,6 +5,7 @@ class Rustyssl < Formula
   desc "Memory-safe drop-in replacement for OpenSSL's libraries"
   homepage "https://github.com/zebra-rs/rustyssl"
   url "https://github.com/zebra-rs/rustyssl/archive/refs/tags/v1.0.1.tar.gz"
+  sha256 "24ef11ebf6938e726f99e6bd6f1deb20e9f8a29545a1581f6edb3664965a877b"
   license "Apache-2.0"
 
   keg_only "it provides the same libraries as openssl@3"
