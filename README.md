@@ -20,6 +20,9 @@ To try it: [docs/TRY-ON-UBUNTU.md](docs/TRY-ON-UBUNTU.md) (build it, run program
 `LD_LIBRARY_PATH`, or install it side by side on Ubuntu 22.04 and 24.04);
 [docs/MIGRATION.md](docs/MIGRATION.md) for other distributions.
 
+Why a Rust drop-in, and how its claims are checked (Miri, fuzzing, every OpenSSL CVE):
+[docs/WHY-RUSTYSSL.md](docs/WHY-RUSTYSSL.md).
+
 Plans: [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) (phased steps) and
 [docs/TEST_PLAN.md](docs/TEST_PLAN.md) (verification strategy). Keep both current: mark
 steps done and record decisions as they're made.
