@@ -27,7 +27,8 @@
 //! - `&`: a server (`ocsp -port`, `cmp -port`): it starts in the background, the next line runs
 //!   once it has printed its `ACCEPT` line, and then both outputs are compared (the server must
 //!   exit by itself, as with `-nrequest 1`; an `ocsp -multi` server, which runs until a signal,
-//!   gets `SIGTERM` in its process group half a second after the client ends);
+//!   gets `SIGTERM` in its process group half a second after the client ends, and its log is
+//!   compared as [`multi_log`] puts it);
 //! - `^`: the times within a few days of now (a reply made now) are masked.
 //!
 //! `{fresh:NAME}` in an argument is `fresh/NAME` in the work directory, a pristine copy of the
@@ -768,7 +769,13 @@ fn run_pair(
     let stdout = out_thread.join().unwrap_or_default();
     let stderr = err_thread.join().unwrap_or_default();
     let mut text = String::from_utf8_lossy(&stdout).into_owned();
-    text.push_str(&String::from_utf8_lossy(&stderr));
+    let log = String::from_utf8_lossy(&stderr);
+    match server.args.first() {
+        Some(prog) if server.args.iter().any(|a| a == "-multi") => {
+            text.push_str(&multi_log(&log, prog));
+        }
+        _ => text.push_str(&log),
+    }
     text.push_str(&format!("[{status}]\n"));
     let server_out = Output {
         stdout,
@@ -777,6 +784,27 @@ fn run_pair(
         ok: status.success(),
     };
     Ok((server_out, got))
+}
+
+/// An `ocsp -multi` server's log in an order of its own: each line without the `PROG: `
+/// prefixes it starts with, sorted, then prefixed once. The parent and its responders log to
+/// one standard error at once, and upstream's prefix BIO writes the prefix and the line in two
+/// `write`s, so the reference's lines come in any order, with two prefixes on one line and
+/// none on another (`ocsp: ocsp: waiting...` then `waiting...`); ours write a line at once.
+/// Only the lines' text, which each process writes in one `write`, is the same on every run.
+fn multi_log(log: &str, prog: &str) -> String {
+    let prefix = format!("{prog}: ");
+    let mut lines: Vec<&str> = log
+        .lines()
+        .map(|mut l| {
+            while let Some(rest) = l.strip_prefix(&prefix) {
+                l = rest;
+            }
+            l
+        })
+        .collect();
+    lines.sort_unstable();
+    lines.iter().map(|l| format!("{prefix}{l}\n")).collect()
 }
 
 /// [`check`] for a server line and its client line.
@@ -1071,6 +1099,20 @@ fn check_help_goldens(root: &Path, setup: &Setup, list: &str, bless: bool) -> Re
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn multi_logs_in_any_interleaving_agree() {
+        let w = "waiting for OCSP client connections...";
+        let t = "terminating on signal: 15";
+        let apart = format!("ocsp: {w}\nocsp: {w}\nocsp: {t}\n");
+        let interleaved = format!("ocsp: ocsp: {w}\n{w}\nocsp: {t}\n");
+        let reordered = format!("ocsp: {t}\nocsp: {w}\nocsp: {w}\n");
+        let want = format!("ocsp: {t}\nocsp: {w}\nocsp: {w}\n");
+        for log in [apart, interleaved, reordered] {
+            assert_eq!(multi_log(&log, "ocsp"), want);
+        }
+        assert_eq!(multi_log("", "ocsp"), "");
+    }
 
     #[test]
     fn masking() {
