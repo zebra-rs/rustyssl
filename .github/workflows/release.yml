@@ -109,6 +109,10 @@ jobs:
           version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
           # Each release has its own notes (docs/RELEASING.md); a dry run fails without them.
           test -f "docs/RELEASE-NOTES-$version.md"
+          if grep -n '^# ' "docs/RELEASE-NOTES-$version.md"; then
+            echo "the release's title is GitHub's; its notes have no '#' title" >&2
+            exit 1
+          fi
           mkdir dist
           # rustyssl-<OpenSSL version>-<layout>-<arch>.tar.gz -> rustyssl-<version>-<layout>-<arch>.tar.gz
           for f in packages/*.tar.gz; do

@@ -18,7 +18,9 @@ drop-in libraries come from `cargo xtask dist`, not from cargo.
 4. `CHANGELOG.md` has the version's section with its date, and the version has its own release
    notes, `docs/RELEASE-NOTES-<version>.md` (`release.yml` makes them the release's description,
    and a dry run fails without them). They describe that release only: a patch release's notes
-   say what changed since the last one and link to the earlier releases for the rest.
+   say what changed since the last one and link to the earlier releases for the rest. GitHub
+   shows the release's title above them and keeps their line breaks, so they have no `#` title
+   and put each paragraph and list item on one line.
 5. A dry run: Actions → Release → Run workflow on `main`. It runs everything but the draft and
    keeps the packages as the `release-dry-run` artifact; check them as below.
 
