@@ -7,7 +7,7 @@ with rustyssl's version.
 
 ## [Unreleased]
 
-## [1.0.1] - unreleased
+## [1.0.1] - 2026-10-25
 
 ### Security
 
