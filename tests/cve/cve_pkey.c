@@ -128,20 +128,17 @@ static void signature_forgery(void)
     static const unsigned char prefix[] = {0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48,
                                            0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05, 0x00, 0x04,
                                            0x20};
-    EVP_PKEY_CTX *kctx = EVP_PKEY_CTX_new_from_name(NULL, "RSA", NULL);
-    EVP_PKEY *key = NULL;
-    BIGNUM *e3 = BN_new(), *target, *s;
+    /* A fixed e = 3 key: with a fresh one, the garbage signature below recovers a random
+     * block, whose first octet is zero (BLOCK_TYPE_IS_NOT_01, not INVALID_PADDING) for
+     * about 1 key in 200. */
+    EVP_PKEY *key = read_key("rsa2048-e3.pem");
+    BIGNUM *target, *s;
     BN_CTX *bn = BN_CTX_new();
     unsigned char em[256], hash[32], sig[256];
     size_t at = 0;
     int r1, r2;
     EVP_MD_CTX *md = EVP_MD_CTX_new();
 
-    BN_set_word(e3, 3);
-    EVP_PKEY_keygen_init(kctx);
-    EVP_PKEY_CTX_set_rsa_keygen_bits(kctx, 2048);
-    EVP_PKEY_CTX_set1_rsa_keygen_pubexp(kctx, e3);
-    EVP_PKEY_keygen(kctx, &key);
     SHA256((const unsigned char *)"forged", 6, hash);
 
     /* 00 01 FF 00 DigestInfo hash, then garbage: a cube root's cube keeps this prefix. */
@@ -191,10 +188,8 @@ static void signature_forgery(void)
     EVP_MD_CTX_free(md);
     BN_free(target);
     BN_free(s);
-    BN_free(e3);
     BN_CTX_free(bn);
     EVP_PKEY_free(key);
-    EVP_PKEY_CTX_free(kctx);
 }
 
 static void implicit_rejection(void)

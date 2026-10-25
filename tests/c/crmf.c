@@ -428,8 +428,23 @@ static void encrypted(EVP_PKEY *k, X509 *ee)
     {
         EVP_PKEY *wrong = EVP_PKEY_Q_keygen(NULL, NULL, "RSA", (size_t)2048);
 
+        unsigned long e;
+        int first = 1, expected = 0;
+
         check(OSSL_CRMF_ENCRYPTEDVALUE_decrypt(ev, NULL, NULL, wrong, &outlen) == NULL, "the wrong key");
-        errors();
+        /* Implicit rejection: the wrong key's RSA decryption yields a synthetic key of random
+         * length, so whether the failure is reported as the key's (when that length isn't 16)
+         * or as the content's (about 1 in 245 keys) varies by key, on the reference too. */
+        while ((e = ERR_get_error()) != 0) {
+            if (first)
+                expected = ERR_GET_LIB(e) == ERR_LIB_CRMF
+                    && ERR_GET_REASON(e) == CRMF_R_ERROR_DECRYPTING_SYMMETRIC_KEY;
+            first = 0;
+            if (ERR_GET_LIB(e) == ERR_LIB_CRMF
+                && ERR_GET_REASON(e) == CRMF_R_ERROR_DECRYPTING_ENCRYPTEDVALUE)
+                expected = 1;
+        }
+        check(expected, "the wrong key: the symmetric key or the content fails to decrypt");
         EVP_PKEY_free(wrong);
     }
 
